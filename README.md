@@ -25,7 +25,10 @@ Open `index.html` in a browser. It's one self-contained file with no downloads o
 - `src/level.js`: the store (furniture builders and layout)
 - `src/game.js`: player, Krampus (A* across both floors), brother, clues, traps, lights, HUD, audio, touch controls
 - `tools/build.py`: inlines `src/` into `index.html`. Run it after editing anything in `src/`.
-- `tools/shots.py`, `tools/sim.py`: headless screenshot and gameplay checks (Playwright + Chrome)
+- `tools/shots.py`, `tools/sim.py`, `tools/escape_sim.py`: headless screenshot, gameplay and finale checks (Playwright + Chrome)
 
-## Not built yet
-The opening and ending cutscenes (the family arriving at closing, the manager's warning, the skylight crash, the escape) are story text for now.
+## Story
+The full script is in `docs/script.md`. In the game it plays as story cards: eight before the round (you can skip them) and three after you escape. The animated cutscenes and the playable 10-minute exploration with Leo aren't built yet.
+
+## Tuning
+`tools/escape_sim.py [easy|normal|hard] [trials]` autopilots the finale: it rescues Leo from a random spot and sprints the shortest route to the doors. With perfect steering, about every run escapes on Easy and Normal and about 9 in 10 on Hard, with Krampus closing to about 2.5 m on Normal. Real players will lose more.

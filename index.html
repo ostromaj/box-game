@@ -57,6 +57,15 @@
   body.touch #btnUse { display: none; }
   .story { font-size: 14.5px; max-width: 560px; }
   @media (max-height: 560px) { .story { font-size: 12px; } #obj { font-size: 11px; } }
+  #card { max-width: 600px; width: 100%; text-align: left; background: rgba(10,9,8,0.72); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; padding: 20px 24px; min-height: 180px; }
+  #cardWhere { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 12px; }
+  #cardBody p { margin: 0 0 10px; font-size: 15.5px; line-height: 1.5; }
+  #cardBody p.act { font-style: italic; opacity: 0.8; }
+  #cardBody b.who { display: inline-block; min-width: 0; letter-spacing: 0.08em; font-size: 12px; margin-right: 6px; color: #f0c98a; }
+  #cardBody .howto { font-size: 13.5px; opacity: 0.9; }
+  #cardCount { font-size: 11px; opacity: 0.5; }
+  #card.fade { animation: fadein .5s ease; } @keyframes fadein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (max-height: 560px) { #card { padding: 12px 16px; min-height: 0; } #cardBody p { font-size: 13px; margin-bottom: 6px; } }
   #fatal { display: none; position: fixed; inset: 0; align-items: center; justify-content: center; padding: 30px; text-align: center; z-index: 50; background: #141210; }
 </style>
 </head>
@@ -100,17 +109,13 @@
 </div>
 
 <div class="screen" id="intro" style="display:none">
-  <div class="how story">
-    Your parents walked into the Box store one minute before closing.<br>
-    <b>Something came through the skylight.</b> It took your little brother upstairs in a sack. Your parents ran. The employees locked the doors behind them, and smiled.<br><br>
-    <b>Find him.</b> He's stuffed in a hamper or a big pot upstairs. Follow the crying. Clues make it easier to hear, but every clue makes Krampus angrier and kills more lights.<br>
-    <b>Listen for the bells.</b> That's him. Crouch behind furniture, or climb into a pot or hamper. Duck under his bell traps.<br>
-    <b>Get the store keys</b> from one of the registers. Then grab your brother and run for the front doors.
-    <br><br>
-    <span class="keyonly">WASD move · mouse look · Shift run (loud) · C crouch · E hide / look inside · M map</span>
-    <span class="touchonly">Left thumb: move · Right thumb: look · Hide, Crouch and Run buttons on the right</span>
+  <div id="card">
+    <div id="cardWhere"></div>
+    <div id="cardBody"></div>
   </div>
-  <button class="big" id="go">Start</button>
+  <div class="row"><button class="big" id="next">Next</button></div>
+  <button id="skip">Skip story</button>
+  <div id="cardCount"></div>
 </div>
 
 <div class="screen" id="pause" style="display:none">
@@ -1172,9 +1177,9 @@ function buildLevel() {
   const $ = (id) => document.getElementById(id);
   const canvas = $('view');
   const DIFF = {
-    easy:   { label: 'Easy',   spd: 0.88, range: 13, rate: 0.7, grace: 35, map: true },
-    normal: { label: 'Normal', spd: 1.0,  range: 16, rate: 1.0, grace: 28, map: false },
-    hard:   { label: 'Hard',   spd: 1.08, range: 19, rate: 1.3, grace: 20, map: false },
+    easy:   { label: 'Easy',   rage: 3.85, behind: 15, spd: 0.88, range: 13, rate: 0.7, grace: 35, map: true },
+    normal: { label: 'Normal', rage: 4.2, behind: 14, spd: 1.0,  range: 16, rate: 1.0, grace: 28, map: false },
+    hard:   { label: 'Hard',   rage: 4.5, behind: 12, spd: 1.08, range: 19, rate: 1.3, grace: 20, map: false },
   };
   const CLUES = [
     { name: 'mitten', col: '#d0342c', text: 'His mitten. The crying is easier to hear now.' },
@@ -1403,11 +1408,10 @@ function buildLevel() {
     items.push({ kind: 'keys', x: kx, z: kz, y: (kf ? F1 : 0) + kh, f: kf, taken: false });
     const traps = shuffle(LV.trapSpots.map(([f, x, z, ax, len]) => ({ f, x, z, ax, len, on: false, cool: 0 })));
     for (let i = 0; i < 4; i++) traps[i].on = true;
-    const [sx, sz] = nodePos(rNode(1, bc.x, bc.z));
-    K = { x: sx, z: sz, y: F1, yaw: 0, state: 'wait', path: null, pi: 0, t: 0, look: 0, step: 0, stuck: 0, lastP: [sx, sz], seeing: false, lastSeen: null, searchLeft: 0, repath: 0, target: null, spd: 0, see: 0, sawT: 99, stun: 0, mark: '' };
+    K = { x: -50, z: -50, y: -50, yaw: 0, state: 'wait', path: null, pi: 0, t: 0, look: 0, step: 0, stuck: 0, lastP: [0, 0], seeing: false, lastSeen: null, searchLeft: 0, repath: 0, target: null, spd: 0, see: 0, sawT: 99, stun: 0, mark: '' };
     G = { D, phase: 'grace', t: D.grace, time: 0, huntT: 0, clues: 0, keys: false, items, traps, broC, bro: { state: 'hidden', x: bc.x, z: bc.z, y: bc.y }, trail: [], hiding: null, back: null,
       alert: 0, noiseT: 0, msgT: 0, level: 0, hunchT: 30, lightT: 70, cryT: 2, doorT: 0, dead: shuffle([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]), reason: '' };
-    showMsg('He took your brother upstairs.', 4);
+    showMsg('It took Leo upstairs. Find him.', 4);
   }
   const level = () => Math.min(5, G.clues + Math.floor(G.huntT / 100));
 
@@ -1507,6 +1511,7 @@ function buildLevel() {
   function sob(vol, pan) {
     tone(540, 0.34, vol, 'triangle', 0, -150, pan); tone(480, 0.4, vol, 'triangle', 0.42, -150, pan); tone(610, 0.14, vol * 0.6, 'sine', 0.92, -90, pan);
   }
+  function boxSmash() { for (let i = 0; i < 6; i++) tone(1800 + Math.random() * 2600, 0.08 + Math.random() * 0.12, 0.12, 'square', i * 0.05 + Math.random() * 0.05, -900); thud(0.5, 0, 1800); }
   function roar() { tone(95, 1.1, 0.5, 'sawtooth', 0, -50); tone(63, 1.3, 0.4, 'square', 0.05, -25); thud(0.6, 0, 400); }
   // where a sound at (x,z,y) sits relative to the player: [loudness 0..1, pan]
   function hear(x, z, y, range) {
@@ -1527,11 +1532,11 @@ function buildLevel() {
   function updateHUD(dt) {
     if (G.msgT > 0) { G.msgT -= dt; if (G.msgT <= 0) $('msg').style.opacity = 0; }
     const ph = $('phase');
-    ph.textContent = G.phase === 'grace' ? 'HE IS HIDING YOUR BROTHER' : G.phase === 'hunt' ? 'FIND YOUR BROTHER' : 'RUN TO THE FRONT DOORS';
+    ph.textContent = G.phase === 'grace' ? 'HE IS HIDING LEO' : G.phase === 'hunt' ? 'FIND LEO' : 'RUN TO THE FRONT DOORS';
     ph.className = G.phase === 'escape' ? 'run' : G.phase === 'grace' ? 'hide' : 'seek';
     $('timer').textContent = G.phase === 'grace' ? fmt(G.t + 1) : fmt(G.time);
     $('where').textContent = (floorOf(P.y) ? 'Upstairs · ' : 'Downstairs · ') + zoneName(P.x, P.z, P.y);
-    $('obj').innerHTML = `Clues <b>${G.clues}/3</b> · Keys <b>${G.keys ? '✓' : '✗'}</b> · Brother <b>${G.bro.state === 'follow' ? 'with you' : 'missing'}</b>`;
+    $('obj').innerHTML = `Clues <b>${G.clues}/3</b> · Keys <b>${G.keys ? '✓' : '✗'}</b> · Leo <b>${G.bro.state === 'follow' ? 'with you' : 'missing'}</b>`;
     const a = G.phase === 'escape' ? 1 : G.alert;
     $('alertFill').style.width = Math.round(a * 100) + '%';
     $('alert').style.opacity = a > 0.02 ? 1 : 0.25;
@@ -1555,7 +1560,7 @@ function buildLevel() {
       mg.translate(-P.x * MAP_S, -(LV.depth - P.z) * MAP_S);
       mg.globalAlpha = 0.9; mg.drawImage(mapImg[f], 0, 0); mg.globalAlpha = 1;
       const sx = (x) => x * MAP_S, sz = (z) => (LV.depth - z) * MAP_S;
-      if ((G.D.map || debug) && floorOf(K.y) === f) { mg.fillStyle = '#7a1010'; mg.beginPath(); mg.arc(sx(K.x), sz(K.z), 4, 0, TAU); mg.fill(); }
+      if ((G.D.map || debug) && K.state !== 'wait' && floorOf(K.y) === f) { mg.fillStyle = '#7a1010'; mg.beginPath(); mg.arc(sx(K.x), sz(K.z), 4, 0, TAU); mg.fill(); }
       if (debug) { const c = LV.containers[G.broC]; mg.fillStyle = '#18a0ff'; mg.beginPath(); mg.arc(sx(c.x), sz(c.z), 3, 0, TAU); mg.fill(); for (const it of G.items) if (!it.taken && it.f === f) { mg.fillStyle = it.kind === 'keys' ? '#d6b24a' : '#d040d0'; mg.fillRect(sx(it.x) - 2, sz(it.z) - 2, 4, 4); } }
       mg.translate(sx(P.x), sz(P.z)); mg.rotate(Math.PI - P.yaw);
       mg.fillStyle = '#d4402c'; mg.beginPath(); mg.moveTo(0, -6); mg.lineTo(4, 4); mg.lineTo(-4, 4); mg.closePath(); mg.fill();
@@ -1587,12 +1592,66 @@ function buildLevel() {
     P.x = LV.containers[i].x; P.z = LV.containers[i].z; P.vx = P.vz = 0;
     if (G.bro.state === 'hidden') showMsg('Empty. You climb in.', 1.6);
   }
+  // walking distance from the top of the stairs to every upstairs cell
+  let extraStun = 0;
+  function upstairsDist() {
+    const dist = new Float64Array(GN * 2).fill(1e9), top = LV.stairs[0].top, s0 = rNode(1, top[0], top[1]);
+    const heap = [[0, s0]]; dist[s0] = 0;
+    const push = (d, n) => { heap.push([d, n]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+    const pop = () => { const t = heap[0], l = heap.pop(); if (heap.length) { heap[0] = l; let i = 0; for (;;) { const a = 2 * i + 1, b = a + 1; let m = i; if (a < heap.length && heap[a][0] < heap[m][0]) m = a; if (b < heap.length && heap[b][0] < heap[m][0]) m = b; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return t; };
+    while (heap.length) {
+      const [d, n] = pop(); if (d > dist[n]) continue;
+      const k = n - GN, i = k % GW, j = Math.floor(k / GW);
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        if (!di && !dj) continue;
+        const ii = i + di, jj = j + dj; if (ii < 0 || jj < 0 || ii >= GW || jj >= GH) continue;
+        const m = id(1, ii, jj); if (!walk[m]) continue;
+        if (di && dj && (!walk[id(1, i + di, j)] || !walk[id(1, i, j + dj)])) continue;
+        const nd = d + (di && dj ? 1.414 : 1) * CELL; if (nd < dist[m]) { dist[m] = nd; push(nd, m); }
+      }
+    }
+    return dist;
+  }
+  // Krampus appears somewhere upstairs, far from the player and away from Leo
+  function dropKrampus() {
+    let best = null, bd = -1;
+    for (let i = 0; i < 40; i++) {
+      const n = REACH[(Math.random() * REACH.length) | 0], [x, z, f] = nodePos(n);
+      if (f !== 1) continue;
+      const bc = LV.containers[G.broC];
+      const d = Math.min(Math.hypot(x - P.x, z - P.z) + (floorOf(P.y) !== 1 ? 10 : 0), Math.hypot(x - bc.x, z - bc.z) * 2);
+      if (d > bd) { bd = d; best = [x, z]; }
+    }
+    K.x = best[0]; K.z = best[1]; K.y = F1; K.lastP = [K.x, K.z];
+  }
   function rescue() {
+    { // he bursts out behind you: farther from the staircase (by walking distance) than you are
+      const dist = upstairsDist();
+      const mine = dist[rNode(1, P.x, P.z)];
+      let best = -1, bd = 1e9, far = -1, fd = -1e9;
+      for (const n of REACH) {
+        if (n < GN || !(dist[n] < 1e8)) continue;
+        const [x, z] = nodePos(n), d = Math.hypot(x - P.x, z - P.z);
+        if (d < 5) continue;
+        const lead = dist[n] - mine;
+        if (lead > fd) { fd = lead; far = n; }
+        if (lead < G.D.behind * 0.75) continue;
+        const score = Math.abs(lead - G.D.behind) + Math.abs(d - G.D.behind) * 0.4;
+        if (score < bd) { bd = score; best = n; }
+      }
+      const at = best >= 0 ? best : far;
+      if (at >= 0) {
+        const [x, z] = nodePos(at); K.x = x; K.z = z; K.y = F1; K.lastP = [x, z]; K.path = null;
+        // dead-end corner with no room behind you: he takes longer to get going
+        extraStun = best >= 0 ? 0 : clamp((G.D.behind - fd) / G.D.rage, 0, 4);
+      }
+      thud(0.8, 0, 1500); boxSmash();
+    }
     G.bro.state = 'follow'; G.phase = 'escape'; G.trail = []; P.crouch = false;
-    K.state = 'rage'; K.stun = 3.2; K.repath = 0; K.mark = '!';
+    K.state = 'rage'; K.stun = 2.4 + extraStun; K.repath = 0; K.mark = '!'; extraStun = 0;
     for (let i = 0; i < 16; i++) ZT[i] = Math.max(ZT[i], 0.5);
     roar();
-    showMsg(G.keys ? 'You found him! RUN — front doors!' : 'You found him! RUN — but you still need the keys!', 4);
+    showMsg(G.keys ? '"…I knew you\'d find me." RUN — front doors!' : '"…I knew you\'d find me." RUN — but you still need the keys!', 4);
   }
 
   // ---------------- Krampus ----------------
@@ -1633,7 +1692,7 @@ function buildLevel() {
   }
   function updateKrampus(dt) {
     const D = G.D, mult = D.spd * (1 + 0.05 * Math.min(4, level()));
-    if (K.state === 'wait') { K.yaw += dt * 0.6; return; }
+    if (K.state === 'wait') return;
     if (K.stun > 0) { K.stun -= dt; K.spd = 0; return; }
     const sameFloor = Math.abs(K.y - P.y) < 1;
     const dP = Math.hypot(P.x - K.x, P.z - K.z);
@@ -1641,7 +1700,7 @@ function buildLevel() {
       K.repath -= dt;
       if (K.repath <= 0) { K.repath = 0.35; const b = G.bro; const tb = Math.hypot(b.x - K.x, b.z - K.z) < dP; goTo(tb ? b.x : P.x, tb ? b.z : P.z, floorOf(tb ? b.y : P.y)); }
       if (sameFloor && dP < 1.3) return caught('Krampus caught you at the last second.');
-      if (Math.abs(K.y - G.bro.y) < 1 && Math.hypot(G.bro.x - K.x, G.bro.z - K.z) < 1.15) return caught('Krampus snatched your brother back.');
+      if (Math.abs(K.y - G.bro.y) < 1 && Math.hypot(G.bro.x - K.x, G.bro.z - K.z) < 0.95) return caught('Krampus snatched Leo back.');
     } else {
       const s = canSee();
       K.seeing = !!s; K.sawT = K.seeing ? 0 : K.sawT + dt;
@@ -1683,7 +1742,7 @@ function buildLevel() {
     const moving = K.path && K.pi < K.path.length && K.state !== 'look' && K.state !== 'search';
     if (moving) {
       const base = { chase: 4.1, rage: 4.5, rush: 3.3, investigate: 2.7, searchwalk: 2.4, patrol: 1.75 }[K.state] || 1.75;
-      const spd = base * (K.state === 'rage' ? D.spd : mult);
+      const spd = K.state === 'rage' ? D.rage : base * mult;
       let left = spd * dt;
       while (left > 0 && K.pi < K.path.length) {
         const [tx, tz] = K.path[K.pi], ddx = tx - K.x, ddz = tz - K.z, dist = Math.hypot(ddx, ddz);
@@ -1697,7 +1756,7 @@ function buildLevel() {
       const before = K.step; K.step += spd * dt * 0.62;
       if (Math.floor(before) !== Math.floor(K.step)) {
         const [v, pan] = hear(K.x, K.z, K.y, 30);
-        if (K.state === 'rage') thud(v * 1.2 + 0.05, pan, 350);      // the bells go silent at the end
+        if (K.state === 'rage') { thud(v * 1.2 + 0.05, pan, 350); if (Math.random() < 0.18) boxSmash(); }   // the bells go silent at the end
         else { jingle(v * 0.5, pan, K.state === 'chase' ? 6 : 4); thud(v * 0.5, pan, 300); }
       }
       K.stuck += dt;
@@ -1766,7 +1825,7 @@ function buildLevel() {
     const fd = LV.doors.front, sd = LV.doors.side;
     if (floorOf(P.y) === 0 && Math.hypot(P.x - fd.x, P.z - fd.z) < 1.9) {
       if (G.phase === 'escape' && G.keys) return win();
-      if (G.doorT <= 0) { G.doorT = 5; thud(0.3, 0, 700); showMsg(G.phase === 'escape' ? 'LOCKED! You need the store keys!' : G.keys ? 'You are not leaving without your brother.' : 'Locked. Outside, an employee shakes their head. Then smiles.', 3.5); }
+      if (G.doorT <= 0) { G.doorT = 5; thud(0.3, 0, 700); showMsg(G.phase === 'escape' ? 'LOCKED! You need the store keys!' : G.keys ? 'You are not leaving without Leo.' : 'Locked. Outside, an employee shakes their head. Then smiles.', 3.5); }
     } else if (floorOf(P.y) === 0 && Math.hypot(P.x - sd.x, P.z - sd.z) < 1.7 && G.doorT <= 0) {
       G.doorT = 5; thud(0.3, 0, 700); showMsg('This door is chained. The employee outside just smiles.', 3.5);
     }
@@ -1776,13 +1835,13 @@ function buildLevel() {
     if (b.state !== 'follow') {
       // muffled crying from wherever he is stuffed
       G.cryT -= dt;
-      if (G.cryT <= 0 && G.phase !== 'grace') { G.cryT = 2.3 + Math.random() * 1.2; const [v, pan] = hear(b.x, b.z, b.y, 8 + 5 * G.clues); sob(v * 0.5, pan); }
+      if (G.cryT <= 0 && G.phase !== 'grace') { G.cryT = 2.3 + Math.random() * 1.2; const [v, pan] = hear(b.x, b.z, b.y, 14 + 6 * G.clues); sob(v * 0.6, pan); }
       return;
     }
     const tr = G.trail, last = tr[tr.length - 1];
     if (!last || Math.hypot(P.x - last[0], P.z - last[1]) > 0.4) tr.push([P.x, P.z, P.y]);
-    let left = 5.4 * dt;
-    while (left > 0 && tr.length > 2) {
+    let left = 5.8 * dt;
+    while (left > 0 && tr.length > 1) {
       const [tx, tz] = tr[0], dx = tx - b.x, dz = tz - b.z, d = Math.hypot(dx, dz);
       if (d < 0.15) { tr.shift(); continue; }
       const m = Math.min(left, d); b.x += dx / d * m; b.z += dz / d * m; left -= m;
@@ -1813,7 +1872,7 @@ function buildLevel() {
   function drawDynamic(t) {
     const g = new Geo();
     // Krampus: a huge horned shape with a sack and chains
-    { const s = 1.5, B = figure(g, K.x, K.y, K.z, K.yaw, s, KC, K.step, K.spd > 0);
+    if (K.state !== 'wait') { const s = 1.5, B = figure(g, K.x, K.y, K.z, K.yaw, s, KC, K.step, K.spd > 0);
       const horn = hx('#cfc3a8'), eye = hx('#ffb020');
       for (const q of [-1, 1]) { B(q * 0.13, 1.86, 0.02, 0.07, 0.2, 0.07, horn); B(q * 0.2, 2.02, 0.06, 0.07, 0.18, 0.07, horn); B(q * 0.26, 2.16, 0.02, 0.06, 0.16, 0.06, horn); B(q * 0.07, 1.665, -0.156, 0.06, 0.045, 0.01, eye, MAT.GLOW); }
       B(0, 1.42, -0.17, 0.08, 0.2, 0.03, hx('#b3202a'));
@@ -1843,13 +1902,58 @@ function buildLevel() {
     return g.array();
   }
 
+
+  // ---------------- story cards (full script: docs/script.md) ----------------
+  const N = (t) => ['', t];
+  const OPENING = [
+    { where: 'Parking lot · 8:59 PM', lines: [N('Snow. The car pulls in crooked, right by the doors.'), ['DAD', 'Huh. One minute till they close.'], ['MOM', 'Perfect. We’ll pop into Box. Five minutes, tops.'], N('You and Leo exchange a look. It is never five minutes.')] },
+    { where: 'Front doors · 8:59 PM', lines: [N('An employee is reaching for the lock. Her hand drops.'), ['DANA', 'Hi folks! Just so you know, we close in one minute.'], ['DAD', 'Oh, we’ll be quick.'], N('Her smile stays on. Her eyes do not.')] },
+    { where: 'Living rooms · 9:00 PM', lines: [N('Dad sinks into a sectional.'), ['DAD', 'So, could I get this one in a custom fabric? What are my options in, like, a performance velvet?'], N('Marcus slowly turns his head toward the clock.')] },
+    { where: 'Dishes & glassware · 9:01 PM', lines: [N('Mom picks up a plate, studies the bottom, and puts it back on a completely different shelf.'), N('Priya appears, sighs through her nose, and puts it back where it goes.'), N('Mom picks up another plate.')] },
+    { where: 'By the registers · 9:02 PM', lines: [['PRIYA', 'What are they still doing here?'], ['MARCUS', 'He asked about performance velvet.'], ['PRIYA', 'Does she know we close at nine?'], ['DANA', '…She knows.'], ['DAD', '(waving a throw pillow) Hey! Do you guys have this in the back?']] },
+    { where: 'Upstairs balcony · 9:14 PM', lines: [N('You and Leo spent ten minutes hiding in every hamper in the store. Now there are voices below.'), N('Every employee is standing around your parents. The manager is in front.'), ['MANAGER', 'We told you not to stay too late.'], ['MOM', 'It’s been ten minutes—'], ['MANAGER', '(looking up at the ceiling) You don’t want to be here after it’s too late.'], N('The music slows down. The lights flicker. Somewhere far away: bells.')] },
+    { where: 'The atrium', lines: [N('The skylight explodes. Something huge drops through and lands on the ornament display. Glass balls burst everywhere.'), N('Horns. Chains. A sack. It looks at you. Then it looks at Leo.'), ['LEO', '(whisper) …Is he part of the store?'], N('One swipe. Leo’s hand is gone from yours. He’s in the sack, and the thing leaps straight up to the balcony.')] },
+    { where: 'The doors', lines: [N('Your parents are swept out the side door with the crowd. Mom screams your name.'), N('You reach the glass. Dana turns the lock from outside. She shakes her head.'), N('Then she smiles. Slow, wide, wrong.'), N('At the front doors, Marcus does the same. They walk off into the snow.'), N('Upstairs: bells. And crying, muffled, like it’s coming through wicker.')] },
+  ];
+  const HOWTO = { where: 'How to play', how: true, lines: [
+    N('<b>Find Leo.</b> He’s stuffed in a hamper or a big pot upstairs. Follow the crying. Clues (his mitten, train, scarf) make it carry farther, but every clue makes Krampus angrier and kills more lights.'),
+    N('<b>Listen for the bells.</b> That’s him. Crouch behind furniture or climb into a pot or hamper. Crouch under bell traps.'),
+    N('<b>Get the store keys</b> from a register, then grab Leo and run for the front doors.'),
+    N(isTouchDevice() ? 'Left thumb move · right thumb look · Hide, Crouch, Run buttons on the right' : 'WASD move · mouse look · Shift run (loud) · C crouch · E hide / look inside · M map'),
+  ] };
+  const ENDING = [
+    { where: 'The front doors', lines: [N('The keys turn. The doors burst open. Everything goes slow.'), N('Glass. Snow. A clawed hand sweeps an inch behind Leo’s back and closes on nothing.')] },
+    { where: 'Parking lot', lines: [N('Headlights. The car, engine running, doors flung open.'), ['MOM', 'OVER HERE! RUN!'], N('Dana is still by the doors, still smiling. She sees it a second too late. A claw closes on her apron.'), ['DANA', '(dragged inside) We’re CLOSED—'], N('The doors swing shut. Inside, the bells start up again, happily.')] },
+    { where: 'The car', lines: [['DAD', '…We’ll order the sofa online.'], ['MOM', 'David.'], N('Leo is holding his fist closed. You nudge him. He opens his hand.'), N('A tiny brass bell.'), N('It rings once, on its own.')] },
+  ];
+  function isTouchDevice() { return ('ontouchstart' in window) || navigator.maxTouchPoints > 0; }
+  let cards = [], cardI = 0, cardsDone = null;
+  function esc(t) { return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/&lt;(\/?)b&gt;/g, '<$1b>'); }
+  function showCard() {
+    const c = cards[cardI];
+    $('cardWhere').textContent = c.where;
+    $('cardBody').innerHTML = c.lines.map(([who, t]) => who ? `<p><b class="who">${who}</b>${esc(t)}</p>` : `<p class="${c.how ? 'howto' : 'act'}">${esc(t)}</p>`).join('');
+    $('cardCount').textContent = `${cardI + 1} / ${cards.length}`;
+    $('next').textContent = cardI === cards.length - 1 ? (cardsDone === startGame ? 'Start' : 'Continue') : 'Next';
+    $('skip').style.display = cardI === cards.length - 1 ? 'none' : 'inline-block';
+    const el = $('card'); el.classList.remove('fade'); void el.offsetWidth; el.classList.add('fade');
+    // little sounds for the big beats
+    if (c.where === 'Upstairs balcony · 9:14 PM') { tone(260, 1.6, 0.12, 'triangle', 0, -150); setTimeout(() => jingle(0.08, 0.6, 3), 900); }
+    if (c.where === 'The atrium') { thud(0.7, 0, 2500); jingle(0.25, 0, 10); setTimeout(roar, 600); }
+    if (c.where === 'The doors') { setTimeout(() => thud(0.4, 0, 700), 300); setTimeout(() => sob(0.12, -0.4), 1600); }
+    if (c.where === 'The car') setTimeout(() => jingle(0.3, 0.2, 2), 1800);
+  }
+  function playCards(list, done) { cards = list; cardI = 0; cardsDone = done; mode = 'intro'; showOnly('intro'); showCard(); }
+  function nextCard() { if (mode !== 'intro') return; if (cardI < cards.length - 1) { cardI++; showCard(); } else cardsDone(); }
+  function skipCards() { if (mode !== 'intro') return; cardI = cards.length - 1; showCard(); }
+
   // ---------------- flow ----------------
   function showOnly(idShown) {
     for (const s of ['title', 'intro', 'pause', 'end']) $(s).style.display = s === idShown ? 'flex' : 'none';
   }
-  function toIntro() { audioInit(); mode = 'intro'; showOnly('intro'); }
+  function toIntro() { audioInit(); playCards(OPENING.concat([HOWTO]), startGame); }
   function startGame() {
-    audioInit(); newRound(); mode = 'play'; showOnly(null); $('hud').style.display = 'block'; lastTime = performance.now(); lock();
+    audioInit(); newRound(); mode = 'play'; showOnly(null); $('hud').style.display = 'block'; $('msg').style.opacity = 1; lastTime = performance.now(); lock();
     roar(); jingle(0.3, 0, 8);
   }
   function pause() { if (mode !== 'play') return; mode = 'pause'; showOnly('pause'); if (document.pointerLockElement) document.exitPointerLock(); }
@@ -1866,12 +1970,16 @@ function buildLevel() {
     if (mode !== 'play') return;
     mode = 'end';
     [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.3, 0.18, 'triangle', i * 0.12));
-    const t = Math.floor(G.time), prev = getBest(diffKey);
-    if (!prev || t < prev) setBest(diffKey, t);
-    $('endTitle').textContent = 'YOU GOT HIM OUT'; $('endTitle').className = 'win';
-    $('endText').innerHTML = `The doors fly open. Snow. Headlights. Your parents are screaming your names.<br>Behind you, something drags a smiling employee back inside.<br><br>In the car, your brother opens his hand. A tiny bell. It jingles.<br><br><b>${fmt(t)}</b> on ${G.D.label}${!prev || t < prev ? ' — new best!' : ''}`;
-    showOnly('end'); if (document.pointerLockElement) document.exitPointerLock();
-    setTimeout(() => jingle(0.3, 0, 3), 2600);
+    const t = Math.floor(G.time), prev = getBest(diffKey), best = !prev || t < prev;
+    if (best) setBest(diffKey, t);
+    if (document.pointerLockElement) document.exitPointerLock();
+    $('hud').style.display = 'none';
+    playCards(ENDING, () => {
+      mode = 'end';
+      $('endTitle').textContent = 'YOU GOT LEO OUT'; $('endTitle').className = 'win';
+      $('endText').innerHTML = `Escaped in <b>${fmt(t)}</b> on ${G.D.label}${best ? ' — new best!' : ''}`;
+      showOnly('end');
+    });
   }
   function refreshBest() {
     $('best').textContent = 'Best escapes — ' + ['easy', 'normal', 'hard'].map((k) => `${DIFF[k].label}: ${getBest(k) ? fmt(getBest(k)) : '—'}`).join(' · ');
@@ -1881,8 +1989,11 @@ function buildLevel() {
     document.querySelectorAll('[data-diff]').forEach((x) => x.classList.toggle('sel', x === b));
   }));
   $('play').addEventListener('click', toIntro);
-  $('go').addEventListener('click', startGame);
+  $('next').addEventListener('click', nextCard);
+  $('skip').addEventListener('click', skipCards);
+  window.addEventListener('keydown', (e) => { if (mode === 'intro' && (e.code === 'Space' || e.code === 'Enter' || e.code === 'ArrowRight')) { e.preventDefault(); nextCard(); } });
   $('again').addEventListener('click', startGame);
+  $('replayStory') && $('replayStory').addEventListener('click', toIntro);
   $('menu').addEventListener('click', toTitle);
   $('resume').addEventListener('click', resume);
   $('quit').addEventListener('click', toTitle);
@@ -1907,7 +2018,7 @@ function buildLevel() {
     const proj = perspective(1.2, canvas.width / Math.max(1, canvas.height), 0.05, 140);
     const vp = mul4(proj, viewFPS(ex, ey, ez, yaw, pitch));
     R.begin(vp, [ex, ey, ez], menu ? { lights: MENU_L, k: [0, -99, 0, 1], alarm: 0, time: now / 1000 }
-      : { lights: ZL, k: [K.x, K.y + 1.5, K.z, flick], alarm: G.phase === 'escape' ? 1 : 0, time: now / 1000 });
+      : { lights: ZL, k: [K.x, K.y + 1.5, K.z, K.state === 'wait' ? 1 : flick], alarm: G.phase === 'escape' ? 1 : 0, time: now / 1000 });
     R.draw(STATIC);
     if (G && !menu) R.drawDynamic(drawDynamic(now / 1000));
     requestAnimationFrame(frame);
@@ -1917,7 +2028,7 @@ function buildLevel() {
     updatePlayer(dt); if (mode !== 'play') return;
     if (G.phase === 'grace') {
       G.t -= dt;
-      if (G.t <= 0) { G.phase = 'hunt'; pickPatrol(); jingle(0.35, 0, 8); showMsg('Listen for the bells. Follow the crying.', 4); for (let i = 0; i < 16; i++) ZT[i] = Math.min(ZT[i], 0.8); }
+      if (G.t <= 0) { G.phase = 'hunt'; dropKrampus(); pickPatrol(); jingle(0.35, 0, 8); showMsg('Listen for the bells. Follow the crying.', 4); for (let i = 0; i < 16; i++) ZT[i] = Math.min(ZT[i], 0.8); }
     } else if (G.phase === 'hunt') {
       G.huntT += dt; G.lightT -= dt;
       if (G.lightT <= 0) { G.lightT = 70; killLights(1); }
@@ -1935,6 +2046,8 @@ function buildLevel() {
     tick: (dt, n) => { for (let i = 0; i < n && mode === 'play'; i++) tick(dt); },
     setP: (x, y, z, yaw, pitch, crouch) => { Object.assign(P, { x, y, z, yaw, pitch: pitch || 0 }); if (crouch != null) { P.crouch = crouch; P.ct = crouch ? 1 : 0; } },
     interact, zoneName, killLights, mapImg,
+    key: (c, v) => { keys[c] = v; }, upDist: () => upstairsDist(), node: (f, x, z) => rNode(f, x, z), GN,
+    route: (x0, z0, f0, x1, z1, f1) => makePath(astar(rNode(f0, x0, z0), rNode(f1, x1, z1))),
     reachable: (f, x, z) => { const n = rNode(f, x, z); if (n < 0) return 99; const [nx, nz] = nodePos(n); return Math.hypot(nx - x, nz - z); },
     path: (x0, z0, f0, x1, z1, f1) => { const p = makePath(astar(rNode(f0, x0, z0), rNode(f1, x1, z1))); return p ? p.length : null; },
   };
