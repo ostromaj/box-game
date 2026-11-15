@@ -94,7 +94,7 @@ const ACT = (() => {
           if (eyes === 'closed') { g.rbox(s * ex, ey - 0.004, ez - 0.012, rx * 0.34, 0.006, 0.006, 0, dark, 0, 0.002); }
           else {
             const stare = eyes === 'stare', sy = eyes === 'narrow' ? 0.45 : eyes === 'wide' ? 1.35 : stare ? 1.6 : 1, ik = stare ? 0.62 : 1;
-            g.ellipsoid(s * ex, ey, ez, rx * (stare ? 0.23 : 0.2), ry * 0.11 * sy, rz * 0.1, white, MAT.CERAMIC, 10, 6);
+            g.ellipsoid(s * ex, ey, ez, rx * (stare ? 0.23 : 0.2), ry * 0.11 * sy, rz * 0.1, stare ? H('#7d7b76') : white, stare ? MAT.GLOW : MAT.CERAMIC, 10, 6);   // staring eyes catch the light, even in the dark
             g.ellipsoid(s * ex, ey, ez - rz * 0.07, rx * 0.1 * ik, ry * 0.085 * Math.min(1, sy * 1.1) * ik, rz * 0.05, H(id === 'leo' || id === 'you' ? '#5a3a22' : '#3a2a1e'), MAT.CERAMIC, 8, 5);
             g.ellipsoid(s * ex, ey, ez - rz * 0.1, rx * 0.05 * ik, ry * 0.045 * Math.min(1, sy) * ik, rz * 0.03, dark, MAT.CERAMIC, 6, 4);
             if (!stare) g.sphere(s * ex + rx * 0.03, ey + ry * 0.03, ez - rz * 0.125, d.H * 0.0025, white, MAT.GLOW, 4);

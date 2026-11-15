@@ -36,6 +36,8 @@ window.AP = (() => {
       if (route && route.length > 1) { while (wi < route.length - 1 && Math.hypot(route[wi][0] - P.x, route[wi][1] - P.z) < 0.5) wi++; tgt = route[Math.min(wi, route.length - 1)]; if (wi >= route.length - 1 && fl() === f) tgt = [x, z]; }
       if (P.x > 24.2 && P.x < 26.2 && P.z > 11.9 && P.z < 26.1 && P.y > 0.01 && P.y < 4.49) tgt = f === 1 ? [25.2, 10.9] : [25.2, 27.2];   // on the staircase: keep going to the end
       P.yaw = Math.atan2(tgt[0] - P.x, -(tgt[1] - P.z)); P.pitch = 0;
+      if (o.run) P.crouch = false;
+      if (B.mode === 'play' && !o.run && B.G.phase !== 'escape') P.crouch = B.G.traps.some((tr) => tr.on && tr.f === fl() && Math.hypot(tr.x - P.x, tr.z - P.z) < 2.2);   // duck under bell strings
       step(); t += 1/30;
     }
     keys(false, false);
@@ -52,7 +54,8 @@ window.AP = (() => {
   }
   function hideIn(ci, st, run) {
     const c = B.LV.containers[ci];
-    walk(c.x, c.z, c.f, { near: 1.3, maxT: 14, run });
+    walk(c.x, c.z, c.f, { near: 1.3, maxT: 14, run, cond: () => !run && chased() });
+    if (!run && B.mode === 'play' && chased()) return false;   // he noticed on the way: let the chase logic take over
     if (B.mode !== 'play' || Math.hypot(c.x - B.P.x, c.z - B.P.z) > 1.5) return false;
     if (B.K.state === 'chase' && (B.K.seeing || B.K.sawT < 1.6)) return false;      // he is watching: climbing in would get you pulled out
     B.interact(); if (B.mode !== 'play' || B.G.hiding == null) return false;

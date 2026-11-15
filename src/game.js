@@ -9,9 +9,9 @@
   if (isTouch) document.body.classList.add('touch');
   const debug = /debug/.test(location.search);
   const DIFF = {
-    easy:   { label: 'Easy',   rage: 3.85, behind: 15, spd: 0.88, range: 13, rate: 0.7, grace: 35, map: true, lose: 11 },
-    normal: { label: 'Normal', rage: 4.2,  behind: 14, spd: 1.0,  range: 16, rate: 1.0, grace: 28, map: false, lose: 13 },
-    hard:   { label: 'Hard',   rage: 4.5,  behind: 12, spd: 1.08, range: 19, rate: 1.3, grace: 20, map: false, lose: 15 },
+    easy:   { label: 'Easy',   rage: 3.85, behind: 15, spd: 0.88, range: 13, rate: 0.7, grace: 35, map: true, lose: 11, slips: 2 },
+    normal: { label: 'Normal', rage: 4.2,  behind: 14, spd: 1.0,  range: 15, rate: 0.9, grace: 30, map: false, lose: 13, slips: 1 },
+    hard:   { label: 'Hard',   rage: 4.5,  behind: 12, spd: 1.08, range: 19, rate: 1.3, grace: 20, map: false, lose: 15, slips: 0 },
   };
   const CLUES = [
     { name: 'mitten', col: '#d0342c', text: 'Leo’s mitten. The crying is easier to hear now.' },
@@ -59,6 +59,8 @@
     const i = x < 24 ? (z < 14 ? 0 : 1) : x < 40 ? (z < 12 ? 2 : z < 28 ? 3 : 4) : (z < 14 ? 5 : z < 28 ? 6 : 7);
     return i + (f ? 8 : 0);
   }
+  const PLACE = { 'Clearance': 'the clearance corner', 'Lighting': 'the lamp department', 'Bedrooms': 'the bedrooms', 'Bath Corner': 'the bath corner', 'Rug Wall': 'the rug wall', 'Upstairs Living Rooms': 'the upstairs living rooms', 'Upstairs Dining': 'the upstairs dining tables', 'Balcony': 'the balcony' };
+  const placeName = (x, z, y) => { const n = zoneName(x, z, y); return PLACE[n] || 'the ' + n.toLowerCase(); };
   const turnTo = (a, b, k) => { let d = b - a; while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU; return a + d * Math.min(1, k); };
 
   // ---------------- walk grid + A* ----------------
@@ -553,7 +555,7 @@
     for (let i = 0; i < 4; i++) traps[i].on = true;
     K = { x: -50, z: -50, y: -50, yaw: 0, state: 'wait', path: null, pi: 0, t: 0, look: 0, step: 0, stuck: 0, lastP: [0, 0], seeing: false, lastSeen: null, searchLeft: 0, repath: 0, spd: 0, sawT: 99, stun: 0 };
     G = { hearCool: 8, peerCool: 25, peerAt: 0, D, phase: 'grace', t: D.grace, time: 0, huntT: 0, clues: 0, keys: false, items, traps, broC, bro: { state: 'hidden', x: bc.x, z: bc.z, y: bc.y }, trail: [], hiding: null, back: null,
-      alert: 0, noiseT: 0, hunchT: 30, lightT: 70, cryT: 2, doorT: 7, lingerT: 0, knockCool: 0, tipT: 5, tips: {}, breathT: 0, sightings: 0, hides: 0, dead: shuffle([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]), reason: '', extraStun: 0 };
+      alert: 0, noiseT: 0, hunchT: 30, lightT: 70, cryT: 2, doorT: 7, lingerT: 0, knockCool: 0, tipT: 5, tips: {}, breathT: 0, sightings: 0, hides: 0, slips: D.slips, dead: shuffle([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]), reason: '', extraStun: 0 };
     hideAll();
     const fd = LV.doors.front, sd = LV.doors.side;
     // the staff wait outside, at the glass. More of them come to watch with every clue you find.
@@ -670,7 +672,7 @@
       K.breathT -= dt; if (K.breathT <= 0) { K.breathT = 2.1 + Math.random() * 0.8; breath(0.3, 0); }
       if (G.peerLook > 0 && KV._eye) { G.peerLook -= dt; const e = KV._eye, ey = P.y + EYE(); P.yaw = turnTo(P.yaw, Math.atan2(e[0] - P.x, -(e[2] - P.z)), dt * 2.5); P.pitch = lerp(P.pitch, clamp(Math.atan2(e[1] - ey, Math.hypot(e[0] - P.x, e[2] - P.z)), -1.3, 1.3), Math.min(1, dt * 3)); }
       if (K.peerT > 9 && !K.peerSaid) { K.peerSaid = true; krampusSay('I can hear you', 1); }
-      if (K.peerT > K.peerDur) { KV.gest = null; K.peerSaid = false; K.state = 'look'; K.t = 2.6; K.look = K.yaw + 2.4; G.alert = 0; }
+      if (K.peerT > K.peerDur) { KV.gest = null; K.peerSaid = false; K.state = 'look'; K.t = 2.6; K.look = K.yaw + 2.4; G.alert = 0; showMsg('He’s leaving. Wait for the bells to fade.', 3, 'tip'); }
       Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: 1.1, sackFull: false, look: null });
       return true;
     }
@@ -726,10 +728,18 @@
         else if (K.state !== 'chase' && G.alert > 0.45 && K.state !== 'rush') investigate(P.x, P.z, floorOf(P.y), true);
       } else if (K.state !== 'chase') G.alert = Math.max(0, G.alert - 0.14 * dt);
       if (K.state === 'chase') {
-        if (K.seeing && sameFloor && dP < 1.35) return caught('Krampus caught you.');
+        if (K.seeing && sameFloor && dP < 1.35) {
+          if (G.slips > 0) {   // he gets a fistful of coat, and you tear free: once (twice on Easy, never on Hard)
+            G.slips--; K.stun = 2.8; KV.gest = { name: 'roar', t0: NOW, dur: 1.6 }; roar(); thud(0.7, 0, 500); FEAR = 1; cam.shake = 0.6; G.alert = 1;
+            try { if (navigator.vibrate) navigator.vibrate(120); } catch (e) {}
+            showMsg(G.slips > 0 ? 'He got your coat. You tore free! RUN!' : 'He got your coat. You tore free! He won’t miss again. RUN!', 3.2);
+            return;
+          }
+          return caught('Krampus caught you.');
+        }
         K.repath -= dt;
         if (K.repath <= 0) { K.repath = 0.4; goTo(K.lastSeen[0], K.lastSeen[1], K.lastSeen[2]); }
-        if (!K.seeing && (!K.path || K.pi >= K.path.length)) { K.state = 'search'; K.t = 2.2; K.look = K.yaw; K.searchLeft = 2 + Math.min(2, G.clues); G.alert = 0.6; }
+        if (!K.seeing && (!K.path || K.pi >= K.path.length)) { K.state = 'search'; K.t = 2.2; K.look = K.yaw; K.searchLeft = 2 + Math.min(2, G.clues); G.alert = 0.6; if (msgT <= 0.3) showMsg(G.hiding != null ? 'He lost you. Stay still.' : 'He lost you. Hide before he looks around.', 2.6, 'tip'); }
       } else if (K.state === 'look' || K.state === 'search') {
         K.t -= dt; K.yaw = K.look + Math.sin((2.2 - K.t) * 1.9) * 1.2;
         if (K.t <= 0) {
@@ -811,7 +821,7 @@
       else {
         const c = CLUES[G.clues]; G.clues++; tone(660, 0.2, 0.2, 'triangle'); tone(880, 0.3, 0.2, 'triangle', 0.12);
         const bc = LV.containers[G.broC];
-        showMsg(c.text || ('His scarf. The crying is coming from the ' + zoneName(bc.x, bc.z, bc.y) + '.'), 4.5);
+        showMsg(c.text || ('His scarf. The crying is coming from ' + placeName(bc.x, bc.z, bc.y) + '.'), 4.5);
         killLights(3); let add = 2; for (const t of G.traps) if (!t.on && add > 0) { t.on = true; add--; }
       }
     }
@@ -1007,6 +1017,9 @@
       leoSay('n2', act >= 2 && t > ACT_AT[2] + 20 && STAFF.some((k) => near(cast[k], 12) && inView(cast[k].x, cast[k].y || 0, cast[k].z)), 'He hasn’t blinked. I’ve been counting.');
       leoSay('n3', act >= 3 && t > ACT_AT[3] + 12, 'They’re all humming the same song.');
       leoSay('n4', act >= 3 && t > ACT_AT[3] + 45, 'I don’t like it here anymore.');
+      once('dim', t > 505, () => { const e2 = e; let n = 0; const fl = () => { if (EX !== e2 || mode !== 'explore') return; ambDim = n % 2 ? 0.8 : 0.3; if (n++ < 7) later(0.07 + Math.random() * 0.1, fl); else { ambDim = 0.72; thud(0.3, 0, 250); } }; fl(); later(1.6, () => { if (EX === e2 && subT <= 0) say('LEO', 'Why did the lights do that?', 2.6); }); });
+      leoSay('n5', t > 552, 'Where are they all going? They’re all walking the same way.');
+      leoSay('n6', t > 575, 'It’s too quiet. Hold my hand tighter.');
       if (act === 0 && Math.random() < dt * 0.05) gest(man, 'lookUp', 2.5);
     }
     once('bells1', t > 470, () => { jingle(0.05, -0.8, 3); later(0.9, () => say('LEO', 'Did you hear bells?', 2.4)); });
@@ -1123,12 +1136,12 @@
       $('obj').innerHTML = `Leo’s things <b>${G.clues}/3</b> · Keys <b>${G.keys ? '✓' : '✗'}</b> · Leo <b>${G.bro.state === 'follow' ? 'with you' : 'missing'}</b>`;
       { const bc = LV.containers[G.broC];
         $('goal').textContent = G.phase === 'escape' ? (G.keys ? 'Front doors. Don’t let go of Leo.' : 'Keys first — behind a register — then the front doors!')
-          : G.clues >= 3 ? 'He’s in the ' + zoneName(bc.x, bc.z, bc.y) + (G.keys ? '. Check the pots and hampers.' : '. Grab the keys from a register too.')
+          : G.clues >= 3 ? 'He’s in ' + placeName(bc.x, bc.z, bc.y) + (G.keys ? '. Check the pots and hampers.' : '. Grab the keys from a register too.')
           : G.clues >= 1 ? 'Find the rest of Leo’s things. Follow the crying.' : 'Find Leo’s things. Listen for the crying.'; }
       const a = G.phase === 'escape' ? 1 : G.alert;
       $('alertFill').style.width = Math.round(a * 100) + '%'; $('alert').style.opacity = a > 0.02 ? 1 : 0.25;
       $('vignette').style.opacity = G.phase === 'escape' ? 0.35 : clamp(a * 1.1, 0, 0.85);
-      $('hidefx').style.opacity = G.hiding != null ? 1 : 0; $('hidefx').classList.toggle('peer', K.state === 'peer');
+      $('hidefx').style.opacity = G.hiding != null ? 1 : 0; $('hidefx').classList.toggle('peer', K.state === 'peer'); document.body.classList.toggle('stare', K.state === 'peer');
     }
     $('where').textContent = (floorOf(P.y) ? 'Upstairs · ' : 'Downstairs · ') + zoneName(P.x, P.z, P.y);
     $('stance').textContent = G && G.hiding != null && mode === 'play' ? 'Hiding' : P.crouch ? 'Crouched' : (P.run || keys.ShiftLeft || keys.ShiftRight) ? 'Running' : 'Standing';
@@ -1341,7 +1354,7 @@
     cut([27.2, 1.0, 25.6], [29.5, 2.0, 21.5], 0.95);
     yield 1.3; jingle(0.25, 0, 3); yield 1.5;
     cut([29.6, 1.55, 17.9], [32.7, 1.4, 13.9], 0.85);
-    yield say('', 'Mom screams. The employees fold their hands and lower their heads.', 3.0);
+    yield say('', 'Mom screams. The staff fold their hands and bow their heads.', 3.0);
     KV.gest = null;
     KV.look = head(C.you);
     cut([27.0, 2.5, 24.9], [29.5, 2.95, 21.5], 0.75);
@@ -1486,7 +1499,7 @@
   function startJump() { audioInit(); showOnly(null); runScene(sceneQuickIntro, startHunt); }
   function pause() { if (!playing()) return; pausedFrom = mode; mode = 'pause'; showOnly('pause'); $('skipAhead').style.display = pausedFrom === 'explore' && EX && EX.stage === 'explore' ? 'inline-block' : 'none'; if (document.pointerLockElement) document.exitPointerLock(); }
   function resume() { mode = pausedFrom || 'play'; showOnly(null); lastTime = performance.now(); lock(); }
-  function toTitle() { $('ears').style.display = 'none'; mode = 'title'; SC = null; timers.length = 0; document.body.classList.remove('cine', 'explore'); $('fade').style.opacity = 0; showOnly('title'); $('hud').style.display = 'none'; $('skipBtn').style.display = 'none'; refreshBest(); if (document.pointerLockElement) document.exitPointerLock(); music.on = false; hideAll(); timeScale = 1; }
+  function toTitle() { $('ears').style.display = 'none'; mode = 'title'; SC = null; timers.length = 0; document.body.classList.remove('cine', 'explore', 'stare'); $('fade').style.opacity = 0; showOnly('title'); $('hud').style.display = 'none'; $('skipBtn').style.display = 'none'; refreshBest(); if (document.pointerLockElement) document.exitPointerLock(); music.on = false; hideAll(); timeScale = 1; }
   function caught(reason) {
     if (mode !== 'play') return;
     // jumpscare first: he is suddenly right there, and the camera is dragged up to his face
@@ -1530,7 +1543,7 @@
   $('menu').addEventListener('click', toTitle);
   $('resume').addEventListener('click', resume);
   $('quit').addEventListener('click', toTitle);
-  $('skipAhead').addEventListener('click', () => { if (EX) { EX.t = Math.max(EX.t, EXPLORE_SECS - 2); gatherGroup(true); for (const k of ['gather', 'bells1', 'n1', 'n2', 'n3', 'n4', 'posts']) EX.events.add(k); EX.hs = 2; if (EX.leo.mode !== 'follow') popLeo(true); resume(); } });
+  $('skipAhead').addEventListener('click', () => { if (EX) { EX.t = Math.max(EX.t, EXPLORE_SECS - 2); gatherGroup(true); for (const k of ['gather', 'bells1', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6', 'dim', 'posts']) EX.events.add(k); EX.hs = 2; if (EX.leo.mode !== 'follow') popLeo(true); resume(); } });
 
   // ---------------- drawing ----------------
   const BUF = new DynBuf(), ABUF = new DynBuf(1 << 14), MBUF = new DynBuf(1 << 14);
@@ -1694,7 +1707,7 @@
     G.tipT -= dt; if (G.tipT > 0 || msgT > 0.4) return;
     const tip = (k, text, secs = 4.5) => { if (G.tips[k]) return false; G.tips[k] = true; showMsg(text, secs, 'tip'); G.tipT = 6; return true; };
     const sameFloor = K && Math.abs(K.y - P.y) < 1, dP = K ? Math.hypot(P.x - K.x, P.z - K.z) : 99;
-    if (G.phase === 'grace' && G.t < DIFF[diffKey].grace - 5 && tip('start', 'Look for Leo’s things. They glow. Each one makes his crying easier to follow.')) return;
+    if (G.phase === 'grace' && G.t < DIFF[diffKey].grace - 12 && tip('start', 'Look for Leo’s things. They glow. Each one makes his crying easier to follow.')) return;
     if (G.phase === 'hunt' && K.state !== 'wait' && sameFloor && dP < 15 && G.hiding == null && tip('close', isTouch ? 'He’s close. Crouch behind something, or climb into a pot or hamper (Hide).' : 'He’s close. Crouch (C) behind something, or climb into a pot or hamper (E).')) return;
     if (G.phase === 'hunt' && G.hiding == null) for (const t of G.traps) if (t.on && t.f === floorOf(P.y) && Math.hypot(t.x - P.x, t.z - P.z) < 4.5 && tip('trap', 'Bells on a string. Crouch to slip under them.')) return;
     if (G.phase === 'hunt' && G.clues >= 1 && !G.keys && G.time > 75 && tip('keys', 'You’ll need the store keys to get out. There’s a ring behind every register.')) return;
