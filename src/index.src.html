@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>BOX — Hide &amp; Seek</title>
+<title>BOX — Krampus</title>
 <style>
   :root { --ink:#1d1b19; --paper:#f4f1ea; --accent:#d4402c; --gold:#e0a03a; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -49,6 +49,14 @@
   #endText { font-size: 16px; line-height: 1.6; max-width: 480px; }
   .screen { overflow-y: auto; justify-content: safe center; }
   @media (max-height: 560px) { .logo { font-size: 54px; border-width: 4px; padding: 2px 14px 6px; } .screen { gap: 8px; padding: 12px; } .how { font-size: 12px; line-height: 1.4; } .how br { display: none; } button.big { padding: 10px 36px; font-size: 18px; } }
+  #phase.run { color: #ff5a44; }
+  #obj { font-size: 12.5px; background: rgba(20,18,16,0.6); padding: 4px 12px; border-radius: 999px; white-space: nowrap; }
+  #prompt { display: none; position: absolute; left: 50%; top: 60%; transform: translateX(-50%); background: rgba(20,18,16,0.7); padding: 6px 14px; border-radius: 10px; font-size: 14px; }
+  #hidefx { position: absolute; inset: 0; opacity: 0; transition: opacity .25s; background: linear-gradient(#000 0 34%, transparent 42% 58%, #000 66% 100%); }
+  #btnUse { right: calc(max(24px, env(safe-area-inset-right)) + 92px); bottom: calc(max(24px, env(safe-area-inset-bottom)) + 92px); background: rgba(212,64,44,0.75); }
+  body.touch #btnUse { display: none; }
+  .story { font-size: 14.5px; max-width: 560px; }
+  @media (max-height: 560px) { .story { font-size: 12px; } #obj { font-size: 11px; } }
   #fatal { display: none; position: fixed; inset: 0; align-items: center; justify-content: center; padding: 30px; text-align: center; z-index: 50; background: #141210; }
 </style>
 </head>
@@ -58,17 +66,21 @@
 
 <div id="hud">
   <div id="vignette"></div>
+  <div id="hidefx"></div>
   <div id="dot"></div>
   <div id="top">
-    <div id="clock"><span id="phase" class="hide">HIDE</span><span id="timer">0:30</span></div>
+    <div id="clock"><span id="phase" class="hide">FIND YOUR BROTHER</span><span id="timer">0:00</span></div>
     <div id="alert"><div id="alertFill"></div></div>
+    <div id="obj"></div>
   </div>
   <div id="where">Downstairs</div>
   <div id="stance">Standing</div>
   <canvas id="minimap" width="340" height="240"></canvas>
   <button id="btnPause">Pause</button>
   <div id="msg"></div>
-  <div id="hint">WASD move · Mouse look · Shift run (loud) · C crouch · M map · Esc pause</div>
+  <div id="prompt"><span class="keyonly"><b>E</b> · </span><span id="promptText"></span></div>
+  <div id="hint">WASD move · Mouse look · Shift run (loud) · C crouch · E hide / look inside · M map · Esc pause</div>
+  <button class="tbtn" id="btnUse">Hide</button>
   <button class="tbtn" id="btnCrouch">Crouch</button>
   <button class="tbtn" id="btnRun">Run</button>
 </div>
@@ -76,20 +88,29 @@
 
 <div class="screen" id="title">
   <div class="logo">BOX</div>
-  <div class="sub">Hide &amp; seek after closing</div>
+  <div class="sub">One minute to closing</div>
   <div class="row">
     <button data-diff="easy">Easy</button>
     <button data-diff="normal" class="sel">Normal</button>
     <button data-diff="hard">Hard</button>
   </div>
   <button class="big" id="play">Play</button>
-  <div class="how">
-    The store just closed and the staff are playing hide &amp; seek. You get <b>30 seconds</b> to hide while they count at the front doors. Then stay hidden until the clock runs out.<br><br>
-    <b>Crouch</b> behind sofas, shelves and beds. <b>Running is loud</b> and draws seekers. A <b>?</b> means they heard something; a <b>!</b> means they see you. If the red bar fills, you're found.<br><br>
-    <span class="keyonly">WASD / arrows to move · mouse to look (click the view) · Shift run · C crouch · M map · Esc pause</span>
-    <span class="touchonly">Left thumb: move · Right thumb: look · Crouch and Run buttons on the right</span>
-  </div>
+  <div class="how">A Krampus story. Best with sound on.</div>
   <div id="best"></div>
+</div>
+
+<div class="screen" id="intro" style="display:none">
+  <div class="how story">
+    Your parents walked into the Box store one minute before closing.<br>
+    <b>Something came through the skylight.</b> It took your little brother upstairs in a sack. Your parents ran. The employees locked the doors behind them, and smiled.<br><br>
+    <b>Find him.</b> He's stuffed in a hamper or a big pot upstairs. Follow the crying. Clues make it easier to hear, but every clue makes Krampus angrier and kills more lights.<br>
+    <b>Listen for the bells.</b> That's him. Crouch behind furniture, or climb into a pot or hamper. Duck under his bell traps.<br>
+    <b>Get the store keys</b> from one of the registers. Then grab your brother and run for the front doors.
+    <br><br>
+    <span class="keyonly">WASD move · mouse look · Shift run (loud) · C crouch · E hide / look inside · M map</span>
+    <span class="touchonly">Left thumb: move · Right thumb: look · Hide, Crouch and Run buttons on the right</span>
+  </div>
+  <button class="big" id="go">Start</button>
 </div>
 
 <div class="screen" id="pause" style="display:none">

@@ -142,11 +142,21 @@ precision highp float;
 precision mediump float;
 #endif
 varying vec3 vP; varying vec3 vN; varying vec3 vC; varying float vM;
-uniform vec3 uEye; uniform float uAlert;
+uniform vec3 uEye; uniform float uL[16]; uniform vec4 uK; uniform float uAlarm; uniform float uTime;
 float h1(float n){ return fract(sin(n)*43758.5453); }
+float zl(vec3 p){
+  float i = p.x<24.0 ? (p.z<14.0?0.0:1.0) : (p.x<40.0 ? (p.z<12.0?2.0:(p.z<28.0?3.0:4.0)) : (p.z<14.0?5.0:(p.z<28.0?6.0:7.0)));
+  if(p.y>4.45) i+=8.0;
+  float L=1.0;
+  for(int k=0;k<16;k++){ if(float(k)==i) L=uL[k]; }
+  float d=distance(p,uK.xyz); if(d<11.0) L*=mix(uK.w,1.0,d/11.0);
+  return L;
+}
 void main(){
   vec3 c=vC; float m=floor(vM+0.5); vec3 n=normalize(vN); vec3 p=vP;
-  if(m==4.0){ gl_FragColor=vec4(c,1.0); return; }
+  float L=zl(p);
+  float pulse=uAlarm*(0.12+0.38*(0.5+0.5*sin(uTime*7.0)));
+  if(m==4.0){ vec3 g=c*mix(0.28,1.0,L); g=mix(g,g*vec3(1.5,0.4,0.35),pulse); gl_FragColor=vec4(g,1.0); return; }
   if(m==1.0){ float f=fract(p.z/0.19); if(abs(n.y)<0.5) f=fract(p.y/0.19); c*= (f<0.07?0.84:1.0); }
   else if(m==2.0){ vec2 g=fract(p.xz/0.61); c*= (min(g.x,g.y)<0.03?0.8:1.0); }
   else if(m==3.0){
@@ -165,9 +175,10 @@ void main(){
   float l2=max(dot(n,normalize(vec3(-0.55,0.35,-0.6))),0.0);
   float l3=max(dot(n,normalize(vec3(0.6,0.2,-0.5))),0.0);
   vec3 lit=c*(0.40+0.36*l1+0.16*l2+0.10*l3)*vec3(1.06,1.0,0.92);
-  float d=length(p-uEye); float fog=clamp((d-22.0)/80.0,0.0,0.55);
-  lit=mix(lit, vec3(0.13,0.11,0.10), fog);
-  lit=mix(lit, vec3(0.6,0.05,0.05), uAlert*0.18);
+  lit*=mix(vec3(0.15,0.18,0.27), vec3(0.88), L);
+  float d=length(p-uEye); float fog=clamp((d-14.0)/60.0,0.0,0.7);
+  lit=mix(lit, vec3(0.05,0.05,0.07), fog);
+  lit=mix(lit, lit*vec3(1.7,0.35,0.3)+vec3(0.04,0.0,0.0), pulse);
   gl_FragColor=vec4(lit,1.0);
 }`;
 
@@ -189,7 +200,8 @@ class Renderer {
     this.loc = {
       aP: gl.getAttribLocation(pr, 'aP'), aN: gl.getAttribLocation(pr, 'aN'),
       aC: gl.getAttribLocation(pr, 'aC'), aM: gl.getAttribLocation(pr, 'aM'),
-      uVP: gl.getUniformLocation(pr, 'uVP'), uEye: gl.getUniformLocation(pr, 'uEye'), uAlert: gl.getUniformLocation(pr, 'uAlert'),
+      uVP: gl.getUniformLocation(pr, 'uVP'), uEye: gl.getUniformLocation(pr, 'uEye'), uL: gl.getUniformLocation(pr, 'uL[0]'),
+      uK: gl.getUniformLocation(pr, 'uK'), uAlarm: gl.getUniformLocation(pr, 'uAlarm'), uTime: gl.getUniformLocation(pr, 'uTime'),
     };
     gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
     this.dyn = gl.createBuffer();
@@ -204,14 +216,17 @@ class Renderer {
     const w = Math.floor(this.canvas.clientWidth * dpr), h = Math.floor(this.canvas.clientHeight * dpr);
     if (this.canvas.width !== w || this.canvas.height !== h) { this.canvas.width = w; this.canvas.height = h; }
   }
-  begin(vp, eye, alert) {
+  begin(vp, eye, o) {
     const gl = this.gl;
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-    gl.clearColor(0.1, 0.09, 0.08, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    gl.clearColor(0.03, 0.03, 0.05, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(this.pr);
     gl.uniformMatrix4fv(this.loc.uVP, false, vp);
     gl.uniform3f(this.loc.uEye, eye[0], eye[1], eye[2]);
-    gl.uniform1f(this.loc.uAlert, alert || 0);
+    gl.uniform1fv(this.loc.uL, o.lights);
+    gl.uniform4f(this.loc.uK, o.k[0], o.k[1], o.k[2], o.k[3]);
+    gl.uniform1f(this.loc.uAlarm, o.alarm || 0);
+    gl.uniform1f(this.loc.uTime, o.time || 0);
   }
   _bind(buf) {
     const gl = this.gl, L = this.loc, st = 40;

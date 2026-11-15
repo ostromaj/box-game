@@ -1,20 +1,21 @@
 // ============================================================
-// BOX — hide & seek after closing. Game logic.
+// BOX — Krampus. Game logic.
+// You're a kid locked in the store. Krampus took your little brother
+// upstairs. Find him by ear, get the keys, and run.
 // ============================================================
 (function () {
   'use strict';
   const $ = (id) => document.getElementById(id);
   const canvas = $('view');
   const DIFF = {
-    easy:   { label: 'Easy',   seekers: 2, speed: 0.85, range: 16, fov: 100, rate: 0.75, survive: 120, hide: 30, map: true, hunch: 0 },
-    normal: { label: 'Normal', seekers: 3, speed: 1.0,  range: 20, fov: 110, rate: 1.0,  survive: 150, hide: 30, map: false, hunch: 32 },
-    hard:   { label: 'Hard',   seekers: 4, speed: 1.12, range: 24, fov: 120, rate: 1.3,  survive: 180, hide: 25, map: false, hunch: 22 },
+    easy:   { label: 'Easy',   spd: 0.88, range: 13, rate: 0.7, grace: 35, map: true },
+    normal: { label: 'Normal', spd: 1.0,  range: 16, rate: 1.0, grace: 28, map: false },
+    hard:   { label: 'Hard',   spd: 1.08, range: 19, rate: 1.3, grace: 20, map: false },
   };
-  const SEEKERS = [
-    { name: 'Red', shirt: '#b8333a', hair: '#2a1d16', skin: '#c99b7a' },
-    { name: 'Blue', shirt: '#2f5d9e', hair: '#5a3a22', skin: '#e2b896' },
-    { name: 'Gold', shirt: '#c9962b', hair: '#111111', skin: '#8d5e3f' },
-    { name: 'Green', shirt: '#3c7a4a', hair: '#b88a4a', skin: '#f0c9a8' },
+  const CLUES = [
+    { name: 'mitten', col: '#d0342c', text: 'His mitten. The crying is easier to hear now.' },
+    { name: 'toy train', col: '#2f6fd0', text: 'His toy train. He has to be somewhere upstairs.' },
+    { name: 'scarf', col: '#2f9e55', text: null },
   ];
 
   // ---------------- level + engine setup ----------------
@@ -43,9 +44,14 @@
   const floorOf = (y) => (y > F1 * 0.5 ? 1 : 0);
   function zoneName(x, z, y) {
     const f = floorOf(y);
-    for (const r of LV.ramps) if (x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) return r.axis === 'x' ? 'Atrium Stairs' : 'Back Stairs';
+    for (const r of LV.ramps) if (x >= r.x0 && x <= r.x1 && z >= r.z0 && z <= r.z1) return 'Stairs';
     for (const [zf, x0, x1, z0, z1, n] of LV.zones) if (zf === f && x >= x0 && x <= x1 && z >= z0 && z <= z1) return n;
-    return f ? 'Upstairs' : 'Sales Floor';
+    return f ? 'Upstairs' : 'Downstairs';
+  }
+  // must match zl() in the shader
+  function lightZone(x, z, f) {
+    const i = x < 24 ? (z < 14 ? 0 : 1) : x < 40 ? (z < 12 ? 2 : z < 28 ? 3 : 4) : (z < 14 ? 5 : z < 28 ? 6 : 7);
+    return i + (f ? 8 : 0);
   }
   function inPoly(poly, x, z) {
     let ins = false;
@@ -56,29 +62,26 @@
     return ins;
   }
 
-  // ---------------- walk grid for the seekers ----------------
+  // ---------------- walk grid for Krampus ----------------
   const CELL = 0.5, GW = Math.ceil(LV.width / CELL), GH = Math.ceil(LV.depth / CELL), GN = GW * GH;
   const walk = new Uint8Array(GN * 2);
   const cover = new Uint8Array(GN * 2);
   const id = (f, i, j) => f * GN + j * GW + i;
   const cellOf = (x, z) => [clamp(Math.floor(x / CELL), 0, GW - 1), clamp(Math.floor(z / CELL), 0, GH - 1)];
   const cx = (i) => (i + 0.5) * CELL;
-  (function buildGrid() {
-    for (let f = 0; f < 2; f++) {
-      const fy = f ? F1 : 0;
-      for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
-        const x = cx(i), z = cx(j);
-        if (!inPoly(LV.polys[f], x, z)) continue;
-        if (f === 1 && !LV.surfaces.some((s) => s.y === F1 && x > s.x0 + 0.05 && x < s.x1 - 0.05 && z > s.z0 + 0.05 && z < s.z1 - 0.05)) continue;
-        if (LV.ramps.some((r) => x > r.x0 - 0.35 && x < r.x1 + 0.35 && z > r.z0 - 0.35 && z < r.z1 + 0.35)) continue;
-        if (WORLD.blocked(x, z, 0.4, fy + 0.36, fy + 1.7)) continue;
-        walk[id(f, i, j)] = 1;
-      }
+  for (let f = 0; f < 2; f++) {
+    const fy = f ? F1 : 0;
+    for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
+      const x = cx(i), z = cx(j);
+      if (!inPoly(LV.polys[f], x, z)) continue;
+      if (f === 1 && !LV.surfaces.some((s) => s.y === F1 && x > s.x0 + 0.05 && x < s.x1 - 0.05 && z > s.z0 + 0.05 && z < s.z1 - 0.05)) continue;
+      if (LV.ramps.some((r) => x > r.x0 - 0.35 && x < r.x1 + 0.35 && z > r.z0 - 0.35 && z < r.z1 + 0.35)) continue;
+      if (WORLD.blocked(x, z, 0.45, fy + 0.36, fy + 2.2)) continue;
+      walk[id(f, i, j)] = 1;
     }
-  })();
-  // stair links between floors
+  }
   const links = new Map();
-  function nearestWalk(f, x, z, maxR = 10) {
+  function nearestWalk(f, x, z, maxR = 12, only = null) {
     const [ci, cj] = cellOf(x, z);
     for (let r = 0; r <= maxR; r++) {
       let best = -1, bd = 1e9;
@@ -86,27 +89,25 @@
         if (i < 0 || j < 0 || i >= GW || j >= GH) continue;
         if (Math.max(Math.abs(i - ci), Math.abs(j - cj)) !== r) continue;
         const n = id(f, i, j);
-        if (walk[n]) { const d = (cx(i) - x) ** 2 + (cx(j) - z) ** 2; if (d < bd) { bd = d; best = n; } }
+        if (walk[n] && (!only || only[n])) { const d = (cx(i) - x) ** 2 + (cx(j) - z) ** 2; if (d < bd) { bd = d; best = n; } }
       }
       if (best >= 0) return best;
     }
     return -1;
   }
-  const STAIR_NODES = [];
+  let stairLinks = 0;
   for (const s of LV.stairs) {
     const a = nearestWalk(0, s.bottom[0], s.bottom[1], 3), b = nearestWalk(1, s.top[0], s.top[1], 3);
     if (a < 0 || b < 0) { console.warn('stair link missing', s.name); continue; }
     const cost = Math.hypot(s.top[0] - s.bottom[0], s.top[1] - s.bottom[1]) + 1;
     if (!links.has(a)) links.set(a, []); if (!links.has(b)) links.set(b, []);
-    links.get(a).push([b, cost]); links.get(b).push([a, cost]);
-    STAIR_NODES.push([a, b]);
+    links.get(a).push([b, cost]); links.get(b).push([a, cost]); stairLinks++;
   }
   const nodePos = (n) => { const f = n >= GN ? 1 : 0, k = n - f * GN; return [cx(k % GW), cx(Math.floor(k / GW)), f]; };
-  // reachable area (flood from the entrance)
   const reach = new Uint8Array(GN * 2);
   const REACH = [];
   (function flood() {
-    const s0 = nearestWalk(0, LV.seekerSpawns[0][0], LV.seekerSpawns[0][1]);
+    const s0 = nearestWalk(0, LV.playerSpawn[0], LV.playerSpawn[2]);
     const q = [s0]; reach[s0] = 1;
     while (q.length) {
       const n = q.pop(); REACH.push(n);
@@ -117,7 +118,6 @@
       }
       for (const [m] of links.get(n) || []) if (!reach[m]) { reach[m] = 1; q.push(m); }
     }
-    // "cover" = how much stuff is around a cell (good hiding spots attract seekers)
     for (const n of REACH) {
       const f = n >= GN ? 1 : 0, k = n - f * GN, i = k % GW, j = Math.floor(k / GW);
       let c = 0;
@@ -129,8 +129,8 @@
     }
   })();
   const SPOTS = REACH.filter((n) => cover[n] >= 14);
+  const rNode = (f, x, z) => nearestWalk(f, x, z, 14, reach);
 
-  // A* with a binary heap
   const gS = new Float32Array(GN * 2), came = new Int32Array(GN * 2), seenStamp = new Int32Array(GN * 2), closed = new Int32Array(GN * 2);
   let stampA = 1;
   function astar(a, b) {
@@ -145,9 +145,7 @@
     while (heap.length && iters++ < 60000) {
       const [, n] = pop();
       if (closed[n] === stampA) continue; closed[n] = stampA;
-      if (n === b) {
-        const out = []; let c = n; while (c >= 0) { out.push(c); c = came[c]; } out.reverse(); return out;
-      }
+      if (n === b) { const out = []; let c = n; while (c >= 0) { out.push(c); c = came[c]; } out.reverse(); return out; }
       const f = n >= GN ? 1 : 0, k = n - f * GN, i = k % GW, j = Math.floor(k / GW);
       const tryN = (m, cost) => {
         const g = gS[n] + cost;
@@ -174,14 +172,11 @@
   }
   function makePath(nodes) {
     if (!nodes) return null;
-    const pts = nodes.map(nodePos);
-    const out = [pts[0]];
+    const pts = nodes.map(nodePos), out = [pts[0]];
     let i = 0;
     while (i < pts.length - 1) {
       let j = i + 1;
-      if (pts[j][2] === pts[i][2]) {
-        while (j + 1 < pts.length && pts[j + 1][2] === pts[i][2] && lineWalkable(pts[i][2], pts[i][0], pts[i][1], pts[j + 1][0], pts[j + 1][1])) j++;
-      }
+      if (pts[j][2] === pts[i][2]) while (j + 1 < pts.length && pts[j + 1][2] === pts[i][2] && lineWalkable(pts[i][2], pts[i][0], pts[i][1], pts[j + 1][0], pts[j + 1][1])) j++;
       out.push(pts[j]); i = j;
     }
     return out;
@@ -193,8 +188,8 @@
     const c = document.createElement('canvas'); c.width = Math.ceil(LV.width * MAP_S); c.height = Math.ceil(LV.depth * MAP_S);
     const g = c.getContext('2d');
     g.translate(0, c.height); g.scale(MAP_S, -MAP_S);
-    g.fillStyle = 'rgba(255,255,255,0.9)'; g.beginPath(); LV.polys[f].forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z))); g.closePath(); g.fill();
-    if (f === 1) { g.fillStyle = 'rgba(40,40,40,0.25)'; g.fillRect(24, 8, 16, 16); g.fillRect(24.2, 34, 3.6, 9); }
+    g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillRect(0, 0, LV.width, LV.depth);
+    if (f === 1) { g.fillStyle = 'rgba(40,40,40,0.3)'; g.fillRect(24, 12, 16, 16); }
     const fy = f ? F1 : 0;
     for (const o of LV.obbs) {
       if (!o.collide || o.y1 <= fy + 0.3 || o.y0 >= fy + 1.8) continue;
@@ -205,37 +200,52 @@
     }
     g.fillStyle = '#e0a03a';
     for (const r of LV.ramps) g.fillRect(r.x0, r.z0, r.x1 - r.x0, r.z1 - r.z0);
+    if (f === 0) { g.fillStyle = '#2f9e55'; g.fillRect(30, 0, 4, 0.8); g.fillRect(63.2, 29, 0.8, 2); }
     return c;
   });
   const mm = $('minimap'), mg = mm.getContext('2d');
 
   // ---------------- state ----------------
   const P = { x: 0, y: 0, z: 0, yaw: 0, pitch: 0, vx: 0, vz: 0, crouch: false, ct: 0, run: false, bob: 0 };
-  let G = null;            // current round
+  const ZL = new Float32Array(16).fill(1);      // current light level per zone
+  const ZT = new Float32Array(16).fill(1);      // target light level per zone
+  let G = null, K = null;
   let diffKey = 'normal';
-  let mode = 'title';      // title | play | pause | end
+  let mode = 'title';      // title | intro | play | pause | end
   const keys = {};
   const touch = { move: null, look: null, mx: 0, mz: 0 };
-  let mapOn = true;
-  let lastTime = performance.now();
+  let mapOn = true, lastTime = performance.now(), flick = 1;
   const debug = /debug/.test(location.search);
+  const EYE = () => (G && G.hiding != null ? 0.72 : lerp(1.15, 0.6, P.ct));
 
-  function bestKey(k) { return 'box-best-' + k; }
-  function getBest(k) { try { return +localStorage.getItem(bestKey(k)) || 0; } catch (e) { return 0; } }
-  function setBest(k, v) { try { localStorage.setItem(bestKey(k), String(v)); } catch (e) { /* storage blocked */ } }
+  function getBest(k) { try { return +localStorage.getItem('box-krampus-' + k) || 0; } catch (e) { return 0; } }
+  function setBest(k, v) { try { localStorage.setItem('box-krampus-' + k, String(v)); } catch (e) { /* storage blocked */ } }
+  const shuffle = (a) => { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
   function newRound() {
     const D = DIFF[diffKey];
     const [px, py, pz, pyaw] = LV.playerSpawn;
-    Object.assign(P, { x: px, y: py, z: pz, yaw: pyaw, pitch: 0, vx: 0, vz: 0, crouch: false, ct: 0, run: false });
-    const seekers = [];
-    for (let k = 0; k < D.seekers; k++) {
-      const [sx, sz] = LV.seekerSpawns[k];
-      seekers.push({ ...SEEKERS[k], x: sx, z: sz, y: 0, yaw: Math.PI / 2, state: 'count', path: null, pi: 0, t: 0, look: 0, mark: '', step: 0, stuck: 0, lastP: [sx, sz], seeing: false, lastSeen: null, searchLeft: 0, repath: 0, target: null, spd: 0, see: 0 });
-    }
-    G = { D, phase: 'hide', t: D.hide, survive: D.survive, seekers, alert: 0, noiseT: 0, msg: '', msgT: 0, elapsed: 0, caughtBy: null, beepT: 0, heartT: 0, hunchT: D.hunch || 0 };
-    showMsg('Hide! They are counting…', 3);
+    Object.assign(P, { x: px, y: py, z: pz, yaw: pyaw, pitch: 0.12, vx: 0, vz: 0, crouch: false, ct: 0, run: false });
+    ZL.fill(1); ZT.fill(1);
+    const up = LV.containers.map((c, i) => i).filter((i) => LV.containers[i].f === 1);
+    const broC = up[(Math.random() * up.length) | 0], bc = LV.containers[broC];
+    // clues + keys
+    const items = [];
+    shuffle(LV.clueSpots.slice()).slice(0, 3).forEach(([f, x, z], i) => {
+      const [nx, nz] = nodePos(rNode(f, x, z));
+      items.push({ kind: 'clue', n: i, x: nx, z: nz, y: f ? F1 : 0, f, taken: false });
+    });
+    const [kf, kx, kz, kh] = LV.keySpots[(Math.random() * LV.keySpots.length) | 0];
+    items.push({ kind: 'keys', x: kx, z: kz, y: (kf ? F1 : 0) + kh, f: kf, taken: false });
+    const traps = shuffle(LV.trapSpots.map(([f, x, z, ax, len]) => ({ f, x, z, ax, len, on: false, cool: 0 })));
+    for (let i = 0; i < 4; i++) traps[i].on = true;
+    const [sx, sz] = nodePos(rNode(1, bc.x, bc.z));
+    K = { x: sx, z: sz, y: F1, yaw: 0, state: 'wait', path: null, pi: 0, t: 0, look: 0, step: 0, stuck: 0, lastP: [sx, sz], seeing: false, lastSeen: null, searchLeft: 0, repath: 0, target: null, spd: 0, see: 0, sawT: 99, stun: 0, mark: '' };
+    G = { D, phase: 'grace', t: D.grace, time: 0, huntT: 0, clues: 0, keys: false, items, traps, broC, bro: { state: 'hidden', x: bc.x, z: bc.z, y: bc.y }, trail: [], hiding: null, back: null,
+      alert: 0, noiseT: 0, msgT: 0, level: 0, hunchT: 30, lightT: 70, cryT: 2, doorT: 0, dead: shuffle([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]), reason: '' };
+    showMsg('He took your brother upstairs.', 4);
   }
+  const level = () => Math.min(5, G.clues + Math.floor(G.huntT / 100));
 
   // ---------------- input ----------------
   window.addEventListener('keydown', (e) => {
@@ -243,34 +253,25 @@
     if (mode === 'play') {
       if (e.code === 'KeyC' || e.code === 'ControlLeft') P.crouch = !P.crouch;
       if (e.code === 'KeyM') mapOn = !mapOn;
+      if (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter') interact();
       if (e.code === 'Escape' || e.code === 'KeyP') pause();
-    } else if (mode === 'pause' && (e.code === 'KeyP')) resume();
+    } else if (mode === 'pause' && e.code === 'KeyP') resume();
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   });
   window.addEventListener('keyup', (e) => { keys[e.code] = false; });
   window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-  let dragLook = false;
-  canvas.addEventListener('mousedown', (e) => {
-    if (mode !== 'play') return;
-    if (!isTouch && canvas.requestPointerLock && document.pointerLockElement !== canvas) {
-      try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (err) { /* blocked in some frames */ }
-    }
-    dragLook = true;
-  });
+  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  if (isTouch) document.body.classList.add('touch');
+  let dragLook = false, hadLock = false;
+  const lock = () => { if (!isTouch && canvas.requestPointerLock && document.pointerLockElement !== canvas) { try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) { /* blocked in some frames */ } } };
+  canvas.addEventListener('mousedown', () => { if (mode !== 'play') return; lock(); dragLook = true; });
   window.addEventListener('mouseup', () => { dragLook = false; });
-  window.addEventListener('mousemove', (e) => {
-    if (mode !== 'play') return;
-    if (document.pointerLockElement === canvas || dragLook) look(e.movementX || 0, e.movementY || 0, 0.0024);
-  });
+  window.addEventListener('mousemove', (e) => { if (mode === 'play' && (document.pointerLockElement === canvas || dragLook)) look(e.movementX || 0, e.movementY || 0, 0.0024); });
   document.addEventListener('pointerlockchange', () => {
     if (document.pointerLockElement !== canvas && mode === 'play' && !isTouch && hadLock) pause();
     hadLock = document.pointerLockElement === canvas;
   });
-  let hadLock = false;
   function look(dx, dy, k) { P.yaw += dx * k; P.pitch = clamp(P.pitch - dy * k, -1.35, 1.35); }
-
-  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
-  if (isTouch) document.body.classList.add('touch');
   const stickBase = $('stick'), stickKnob = $('knob');
   canvas.addEventListener('touchstart', (e) => {
     if (mode !== 'play') return;
@@ -307,62 +308,91 @@
   $('btnCrouch').addEventListener('touchstart', (e) => { P.crouch = !P.crouch; e.preventDefault(); }, { passive: false });
   $('btnRun').addEventListener('touchstart', (e) => { P.run = true; e.preventDefault(); }, { passive: false });
   $('btnRun').addEventListener('touchend', (e) => { P.run = false; e.preventDefault(); }, { passive: false });
+  $('btnUse').addEventListener('touchstart', (e) => { interact(); e.preventDefault(); }, { passive: false });
+  $('btnUse').addEventListener('click', () => { if (!isTouch) interact(); });
   $('btnPause').addEventListener('click', () => pause());
   $('minimap').addEventListener('click', () => { mapOn = !mapOn; });
 
   // ---------------- audio ----------------
-  let AC = null, master = null;
+  let AC = null, master = null, noiseBuf = null;
   function audioInit() {
     if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
-    try { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = 0.6; master.connect(AC.destination); } catch (e) { AC = null; }
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = 0.7; master.connect(AC.destination); } catch (e) { AC = null; }
   }
-  function tone(freq, dur, vol = 0.2, type = 'sine', when = 0, slide = 0) {
-    if (!AC) return;
+  function out(node, pan) {
+    if (pan && AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); node.connect(p); p.connect(master); } else node.connect(master);
+  }
+  function tone(freq, dur, vol = 0.2, type = 'sine', when = 0, slide = 0, pan = 0) {
+    if (!AC || vol < 0.003) return;
     const t0 = AC.currentTime + when, o = AC.createOscillator(), g = AC.createGain();
     o.type = type; o.frequency.setValueAtTime(freq, t0); if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t0 + dur);
     g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(vol, t0 + 0.01); g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
-    o.connect(g); g.connect(master); o.start(t0); o.stop(t0 + dur + 0.05);
+    o.connect(g); out(g, pan); o.start(t0); o.stop(t0 + dur + 0.05);
   }
-  let noiseBuf = null;
-  function step(vol, pan) {
+  function thud(vol, pan, cut = 900) {
     if (!AC || vol < 0.01) return;
-    if (!noiseBuf) { noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.08, AC.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3); }
+    if (!noiseBuf) { noiseBuf = AC.createBuffer(1, AC.sampleRate * 0.12, AC.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3); }
     const s = AC.createBufferSource(); s.buffer = noiseBuf;
-    const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 900;
+    const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut;
     const g = AC.createGain(); g.gain.value = vol;
-    s.connect(f); f.connect(g);
-    if (AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p); p.connect(master); } else g.connect(master);
-    s.start();
+    s.connect(f); f.connect(g); out(g, pan); s.start();
+  }
+  function jingle(vol, pan, n = 4) {
+    for (let i = 0; i < n; i++) tone(2300 + Math.random() * 2300, 0.16 + Math.random() * 0.25, vol * (0.5 + Math.random() * 0.5), 'sine', i * 0.04 + Math.random() * 0.05, 0, pan);
+  }
+  function sob(vol, pan) {
+    tone(540, 0.34, vol, 'triangle', 0, -150, pan); tone(480, 0.4, vol, 'triangle', 0.42, -150, pan); tone(610, 0.14, vol * 0.6, 'sine', 0.92, -90, pan);
+  }
+  function roar() { tone(95, 1.1, 0.5, 'sawtooth', 0, -50); tone(63, 1.3, 0.4, 'square', 0.05, -25); thud(0.6, 0, 400); }
+  // where a sound at (x,z,y) sits relative to the player: [loudness 0..1, pan]
+  function hear(x, z, y, range) {
+    const d = Math.hypot(x - P.x, z - P.z);
+    const fall = floorOf(y) === floorOf(P.y) ? 1 : 0.5;
+    const rel = Math.atan2(x - P.x, -(z - P.z)) - P.yaw;
+    return [Math.pow(clamp(1 - d / range, 0, 1), 1.5) * fall, Math.sin(rel) * clamp(d / 3, 0, 1)];
   }
 
   // ---------------- HUD ----------------
-  function showMsg(t, secs) { G.msg = t; G.msgT = secs; $('msg').textContent = t; $('msg').style.opacity = 1; }
-  function fmt(t) { t = Math.max(0, Math.ceil(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); }
+  function showMsg(t, secs) { G.msgT = secs; $('msg').textContent = t; $('msg').style.opacity = 1; }
+  function fmt(t) { t = Math.max(0, Math.floor(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); }
+  function nearContainer() {
+    let best = -1, bd = 1.5;
+    LV.containers.forEach((c, i) => { if (c.f !== floorOf(P.y)) return; const d = Math.hypot(c.x - P.x, c.z - P.z); if (d < bd) { bd = d; best = i; } });
+    return best;
+  }
   function updateHUD(dt) {
     if (G.msgT > 0) { G.msgT -= dt; if (G.msgT <= 0) $('msg').style.opacity = 0; }
-    $('phase').textContent = G.phase === 'hide' ? 'HIDE' : 'STAY HIDDEN';
-    $('timer').textContent = G.phase === 'hide' ? fmt(G.t) : fmt(G.survive);
-    $('phase').className = G.phase === 'hide' ? 'hide' : 'seek';
+    const ph = $('phase');
+    ph.textContent = G.phase === 'grace' ? 'HE IS HIDING YOUR BROTHER' : G.phase === 'hunt' ? 'FIND YOUR BROTHER' : 'RUN TO THE FRONT DOORS';
+    ph.className = G.phase === 'escape' ? 'run' : G.phase === 'grace' ? 'hide' : 'seek';
+    $('timer').textContent = G.phase === 'grace' ? fmt(G.t + 1) : fmt(G.time);
     $('where').textContent = (floorOf(P.y) ? 'Upstairs · ' : 'Downstairs · ') + zoneName(P.x, P.z, P.y);
-    $('alertFill').style.width = Math.round(G.alert * 100) + '%';
-    $('alert').style.opacity = G.alert > 0.02 ? 1 : 0.25;
-    $('vignette').style.opacity = clamp(G.alert * 1.2, 0, 0.9);
-    $('stance').textContent = P.crouch ? 'Crouched' : (P.run ? 'Running' : 'Standing');
+    $('obj').innerHTML = `Clues <b>${G.clues}/3</b> · Keys <b>${G.keys ? '✓' : '✗'}</b> · Brother <b>${G.bro.state === 'follow' ? 'with you' : 'missing'}</b>`;
+    const a = G.phase === 'escape' ? 1 : G.alert;
+    $('alertFill').style.width = Math.round(a * 100) + '%';
+    $('alert').style.opacity = a > 0.02 ? 1 : 0.25;
+    $('vignette').style.opacity = G.phase === 'escape' ? 0.35 : clamp(a * 1.1, 0, 0.85);
+    $('hidefx').style.opacity = G.hiding != null ? 1 : 0;
+    $('stance').textContent = G.hiding != null ? 'Hiding' : P.crouch ? 'Crouched' : (P.run || keys.ShiftLeft || keys.ShiftRight) ? 'Running' : 'Standing';
     $('btnCrouch').classList.toggle('on', P.crouch);
-    // minimap
+    let prompt = '';
+    if (G.hiding != null) prompt = 'Climb out';
+    else { const c = nearContainer(); if (c >= 0) prompt = LV.containers[c].type === 'pot' ? 'Look in / hide in the pot' : 'Look in / hide in the hamper'; }
+    $('prompt').style.display = prompt ? 'block' : 'none';
+    $('promptText').textContent = prompt;
+    $('btnUse').style.display = prompt && isTouch ? 'block' : 'none';
+    $('btnUse').textContent = G.hiding != null ? 'Out' : 'Hide';
     mm.style.display = mapOn ? 'block' : 'none';
     if (mapOn) {
-      const f = floorOf(P.y), W = mm.width, H = mm.height, vw = 34, vh = vw * H / W;
-      mg.clearRect(0, 0, W, H);
+      const f = floorOf(P.y), Wd = mm.width, H = mm.height, s = Wd / 34;
+      mg.clearRect(0, 0, Wd, H);
       mg.save();
-      const s = W / vw;
-      mg.translate(W / 2, H / 2); mg.scale(s / MAP_S, s / MAP_S);
+      mg.translate(Wd / 2, H / 2); mg.scale(s / MAP_S, s / MAP_S);
       mg.translate(-P.x * MAP_S, -(LV.depth - P.z) * MAP_S);
-      mg.globalAlpha = 0.92; mg.drawImage(mapImg[f], 0, 0); mg.globalAlpha = 1;
+      mg.globalAlpha = 0.9; mg.drawImage(mapImg[f], 0, 0); mg.globalAlpha = 1;
       const sx = (x) => x * MAP_S, sz = (z) => (LV.depth - z) * MAP_S;
-      if (G.D.map || debug) for (const k of G.seekers) if (floorOf(k.y) === f) {
-        mg.fillStyle = k.shirt; mg.beginPath(); mg.arc(sx(k.x), sz(k.z), 3.2, 0, TAU); mg.fill();
-      }
+      if ((G.D.map || debug) && floorOf(K.y) === f) { mg.fillStyle = '#7a1010'; mg.beginPath(); mg.arc(sx(K.x), sz(K.z), 4, 0, TAU); mg.fill(); }
+      if (debug) { const c = LV.containers[G.broC]; mg.fillStyle = '#18a0ff'; mg.beginPath(); mg.arc(sx(c.x), sz(c.z), 3, 0, TAU); mg.fill(); for (const it of G.items) if (!it.taken && it.f === f) { mg.fillStyle = it.kind === 'keys' ? '#d6b24a' : '#d040d0'; mg.fillRect(sx(it.x) - 2, sz(it.z) - 2, 4, 4); } }
       mg.translate(sx(P.x), sz(P.z)); mg.rotate(Math.PI - P.yaw);
       mg.fillStyle = '#d4402c'; mg.beginPath(); mg.moveTo(0, -6); mg.lineTo(4, 4); mg.lineTo(-4, 4); mg.closePath(); mg.fill();
       mg.restore();
@@ -370,304 +400,324 @@
     }
   }
 
-  // ---------------- seekers ----------------
-  function seekerFloorNode(k) { return nearestWalk(floorOf(k.y), k.x, k.z); }
-  function goTo(k, x, z, f) {
-    const a = seekerFloorNode(k), b = nearestWalk(f, x, z);
-    const p = makePath(astar(a, b));
-    if (p && p.length) { k.path = p; k.pi = 1; return true; }
-    k.path = null; return false;
+  // ---------------- lights ----------------
+  function killLights(n) {
+    let did = false;
+    for (let i = 0; i < n && G.dead.length; i++) { ZT[G.dead.pop()] = 0.12; did = true; }
+    if (did) { thud(0.5, 0, 300); tone(140, 0.25, 0.2, 'square', 0, -80); }
   }
-  function pickPatrol(k) {
-    const others = G.seekers.filter((o) => o !== k && o.target).map((o) => o.target);
-    let best = null, bs = -1;
-    for (let c = 0; c < 6; c++) {
-      const n = (Math.random() < 0.75 && SPOTS.length) ? SPOTS[(Math.random() * SPOTS.length) | 0] : REACH[(Math.random() * REACH.length) | 0];
-      const [x, z, f] = nodePos(n);
-      let sc = Math.random() * 6 + Math.min(18, Math.hypot(x - k.x, z - k.z)) * 0.3;
-      for (const t of others) sc += Math.min(20, Math.hypot(t[0] - x, t[1] - z) + (t[2] !== f ? 12 : 0)) * 0.5;
-      if (sc > bs) { bs = sc; best = [x, z, f]; }
-    }
-    k.target = best; k.state = 'patrol'; k.mark = '';
-    if (!goTo(k, best[0], best[1], best[2])) { k.state = 'look'; k.t = 0.5; }
+  function updateLights(dt) {
+    for (let i = 0; i < 16; i++) ZL[i] += (ZT[i] - ZL[i]) * Math.min(1, dt * 5);
+    flick = Math.random() < 0.3 ? 0.35 + Math.random() * 0.65 : lerp(flick, 1, 0.3);
   }
-  function canSee(k) {
-    const D = G.D;
-    const ex = k.x, ey = k.y + 1.62, ez = k.z;
-    const eye = P.y + lerp(1.6, 0.62, P.ct), body = P.y + lerp(1.0, 0.38, P.ct);
+
+  // ---------------- interact: hide / rescue ----------------
+  function interact() {
+    if (mode !== 'play') return;
+    if (G.hiding != null) { [P.x, P.z] = G.back; G.hiding = null; return; }
+    const i = nearContainer(); if (i < 0) return;
+    if (G.bro.state === 'hidden' && i === G.broC) return rescue();
+    if (G.phase === 'escape') { showMsg('No time to hide. RUN!', 1.5); return; }
+    if (K.state === 'chase' && (K.seeing || K.sawT < 1.5)) return caught('He watched you climb into the ' + LV.containers[i].type + '.');
+    G.hiding = i; G.back = [P.x, P.z];
+    P.x = LV.containers[i].x; P.z = LV.containers[i].z; P.vx = P.vz = 0;
+    if (G.bro.state === 'hidden') showMsg('Empty. You climb in.', 1.6);
+  }
+  function rescue() {
+    G.bro.state = 'follow'; G.phase = 'escape'; G.trail = []; P.crouch = false;
+    K.state = 'rage'; K.stun = 3.2; K.repath = 0; K.mark = '!';
+    for (let i = 0; i < 16; i++) ZT[i] = Math.max(ZT[i], 0.5);
+    roar();
+    showMsg(G.keys ? 'You found him! RUN — front doors!' : 'You found him! RUN — but you still need the keys!', 4);
+  }
+
+  // ---------------- Krampus ----------------
+  function goTo(x, z, f) {
+    const p = makePath(astar(rNode(floorOf(K.y), K.x, K.z), rNode(f, x, z)));
+    if (p && p.length) { K.path = p; K.pi = 1; return true; }
+    K.path = null; return false;
+  }
+  function pickPatrol() {
+    const n = (Math.random() < 0.7 && SPOTS.length) ? SPOTS[(Math.random() * SPOTS.length) | 0] : REACH[(Math.random() * REACH.length) | 0];
+    const [x, z, f] = nodePos(n);
+    K.state = 'patrol'; K.mark = '';
+    if (!goTo(x, z, f)) { K.state = 'look'; K.t = 0.5; K.look = K.yaw; }
+  }
+  function canSee() {
+    if (G.hiding != null) return 0;
+    const range = (G.D.range + 2 * level()) * (ZL[lightZone(P.x, P.z, floorOf(P.y))] < 0.5 ? 0.7 : 1);
+    const ex = K.x, ey = K.y + 2.3, ez = K.z;
+    const eye = P.y + EYE(), body = P.y + lerp(0.7, 0.3, P.ct);
     const dx = P.x - ex, dz = P.z - ez, dy = eye - ey;
     const d = Math.hypot(dx, dz, dy * 0.6);
-    if (d > D.range) return 0;
-    if (d > 1.7) {
-      const fx = Math.sin(k.yaw), fz = -Math.cos(k.yaw);
-      const cos = (dx * fx + dz * fz) / Math.max(0.001, Math.hypot(dx, dz));
-      if (cos < Math.cos((D.fov / 2) * Math.PI / 180)) return 0;
+    if (d > range) return 0;
+    if (d > 1.8) {
+      const fx = Math.sin(K.yaw), fz = -Math.cos(K.yaw);
+      if ((dx * fx + dz * fz) / Math.max(0.001, Math.hypot(dx, dz)) < Math.cos(55 * Math.PI / 180)) return 0;
     }
-    if (WORLD.clear(ex, ey, ez, P.x, eye + 0.08, P.z) || WORLD.clear(ex, ey, ez, P.x, body, P.z)) return d;
+    if (WORLD.clear(ex, ey, ez, P.x, eye + 0.06, P.z) || WORLD.clear(ex, ey, ez, P.x, body, P.z)) return [d, range];
     return 0;
   }
-  function hearNoise(x, z, f, radius) {
-    for (const k of G.seekers) {
-      if (k.state === 'chase' || k.state === 'count') continue;
-      const r = floorOf(k.y) === f ? radius : radius * 0.45;
-      if (Math.hypot(k.x - x, k.z - z) < r) {
-        k.state = 'investigate'; k.mark = '?';
-        const jx = x + (Math.random() - 0.5) * 3, jz = z + (Math.random() - 0.5) * 3;
-        if (!goTo(k, jx, jz, f)) goTo(k, x, z, f);
-      }
-    }
+  function investigate(x, z, f, fast) {
+    if (K.state === 'chase' || K.state === 'rage' || K.state === 'wait') return;
+    K.state = fast ? 'rush' : 'investigate'; K.mark = '?';
+    if (!goTo(x + (Math.random() - 0.5) * 2, z + (Math.random() - 0.5) * 2, f)) goTo(x, z, f);
   }
-  function updateSeekers(dt) {
-    const D = G.D;
-    let rate = 0, top = null, topR = 0;
-    for (const k of G.seekers) {
-      if (G.phase === 'hide') { k.state = 'count'; continue; }
-      if (k.state === 'count') pickPatrol(k);
-      const d = canSee(k);
-      k.seeing = d > 0;
-      if (k.seeing) {
-        let r = d < 2.2 ? 4.5 : 0.55 + 2.3 * (1 - d / D.range);
+  function hearNoise(x, z, f, radius) {
+    const r = floorOf(K.y) === f ? radius : radius * 0.45;
+    if (Math.hypot(K.x - x, K.z - z) < r) investigate(x, z, f, false);
+  }
+  function updateKrampus(dt) {
+    const D = G.D, mult = D.spd * (1 + 0.05 * Math.min(4, level()));
+    if (K.state === 'wait') { K.yaw += dt * 0.6; return; }
+    if (K.stun > 0) { K.stun -= dt; K.spd = 0; return; }
+    const sameFloor = Math.abs(K.y - P.y) < 1;
+    const dP = Math.hypot(P.x - K.x, P.z - K.z);
+    if (K.state === 'rage') {
+      K.repath -= dt;
+      if (K.repath <= 0) { K.repath = 0.35; const b = G.bro; const tb = Math.hypot(b.x - K.x, b.z - K.z) < dP; goTo(tb ? b.x : P.x, tb ? b.z : P.z, floorOf(tb ? b.y : P.y)); }
+      if (sameFloor && dP < 1.3) return caught('Krampus caught you at the last second.');
+      if (Math.abs(K.y - G.bro.y) < 1 && Math.hypot(G.bro.x - K.x, G.bro.z - K.z) < 1.15) return caught('Krampus snatched your brother back.');
+    } else {
+      const s = canSee();
+      K.seeing = !!s; K.sawT = K.seeing ? 0 : K.sawT + dt;
+      if (s) {
+        const [d, range] = s;
+        let r = d < 2.4 ? 5 : 0.6 + 2.4 * (1 - d / range);
         if (P.ct > 0.5 && d > 3) r *= 0.5;
         if (Math.hypot(P.vx, P.vz) > 0.5) r *= 1.25;
-        r *= D.rate; rate += r; if (r > topR) { topR = r; top = k; }
-        k.see += dt;
-        if (k.see > 0.25 || G.alert > 0.35) {
-          if (k.state !== 'chase') { k.state = 'chase'; k.repath = 0; }
-          k.lastSeen = [P.x, P.z, floorOf(P.y)]; k.mark = '!';
-        } else if (k.state !== 'chase') k.mark = '?';
-      } else k.see = 0;
-
-      // brain
-      if (k.state === 'chase') {
-        k.repath -= dt;
-        if (k.repath <= 0) { k.repath = 0.45; goTo(k, k.lastSeen[0], k.lastSeen[1], k.lastSeen[2]); }
-        if (!k.seeing && (!k.path || k.pi >= k.path.length)) { k.state = 'search'; k.t = 2.2; k.look = k.yaw; k.searchLeft = 2; k.mark = '?'; }
-      } else if (k.state === 'look' || k.state === 'search') {
-        k.t -= dt; k.yaw = k.look + Math.sin((2.2 - k.t) * 1.9) * 1.15;
-        if (k.t <= 0) {
-          if (k.state === 'search' && k.searchLeft > 0 && k.lastSeen) {
-            k.searchLeft--; const [lx, lz, lf] = k.lastSeen;
-            const a = Math.random() * TAU, rr = 2 + Math.random() * 5;
-            if (goTo(k, lx + Math.cos(a) * rr, lz + Math.sin(a) * rr, lf)) k.state = 'searchwalk'; else k.t = 1;
-          } else pickPatrol(k);
+        G.alert = Math.min(1, G.alert + r * D.rate * dt);
+        K.lastSeen = [P.x, P.z, floorOf(P.y)];
+        if (G.alert >= 1 && K.state !== 'chase') { K.state = 'chase'; K.repath = 0; K.mark = '!'; roar(); showMsg('HE SEES YOU!', 1.5); }
+        else if (K.state !== 'chase') { K.mark = '?'; if (G.alert > 0.45 && K.state !== 'rush') investigate(P.x, P.z, floorOf(P.y), true); }
+      } else if (K.state !== 'chase') G.alert = Math.max(0, G.alert - 0.14 * dt);
+      if (K.state === 'chase') {
+        if (K.seeing && sameFloor && dP < 1.35) return caught('Krampus caught you.');
+        K.repath -= dt;
+        if (K.repath <= 0) { K.repath = 0.4; goTo(K.lastSeen[0], K.lastSeen[1], K.lastSeen[2]); }
+        if (!K.seeing && (!K.path || K.pi >= K.path.length)) { K.state = 'search'; K.t = 2.2; K.look = K.yaw; K.searchLeft = 2 + Math.min(2, G.clues); K.mark = '?'; G.alert = 0.6; }
+      } else if (K.state === 'look' || K.state === 'search') {
+        K.t -= dt; K.yaw = K.look + Math.sin((2.2 - K.t) * 1.9) * 1.2;
+        if (K.t <= 0) {
+          if (K.state === 'search' && K.searchLeft > 0 && K.lastSeen) {
+            K.searchLeft--; const [lx, lz, lf] = K.lastSeen, a = Math.random() * TAU, rr = 2 + Math.random() * 5;
+            if (goTo(lx + Math.cos(a) * rr, lz + Math.sin(a) * rr, lf)) K.state = 'searchwalk'; else K.t = 1;
+          } else pickPatrol();
         }
       }
-      // movement along the path
-      const moving = k.path && k.pi < k.path.length && k.state !== 'look' && k.state !== 'search';
-      if (moving) {
-        const spd = (k.state === 'chase' ? 3.7 : k.state === 'investigate' ? 2.7 : k.state === 'searchwalk' ? 2.3 : 1.9) * D.speed;
-        let left = spd * dt;
-        while (left > 0 && k.pi < k.path.length) {
-          const [tx, tz] = k.path[k.pi];
-          const ddx = tx - k.x, ddz = tz - k.z, dist = Math.hypot(ddx, ddz);
-          if (dist < 0.05) { k.pi++; continue; }
-          const m = Math.min(left, dist); k.x += (ddx / dist) * m; k.z += (ddz / dist) * m; left -= m;
-          const want = Math.atan2(ddx, -ddz);
-          let dy = want - k.yaw; while (dy > Math.PI) dy -= TAU; while (dy < -Math.PI) dy += TAU;
-          if (!(k.state === 'chase' && k.seeing)) k.yaw += dy * Math.min(1, dt * 7);
-          if (dist <= m + 1e-4) k.pi++;
-        }
-        k.y = surfaceY(k.x, k.z, k.y);
-        k.spd = spd;
-        // footsteps
-        const before = k.step; k.step += spd * dt * 0.9;
-        if (Math.floor(before) !== Math.floor(k.step)) {
-          const dd = Math.hypot(k.x - P.x, k.z - P.z) + Math.abs(k.y - P.y) * 2;
-          const rel = Math.atan2(k.x - P.x, -(k.z - P.z)) - P.yaw;
-          step(Math.pow(clamp(1 - dd / 20, 0, 1), 1.6) * 0.55, Math.sin(rel));
-        }
-        // stuck check
-        k.stuck += dt;
-        if (k.stuck > 2.5) { if (Math.hypot(k.x - k.lastP[0], k.z - k.lastP[1]) < 0.6) { if (k.state === 'chase') k.repath = 0; else pickPatrol(k); } k.stuck = 0; k.lastP = [k.x, k.z]; }
-        if (k.pi >= k.path.length) {
-          if (k.state === 'patrol') { k.state = 'look'; k.t = 1.2 + Math.random() * 1.6; k.look = k.yaw; }
-          else if (k.state === 'investigate') { k.state = 'look'; k.t = 2.2; k.look = k.yaw; k.mark = '?'; }
-          else if (k.state === 'searchwalk') { k.state = 'search'; k.t = 2; k.look = k.yaw; }
-        }
-      } else k.spd = 0;
-      if (k.state === 'chase' && k.seeing) {
-        const want = Math.atan2(P.x - k.x, -(P.z - k.z));
-        let dy = want - k.yaw; while (dy > Math.PI) dy -= TAU; while (dy < -Math.PI) dy += TAU; k.yaw += dy * Math.min(1, dt * 8);
-      }
-      if (k.state === 'patrol' || k.state === 'look') { if (k.mark === '?' && k.state === 'patrol') k.mark = ''; }
-    }
-    // keep seekers apart
-    for (let a = 0; a < G.seekers.length; a++) for (let b = a + 1; b < G.seekers.length; b++) {
-      const A = G.seekers[a], B = G.seekers[b];
-      if (Math.abs(A.y - B.y) > 1) continue;
-      const dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz);
-      if (d > 0 && d < 0.7) { const p = (0.7 - d) / 2 / d; A.x -= dx * p; A.z -= dz * p; B.x += dx * p; B.z += dz * p; }
-    }
-    // a "hunch": now and then one patrolling seeker wanders toward your general area
-    if (G.phase !== 'hide' && G.D.hunch) {
+      // every so often he drifts toward wherever you are
       G.hunchT -= dt;
       if (G.hunchT <= 0) {
-        G.hunchT = G.D.hunch;
-        const free = G.seekers.filter((k) => k.state === 'patrol' || k.state === 'look');
-        if (free.length) {
-          const k = free[(Math.random() * free.length) | 0], a = Math.random() * TAU, r = 4 + Math.random() * 7;
-          k.state = 'patrol'; k.mark = ''; k.target = [P.x + Math.cos(a) * r, P.z + Math.sin(a) * r, floorOf(P.y)];
-          if (!goTo(k, k.target[0], k.target[1], k.target[2])) pickPatrol(k);
+        G.hunchT = 42 - 6 * level();
+        if (K.state === 'patrol' || K.state === 'look') {
+          const a = Math.random() * TAU, r = 5 + Math.random() * 7;
+          K.state = 'patrol'; if (!goTo(P.x + Math.cos(a) * r, P.z + Math.sin(a) * r, floorOf(P.y))) pickPatrol();
         }
       }
     }
-    if (G.phase !== 'hide') {
-      if (rate > 0) G.alert = Math.min(1, G.alert + rate * dt);
-      else G.alert = Math.max(0, G.alert - 0.3 * dt);
-      if (G.alert >= 1) caught(top || G.seekers[0]);
+    // walk the path
+    const moving = K.path && K.pi < K.path.length && K.state !== 'look' && K.state !== 'search';
+    if (moving) {
+      const base = { chase: 4.1, rage: 4.5, rush: 3.3, investigate: 2.7, searchwalk: 2.4, patrol: 1.75 }[K.state] || 1.75;
+      const spd = base * (K.state === 'rage' ? D.spd : mult);
+      let left = spd * dt;
+      while (left > 0 && K.pi < K.path.length) {
+        const [tx, tz] = K.path[K.pi], ddx = tx - K.x, ddz = tz - K.z, dist = Math.hypot(ddx, ddz);
+        if (dist < 0.05) { K.pi++; continue; }
+        const m = Math.min(left, dist); K.x += (ddx / dist) * m; K.z += (ddz / dist) * m; left -= m;
+        let dy = Math.atan2(ddx, -ddz) - K.yaw; while (dy > Math.PI) dy -= TAU; while (dy < -Math.PI) dy += TAU;
+        if (!(K.state === 'chase' && K.seeing)) K.yaw += dy * Math.min(1, dt * 7);
+        if (dist <= m + 1e-4) K.pi++;
+      }
+      K.y = surfaceY(K.x, K.z, K.y); K.spd = spd;
+      const before = K.step; K.step += spd * dt * 0.62;
+      if (Math.floor(before) !== Math.floor(K.step)) {
+        const [v, pan] = hear(K.x, K.z, K.y, 30);
+        if (K.state === 'rage') thud(v * 1.2 + 0.05, pan, 350);      // the bells go silent at the end
+        else { jingle(v * 0.5, pan, K.state === 'chase' ? 6 : 4); thud(v * 0.5, pan, 300); }
+      }
+      K.stuck += dt;
+      if (K.stuck > 2.5) { if (Math.hypot(K.x - K.lastP[0], K.z - K.lastP[1]) < 0.6) { if (K.state === 'chase' || K.state === 'rage') K.repath = 0; else pickPatrol(); } K.stuck = 0; K.lastP = [K.x, K.z]; }
+      if (K.pi >= K.path.length) {
+        if (K.state === 'patrol') { K.state = 'look'; K.t = 1.2 + Math.random() * 1.6; K.look = K.yaw; }
+        else if (K.state === 'investigate' || K.state === 'rush') { K.state = 'search'; K.t = 2.2; K.look = K.yaw; K.searchLeft = 1; K.lastSeen = [K.x, K.z, floorOf(K.y)]; K.mark = '?'; }
+        else if (K.state === 'searchwalk') { K.state = 'search'; K.t = 2; K.look = K.yaw; }
+      }
+    } else K.spd = 0;
+    if ((K.state === 'chase' && K.seeing) || (K.state === 'rage' && dP < 6)) {
+      let dy = Math.atan2(P.x - K.x, -(P.z - K.z)) - K.yaw; while (dy > Math.PI) dy -= TAU; while (dy < -Math.PI) dy += TAU; K.yaw += dy * Math.min(1, dt * 8);
     }
   }
 
-  // ---------------- player ----------------
+  // ---------------- player, brother, pickups, traps ----------------
   function updatePlayer(dt) {
+    if (G.hiding != null) { P.vx = P.vz = 0; return; }
     let fwd = 0, str = 0;
     if (keys.KeyW || keys.ArrowUp) fwd += 1; if (keys.KeyS || keys.ArrowDown) fwd -= 1;
     if (keys.KeyD || keys.ArrowRight) str += 1; if (keys.KeyA || keys.ArrowLeft) str -= 1;
-    if (keys.KeyQ) look(-260 * dt, 0, 0.01); if (keys.KeyE) look(260 * dt, 0, 0.01);
     if (touch.move) { fwd = -touch.mz; str = touch.mx; }
     const mag = Math.hypot(fwd, str); if (mag > 1) { fwd /= mag; str /= mag; }
     const running = (keys.ShiftLeft || keys.ShiftRight || P.run) && !P.crouch;
-    const sp = P.crouch ? 1.7 : running ? 5.3 : 3.2;
+    const sp = P.crouch ? 1.6 : running ? 5.0 : 2.8;
     const sy = Math.sin(P.yaw), cy = Math.cos(P.yaw);
     const wx = (sy * fwd + cy * str) * sp, wz = (-cy * fwd + sy * str) * sp;
     const k = Math.min(1, dt * 12);
     P.vx += (wx - P.vx) * k; P.vz += (wz - P.vz) * k;
     P.ct += ((P.crouch ? 1 : 0) - P.ct) * Math.min(1, dt * 10);
-    const bodyH = lerp(1.75, 0.92, P.ct);
     let nx = P.x + P.vx * dt, nz = P.z + P.vz * dt;
-    [nx, nz] = WORLD.collide(nx, nz, P.y, bodyH, 0.3, 0.35);
-    const ny = surfaceY(nx, nz, P.y);
-    P.x = nx; P.z = nz; P.y = ny;
+    [nx, nz] = WORLD.collide(nx, nz, P.y, lerp(1.3, 0.7, P.ct), 0.25, 0.32);
+    P.y = surfaceY(nx, nz, P.y); P.x = nx; P.z = nz;
     const spd = Math.hypot(P.vx, P.vz);
-    P.bob += spd * dt * 2.2;
-    // standing up is blocked if something is overhead
-    if (!P.crouch && P.ct > 0.05) { /* nothing low overhead in this store */ }
-    // noise
-    if (G.phase !== 'hide') {
+    P.bob += spd * dt * 2.6;
+    if (G.phase === 'hunt') {
       G.noiseT -= dt;
-      if (spd > 0.6 && G.noiseT <= 0) {
-        G.noiseT = 0.35;
-        const r = running && spd > 4 ? 13 : P.crouch ? 1.4 : 4.5;
-        hearNoise(P.x, P.z, floorOf(P.y), r);
+      if (spd > 0.6 && G.noiseT <= 0) { G.noiseT = 0.35; hearNoise(P.x, P.z, floorOf(P.y), running && spd > 4 ? 14 : P.crouch ? 0 : 3.6); }
+    }
+    // pickups
+    for (const it of G.items) {
+      if (it.taken || it.f !== floorOf(P.y) || Math.hypot(it.x - P.x, it.z - P.z) > (it.kind === 'keys' ? 1.7 : 1.0)) continue;
+      it.taken = true;
+      if (it.kind === 'keys') { G.keys = true; jingle(0.25, 0, 3); showMsg('The store keys! These open the front doors.', 3.5); }
+      else {
+        const c = CLUES[G.clues]; G.clues++;
+        tone(660, 0.2, 0.2, 'triangle'); tone(880, 0.3, 0.2, 'triangle', 0.12);
+        const bc = LV.containers[G.broC];
+        showMsg(c.text || ('His scarf. The crying is coming from the ' + zoneName(bc.x, bc.z, bc.y) + '.'), 4.5);
+        killLights(3);
+        let add = 2; for (const t of G.traps) if (!t.on && add > 0) { t.on = true; add--; }
       }
     }
-    // seekers bump you
-    for (const s of G.seekers) {
-      if (Math.abs(s.y - P.y) > 1) continue;
-      const dx = P.x - s.x, dz = P.z - s.z, d = Math.hypot(dx, dz);
-      if (d > 0 && d < 0.6) { P.x += (dx / d) * (0.6 - d); P.z += (dz / d) * (0.6 - d); }
+    // bell traps: duck under them
+    for (const t of G.traps) {
+      if (t.cool > 0) t.cool -= dt;
+      if (!t.on || t.cool > 0 || t.f !== floorOf(P.y) || P.ct > 0.6) continue;
+      const along = t.ax === 'x' ? P.x - t.x : P.z - t.z, across = t.ax === 'x' ? P.z - t.z : P.x - t.x;
+      if (Math.abs(along) < t.len / 2 && Math.abs(across) < 0.35) {
+        t.cool = 6; jingle(0.5, 0, 9); jingle(0.4, 0, 6);
+        if (G.phase === 'hunt') { showMsg('A bell trap! He heard that.', 2.5); investigate(t.x, t.z, t.f, true); }
+      }
+    }
+    // doors
+    G.doorT -= dt;
+    const fd = LV.doors.front, sd = LV.doors.side;
+    if (floorOf(P.y) === 0 && Math.hypot(P.x - fd.x, P.z - fd.z) < 1.9) {
+      if (G.phase === 'escape' && G.keys) return win();
+      if (G.doorT <= 0) { G.doorT = 5; thud(0.3, 0, 700); showMsg(G.phase === 'escape' ? 'LOCKED! You need the store keys!' : G.keys ? 'You are not leaving without your brother.' : 'Locked. Outside, an employee shakes their head. Then smiles.', 3.5); }
+    } else if (floorOf(P.y) === 0 && Math.hypot(P.x - sd.x, P.z - sd.z) < 1.7 && G.doorT <= 0) {
+      G.doorT = 5; thud(0.3, 0, 700); showMsg('This door is chained. The employee outside just smiles.', 3.5);
     }
   }
+  function updateBrother(dt) {
+    const b = G.bro;
+    if (b.state !== 'follow') {
+      // muffled crying from wherever he is stuffed
+      G.cryT -= dt;
+      if (G.cryT <= 0 && G.phase !== 'grace') { G.cryT = 2.3 + Math.random() * 1.2; const [v, pan] = hear(b.x, b.z, b.y, 8 + 5 * G.clues); sob(v * 0.5, pan); }
+      return;
+    }
+    const tr = G.trail, last = tr[tr.length - 1];
+    if (!last || Math.hypot(P.x - last[0], P.z - last[1]) > 0.4) tr.push([P.x, P.z, P.y]);
+    let left = 5.4 * dt;
+    while (left > 0 && tr.length > 2) {
+      const [tx, tz] = tr[0], dx = tx - b.x, dz = tz - b.z, d = Math.hypot(dx, dz);
+      if (d < 0.15) { tr.shift(); continue; }
+      const m = Math.min(left, d); b.x += dx / d * m; b.z += dz / d * m; left -= m;
+    }
+    b.y = surfaceY(b.x, b.z, b.y);
+  }
 
-  // ---------------- seeker drawing ----------------
-  const shirtC = {}, hx = (h) => shirtC[h] || (shirtC[h] = hex(h));
-  function drawSeekers(t) {
+  // ---------------- drawing the things that move ----------------
+  const HC = {}, hx = (h) => HC[h] || (HC[h] = hex(h));
+  function figure(g, x, y, z, yaw, s, c, walkPhase, moving) {
+    const fx = Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = Math.sin(yaw);
+    const L = (lx, lz) => [x + (rx * lx - fx * lz) * s, z + (rz * lx - fz * lz) * s];
+    const by = -yaw, sw = moving ? Math.sin(walkPhase * Math.PI) * 0.45 : 0;
+    const B = (lx, ly, lz, sx, sy, sz, col, mat) => { const [wx, wz] = L(lx, lz); g.box(wx, y + ly * s, wz, sx * s, sy * s, sz * s, by, col, mat || 0); };
+    for (const q of [-1, 1]) { B(q * 0.11, 0, -Math.sin(sw * q) * 0.25, 0.15, 0.85, 0.17, c.pants); B(q * 0.11, 0, -Math.sin(sw * q) * 0.36 - 0.05, 0.17, 0.09, 0.28, c.shoe); }
+    B(0, 0.85, 0, 0.46, 0.62, 0.26, c.shirt);
+    if (c.apron) B(0, 0.8, -0.135, 0.4, 0.62, 0.02, c.apron);
+    for (const q of [-1, 1]) { B(q * 0.3, 0.85, Math.sin(sw * q) * 0.14, 0.12, 0.6, 0.13, c.shirt); B(q * 0.3, 0.75, Math.sin(sw * q) * 0.22, 0.1, 0.12, 0.1, c.skin); }
+    B(0, 1.47, 0, 0.13, 0.08, 0.13, c.skin); B(0, 1.53, 0, 0.3, 0.3, 0.3, c.skin);
+    B(0, 1.78, 0, 0.32, 0.1, 0.32, c.hair); B(0, 1.6, 0.06, 0.32, 0.2, 0.22, c.hair);
+    for (const q of [-1, 1]) B(q * 0.07, 1.66, -0.152, 0.05, 0.05, 0.01, hx('#111111'));
+    if (c.smile) { B(0, 1.57, -0.153, 0.17, 0.035, 0.01, hx('#f4f4f4'), MAT.GLOW); for (const q of [-1, 1]) B(q * 0.1, 1.6, -0.153, 0.035, 0.035, 0.01, hx('#f4f4f4'), MAT.GLOW); }
+    return B;
+  }
+  const KC = { pants: hex('#17110f'), shoe: hex('#0a0808'), shirt: hex('#241a15'), skin: hex('#3a2a22'), hair: hex('#15100d') };
+  const BRO = { pants: hex('#32456b'), shoe: hex('#222222'), shirt: hex('#c9342c'), skin: hex('#e9c4a4'), hair: hex('#6b4a2a') };
+  const EMP = { pants: hex('#2b2d33'), shoe: hex('#1d1d1f'), shirt: hex('#e8e6e0'), skin: hex('#d9b596'), hair: hex('#2a1d16'), apron: hex('#3a3a3c'), smile: true };
+  function drawDynamic(t) {
     const g = new Geo();
-    for (const k of G.seekers) {
-      // local: +x right, -z forward (seeker faces -z local == its yaw)
-      const P2 = (lx, lz) => { // rotate so local -z points along facing (sin yaw, -cos yaw)
-        const fx = Math.sin(k.yaw), fz = -Math.cos(k.yaw), rx = Math.cos(k.yaw), rz = Math.sin(k.yaw);
-        return [k.x + rx * lx - fx * lz, k.z + rz * lx - fz * lz];
-      };
-      const yaw = -k.yaw;
-      const sw = k.spd > 0 ? Math.sin(k.step * Math.PI) * 0.45 : 0;
-      const y = k.y;
-      const pants = hx('#2b2d33'), shirt = hx(k.shirt), skin = hx(k.skin), hair = hx(k.hair), apron = hx('#3a3a3c');
-      // legs
-      for (const side of [-1, 1]) {
-        const a = sw * side, [lx, lz] = P2(side * 0.11, -Math.sin(a) * 0.25);
-        g.box(lx, y, lz, 0.15, 0.85, 0.17, yaw, pants);
-        const [fx2, fz2] = P2(side * 0.11, -Math.sin(a) * 0.38 - 0.05);
-        g.box(fx2, y, fz2, 0.16, 0.08, 0.28, yaw, hx('#1d1d1f'));
-      }
-      // body
-      let [bx, bz] = P2(0, 0);
-      g.box(bx, y + 0.85, bz, 0.46, 0.62, 0.26, yaw, shirt);
-      [bx, bz] = P2(0, -0.135);
-      g.box(bx, y + 0.8, bz, 0.4, 0.62, 0.02, yaw, apron);
-      // arms
-      const counting = k.state === 'count';
-      for (const side of [-1, 1]) {
-        if (counting) {
-          const [ax, az] = P2(side * 0.2, -0.18); g.box(ax, y + 1.25, az, 0.12, 0.12, 0.42, yaw, shirt);
-          const [hx2, hz2] = P2(side * 0.06, -0.33); g.box(hx2, y + 1.55, hz2, 0.12, 0.14, 0.08, yaw, skin);
-        } else {
-          const a = -sw * side * 0.8, [ax, az] = P2(side * 0.3, -Math.sin(a) * 0.15);
-          g.box(ax, y + 0.85, az, 0.12, 0.6, 0.13, yaw, shirt);
-          const [hx2, hz2] = P2(side * 0.3, -Math.sin(a) * 0.25);
-          g.box(hx2, y + 0.75, hz2, 0.1, 0.12, 0.1, yaw, skin);
-        }
-      }
-      // head
-      [bx, bz] = P2(0, 0);
-      g.box(bx, y + 1.47, bz, 0.13, 0.08, 0.13, yaw, skin);
-      g.box(bx, y + 1.53, bz, 0.3, 0.3, 0.3, yaw, skin);
-      g.box(bx, y + 1.78, bz, 0.32, 0.1, 0.32, yaw, hair);
-      [bx, bz] = P2(0, 0.06); g.box(bx, y + 1.6, bz, 0.32, 0.2, 0.22, yaw, hair);
-      for (const side of [-1, 1]) { const [ex, ez] = P2(side * 0.07, -0.152); g.box(ex, y + 1.66, ez, 0.05, 0.05, 0.01, yaw, hx('#111111')); }
-      // marker above head
-      if (k.mark) {
-        const col = k.mark === '!' ? hx('#ff4a2e') : hx('#ffd23a');
-        const bobY = y + 2.15 + Math.sin(t * 6) * 0.04;
-        if (k.mark === '!') { g.box(k.x, bobY + 0.14, k.z, 0.09, 0.3, 0.09, 0, col, MAT.GLOW); g.box(k.x, bobY, k.z, 0.09, 0.09, 0.09, 0, col, MAT.GLOW); }
-        else { g.box(k.x, bobY + 0.34, k.z, 0.22, 0.07, 0.07, 0, col, MAT.GLOW); g.box(k.x + 0.11, bobY + 0.22, k.z, 0.07, 0.17, 0.07, 0, col, MAT.GLOW); g.box(k.x, bobY + 0.14, k.z, 0.07, 0.1, 0.07, 0, col, MAT.GLOW); g.box(k.x, bobY, k.z, 0.07, 0.07, 0.07, 0, col, MAT.GLOW); }
-      }
+    // Krampus: a huge horned shape with a sack and chains
+    { const s = 1.5, B = figure(g, K.x, K.y, K.z, K.yaw, s, KC, K.step, K.spd > 0);
+      const horn = hx('#cfc3a8'), eye = hx('#ffb020');
+      for (const q of [-1, 1]) { B(q * 0.13, 1.86, 0.02, 0.07, 0.2, 0.07, horn); B(q * 0.2, 2.02, 0.06, 0.07, 0.18, 0.07, horn); B(q * 0.26, 2.16, 0.02, 0.06, 0.16, 0.06, horn); B(q * 0.07, 1.665, -0.156, 0.06, 0.045, 0.01, eye, MAT.GLOW); }
+      B(0, 1.42, -0.17, 0.08, 0.2, 0.03, hx('#b3202a'));
+      B(0, 1.5, -0.16, 0.2, 0.05, 0.02, hx('#e8e2d0'));
+      B(0.06, 0.8, 0.26, 0.5, 0.75, 0.34, hx('#6b4a2e')); B(0.06, 1.5, 0.24, 0.3, 0.14, 0.24, hx('#59391f'));
+      for (let i = 0; i < 4; i++) B(-0.2 + i * 0.13, 0.78 - (i % 2) * 0.05, -0.15, 0.06, 0.06, 0.03, hx('#8f959b'));
+      for (let i = 0; i < 3; i++) B(-0.14 + i * 0.14, 1.36, -0.14, 0.05, 0.05, 0.05, hx('#d6b24a'), MAT.GLOW);
+    }
+    if (G.bro.state === 'follow') figure(g, G.bro.x, G.bro.y, G.bro.z, Math.atan2(P.x - G.bro.x, -(P.z - G.bro.z)), 0.6, BRO, t * 5, true);
+    // the employees outside, always watching
+    for (const d of [LV.doors.front, LV.doors.side]) figure(g, d.ex, 0, d.ez, Math.atan2(P.x - d.ex, -(P.z - d.ez)), 1, EMP, 0, false);
+    // clues and keys
+    for (const it of G.items) {
+      if (it.taken) continue;
+      const bob = Math.sin(t * 3 + it.x) * 0.05, col = it.kind === 'keys' ? hx('#e8c14e') : hx(CLUES[it.n].col);
+      if (it.kind === 'keys') { g.box(it.x, it.y + 0.03 + bob * 0.3, it.z, 0.16, 0.03, 0.16, t, col, MAT.GLOW); g.box(it.x + 0.1, it.y + 0.03, it.z, 0.2, 0.02, 0.04, 0.4, col, MAT.GLOW); }
+      else { g.box(it.x, it.y + 0.05, it.z, 0.2, 0.09, 0.28, 0.6 + it.n, col); g.box(it.x, it.y + 0.55 + bob, it.z, 0.07, 0.07, 0.07, t * 2, hx('#fff1b8'), MAT.GLOW); }
+    }
+    // bell traps
+    for (const tr of G.traps) {
+      if (!tr.on) continue;
+      const y = tr.f ? F1 : 0, ax = tr.ax === 'x', shake = tr.cool > 4.5 ? Math.sin(t * 40) * 0.04 : 0;
+      for (const q of [-1, 1]) g.box(tr.x + (ax ? q * tr.len / 2 : 0), y, tr.z + (ax ? 0 : q * tr.len / 2), 0.07, 0.95, 0.07, 0, hx('#3a2a22'));
+      g.box(tr.x, y + 0.88, tr.z, ax ? tr.len : 0.02, 0.02, ax ? 0.02 : tr.len, 0, hx('#8a1f24'));
+      for (let i = 0; i < 5; i++) { const o = (i - 2) * tr.len / 5.5; g.box(tr.x + (ax ? o : 0), y + 0.76 + shake * (i % 2 ? 1 : -1), tr.z + (ax ? 0 : o), 0.09, 0.11, 0.09, 0, hx('#e8c14e'), MAT.GLOW); }
     }
     return g.array();
   }
 
   // ---------------- flow ----------------
+  function showOnly(idShown) {
+    for (const s of ['title', 'intro', 'pause', 'end']) $(s).style.display = s === idShown ? 'flex' : 'none';
+  }
+  function toIntro() { audioInit(); mode = 'intro'; showOnly('intro'); }
   function startGame() {
-    audioInit();
-    newRound();
-    mode = 'play';
-    $('title').style.display = 'none'; $('end').style.display = 'none'; $('pause').style.display = 'none';
-    $('hud').style.display = 'block';
-    if (!isTouch) { try { const r = canvas.requestPointerLock && canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) { /* ignore */ } }
+    audioInit(); newRound(); mode = 'play'; showOnly(null); $('hud').style.display = 'block'; lastTime = performance.now(); lock();
+    roar(); jingle(0.3, 0, 8);
   }
-  function pause() {
+  function pause() { if (mode !== 'play') return; mode = 'pause'; showOnly('pause'); if (document.pointerLockElement) document.exitPointerLock(); }
+  function resume() { mode = 'play'; showOnly(null); lastTime = performance.now(); lock(); }
+  function toTitle() { mode = 'title'; showOnly('title'); $('hud').style.display = 'none'; refreshBest(); if (document.pointerLockElement) document.exitPointerLock(); }
+  function caught(reason) {
     if (mode !== 'play') return;
-    mode = 'pause'; $('pause').style.display = 'flex';
-    if (document.pointerLockElement) document.exitPointerLock();
-  }
-  function resume() {
-    mode = 'play'; $('pause').style.display = 'none'; lastTime = performance.now();
-    if (!isTouch) { try { const r = canvas.requestPointerLock && canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) { /* ignore */ } }
-  }
-  function toTitle() {
-    mode = 'title'; $('pause').style.display = 'none'; $('end').style.display = 'none'; $('hud').style.display = 'none';
-    $('title').style.display = 'flex'; refreshBest();
-    if (document.pointerLockElement) document.exitPointerLock();
-  }
-  function caught(k) {
-    if (mode !== 'play') return;
-    mode = 'end'; G.caughtBy = k;
-    tone(220, 0.5, 0.25, 'sawtooth', 0, -120); tone(110, 0.8, 0.2, 'square', 0.15, -40);
-    const survived = G.D.survive - G.survive;
-    $('endTitle').textContent = 'FOUND!';
-    $('endTitle').className = 'lose';
-    $('endText').innerHTML = `<b>${k.name}</b> found you in the <b>${zoneName(P.x, P.z, P.y)}</b>${floorOf(P.y) ? ' (upstairs)' : ''}.<br>You lasted ${fmt(survived)} of ${fmt(G.D.survive)}.`;
-    $('end').style.display = 'flex';
-    if (document.pointerLockElement) document.exitPointerLock();
+    mode = 'end'; G.reason = reason; roar();
+    $('endTitle').textContent = 'INTO THE SACK'; $('endTitle').className = 'lose';
+    $('endText').innerHTML = `${reason}<br>You lasted ${fmt(G.time)} and found ${G.clues} of 3 clues.`;
+    showOnly('end'); if (document.pointerLockElement) document.exitPointerLock();
   }
   function win() {
+    if (mode !== 'play') return;
     mode = 'end';
     [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.3, 0.18, 'triangle', i * 0.12));
-    const prev = getBest(diffKey); const wins = prev + 1; setBest(diffKey, wins);
-    $('endTitle').textContent = 'YOU STAYED HIDDEN!';
-    $('endTitle').className = 'win';
-    $('endText').innerHTML = `Nobody found you in the <b>${zoneName(P.x, P.z, P.y)}</b>${floorOf(P.y) ? ' (upstairs)' : ''}.<br>${G.D.label} wins so far: <b>${wins}</b>`;
-    $('end').style.display = 'flex';
-    if (document.pointerLockElement) document.exitPointerLock();
+    const t = Math.floor(G.time), prev = getBest(diffKey);
+    if (!prev || t < prev) setBest(diffKey, t);
+    $('endTitle').textContent = 'YOU GOT HIM OUT'; $('endTitle').className = 'win';
+    $('endText').innerHTML = `The doors fly open. Snow. Headlights. Your parents are screaming your names.<br>Behind you, something drags a smiling employee back inside.<br><br>In the car, your brother opens his hand. A tiny bell. It jingles.<br><br><b>${fmt(t)}</b> on ${G.D.label}${!prev || t < prev ? ' — new best!' : ''}`;
+    showOnly('end'); if (document.pointerLockElement) document.exitPointerLock();
+    setTimeout(() => jingle(0.3, 0, 3), 2600);
   }
   function refreshBest() {
-    $('best').textContent = ['easy', 'normal', 'hard'].map((k) => `${DIFF[k].label}: ${getBest(k)} win${getBest(k) === 1 ? '' : 's'}`).join(' · ');
+    $('best').textContent = 'Best escapes — ' + ['easy', 'normal', 'hard'].map((k) => `${DIFF[k].label}: ${getBest(k) ? fmt(getBest(k)) : '—'}`).join(' · ');
   }
   document.querySelectorAll('[data-diff]').forEach((b) => b.addEventListener('click', () => {
     diffKey = b.dataset.diff;
     document.querySelectorAll('[data-diff]').forEach((x) => x.classList.toggle('sel', x === b));
   }));
-  $('play').addEventListener('click', startGame);
+  $('play').addEventListener('click', toIntro);
+  $('go').addEventListener('click', startGame);
   $('again').addEventListener('click', startGame);
   $('menu').addEventListener('click', toTitle);
   $('resume').addEventListener('click', resume);
@@ -675,51 +725,54 @@
 
   // ---------------- main loop ----------------
   let titleCam = 0;
+  const MENU_L = new Float32Array(16).fill(0.55);
   function frame(now) {
     const dt = Math.min(0.05, (now - lastTime) / 1000); lastTime = now;
     R.resize(isTouch ? 1.25 : 1.5);
-    let ex, ey, ez, yaw, pitch;
     if (mode === 'play') tick(dt);
-    if (mode === 'title') {
+    let ex, ey, ez, yaw, pitch;
+    const menu = mode === 'title' || mode === 'intro';
+    if (menu) {
       titleCam += dt * 0.06;
-      ex = 32 + Math.cos(titleCam) * 13; ez = 16 + Math.sin(titleCam) * 9; ey = 7.2;
-      yaw = Math.atan2(32 - ex, -(16 - ez)); pitch = -0.32;
+      ex = 32 + Math.cos(titleCam) * 11; ez = 20 + Math.sin(titleCam) * 7; ey = 7.3;
+      yaw = Math.atan2(32 - ex, -(20 - ez)); pitch = -0.36;
     } else {
-      ex = P.x; ez = P.z; ey = P.y + lerp(1.6, 0.62, P.ct) + Math.sin(P.bob) * 0.03 * (1 - P.ct * 0.5);
+      ex = P.x; ez = P.z; ey = P.y + EYE() + (G.hiding != null ? 0 : Math.sin(P.bob) * 0.025);
       yaw = P.yaw; pitch = P.pitch;
     }
     const proj = perspective(1.2, canvas.width / Math.max(1, canvas.height), 0.05, 140);
     const vp = mul4(proj, viewFPS(ex, ey, ez, yaw, pitch));
-    R.begin(vp, [ex, ey, ez], mode === 'title' ? 0 : (G ? G.alert : 0));
+    R.begin(vp, [ex, ey, ez], menu ? { lights: MENU_L, k: [0, -99, 0, 1], alarm: 0, time: now / 1000 }
+      : { lights: ZL, k: [K.x, K.y + 1.5, K.z, flick], alarm: G.phase === 'escape' ? 1 : 0, time: now / 1000 });
     R.draw(STATIC);
-    if (G && mode !== 'title') R.drawDynamic(drawSeekers(now / 1000));
+    if (G && !menu) R.drawDynamic(drawDynamic(now / 1000));
     requestAnimationFrame(frame);
   }
   function tick(dt) {
-    G.elapsed += dt;
-    updatePlayer(dt);
-    if (G.phase === 'hide') {
+    G.time += dt;
+    updatePlayer(dt); if (mode !== 'play') return;
+    if (G.phase === 'grace') {
       G.t -= dt;
-      if (G.t <= 5 && Math.ceil(G.t) !== Math.ceil(G.t + dt)) { tone(880, 0.12, 0.15, 'square'); showMsg(String(Math.ceil(G.t)), 0.9); }
-      if (G.t <= 0) { G.phase = 'seek'; tone(440, 0.4, 0.2, 'square'); tone(660, 0.5, 0.2, 'square', 0.15); showMsg('Ready or not, here we come!', 2.5); }
-    } else {
-      G.survive -= dt;
-      if (G.survive <= 0) { win(); return; }
+      if (G.t <= 0) { G.phase = 'hunt'; pickPatrol(); jingle(0.35, 0, 8); showMsg('Listen for the bells. Follow the crying.', 4); for (let i = 0; i < 16; i++) ZT[i] = Math.min(ZT[i], 0.8); }
+    } else if (G.phase === 'hunt') {
+      G.huntT += dt; G.lightT -= dt;
+      if (G.lightT <= 0) { G.lightT = 70; killLights(1); }
     }
-    updateSeekers(dt);
-    if (mode !== 'play') return;
-    if (G.alert > 0.25) { G.heartT -= dt; if (G.heartT <= 0) { G.heartT = lerp(0.9, 0.35, G.alert); tone(70, 0.14, 0.35 * G.alert, 'sine', 0, -20); tone(60, 0.14, 0.25 * G.alert, 'sine', 0.12, -20); } }
+    updateKrampus(dt); if (mode !== 'play') return;
+    updateBrother(dt);
+    updateLights(dt);
     updateHUD(dt);
   }
 
-  // debug/test hooks
   window.__box = {
-    get P() { return P; }, get G() { return G; }, get mode() { return mode; }, LV, walkCount: () => walk.reduce((a, b) => a + b, 0), reach: () => REACH.length,
-    spots: () => SPOTS.length, links: () => STAIR_NODES.length, start: (d) => { if (d) diffKey = d; startGame(); },
+    get P() { return P; }, get G() { return G; }, get K() { return K; }, get mode() { return mode; }, LV, ZL, ZT,
+    stats: () => ({ walk: walk.reduce((a, b) => a + b, 0), reach: REACH.length, spots: SPOTS.length, links: stairLinks, verts: LV.geo.count, obbs: LV.obbs.length }),
+    start: (d) => { if (d) diffKey = d; startGame(); },
     tick: (dt, n) => { for (let i = 0; i < n && mode === 'play'; i++) tick(dt); },
     setP: (x, y, z, yaw, pitch, crouch) => { Object.assign(P, { x, y, z, yaw, pitch: pitch || 0 }); if (crouch != null) { P.crouch = crouch; P.ct = crouch ? 1 : 0; } },
-    zoneName, astarTest: (x0, z0, f0, x1, z1, f1) => { const p = makePath(astar(nearestWalk(f0, x0, z0), nearestWalk(f1, x1, z1))); return p; },
-    mapImg,
+    interact, zoneName, killLights, mapImg,
+    reachable: (f, x, z) => { const n = rNode(f, x, z); if (n < 0) return 99; const [nx, nz] = nodePos(n); return Math.hypot(nx - x, nz - z); },
+    path: (x0, z0, f0, x1, z1, f1) => { const p = makePath(astar(rNode(f0, x0, z0), rNode(f1, x1, z1))); return p ? p.length : null; },
   };
   refreshBest();
   requestAnimationFrame(frame);

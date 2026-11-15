@@ -19,10 +19,14 @@ with sync_playwright() as p:
     pg.wait_for_timeout(2500)
     if not pg.evaluate("() => !!window.__box"):
         print("errors:", errs[:20]); b.close(); sys.exit(1)
-    stats = pg.evaluate("() => ({walk: __box.walkCount(), reach: __box.reach(), spots: __box.spots(), links: __box.links(), verts: __box.LV.geo.count, obbs: __box.LV.obbs.length})")
+    stats = pg.evaluate("() => __box.stats()")
     print("stats", stats)
     pg.screenshot(path=str(out / "00_title.png"))
     pg.evaluate("() => __box.start('normal')")
+    import base64
+    for f in (0, 1):
+        d = pg.evaluate(f"() => __box.mapImg[{f}].toDataURL()")
+        (out / f"map{f}.png").write_bytes(base64.b64decode(d.split(',')[1]))
     pg.wait_for_timeout(300)
     for i, v in enumerate(views):
         pg.evaluate(f"() => __box.setP({v[0]},{v[1]},{v[2]},{v[3]},{v[4] if len(v)>4 else 0},{str(v[5]).lower() if len(v)>5 else 'false'})")

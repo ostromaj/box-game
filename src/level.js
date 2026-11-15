@@ -1,6 +1,6 @@
 // ============================================================
-// BOX — the store. Two sales floors plus back rooms.
-// Units are meters. x runs west→east (0..70), z runs south→north (0..48).
+// BOX — the store. Two sales floors (layout shuffled on purpose; no back rooms).
+// Units are meters. x runs west→east (0..64), z runs south→north (0..40).
 // Ground floor y=0, upstairs y=4.5. Layout is simplified on purpose.
 // ============================================================
 
@@ -363,288 +363,219 @@ function buildLevel() {
     for (let z = z0 + 2; z < z1 - 1; z += 4) for (let x = x0 + 2; x < x1 - 1; x += 4) G.box(x, y - 0.02, z, 1.2, 0.02, 0.6, 0, hex('#f4f7f8'), MAT.GLOW);
   }
 
-  // ---- floors / slabs / ceilings ----
-  G.box(35, -0.1, 24, 70, 0.1, 48, 0, COL.concrete, MAT.CONCRETE);
-  G.box(52, -0.08, 24, 20, 0.083, 16, 0, COL.hardwood, MAT.WOOD);            // kitchen hardwood
-  G.box(57, -0.08, 8, 10, 0.083, 16, 0, COL.tile, MAT.TILE);                 // glassware tile
-  G.box(38, -0.08, 40, 28, 0.083, 16, 0, COL.vinyl, MAT.TILE);               // back of house
-  G.box(66, -0.08, 6, 8, 0.083, 12, 0, hex('#3b3633'), MAT.CONCRETE);        // closed café
-  rug(27.5, 0, 4.5, 6, 3.5, 0, hex('#c9c3b8'));
+  // =========================================================
+  // LAYOUT v2 — an invented arrangement. It keeps the feel (two floors,
+  // open atrium, big staircase, round skylight) but departments, doors,
+  // stairs and elevator are all in different places from any real store.
+  // =========================================================
+  const W = 64, D = 40, Y = F1, ROOF = 9;
+  const containers = [];
+  function pot(x, y, z) {
+    const col = pc(['#d9d2c4', '#b7ab98', '#8b8f8c', '#c9b9a0', '#6f6a62']);
+    G.cyl(x, y, z, 0.4, 0.95, col, 0, 14, 0.6);
+    G.cyl(x, y + 0.9, z, 0.53, 0.03, hex('#241d18'), 0, 14);
+    obbs.push(makeOBB(x, z, 0.55, 0.55, 0, y, y + 0.95));
+    containers.push({ x, z, y, f: y > 1 ? 1 : 0, type: 'pot' });
+  }
+  function hamper(x, y, z) {
+    const col = pc(['#c8a777', '#b8925f', '#a98556']);
+    G.cyl(x, y, z, 0.46, 0.85, col, 0, 12);
+    for (const b of [0.2, 0.45, 0.7]) G.cyl(x, y + b, z, 0.47, 0.04, shade(col, 0.8), 0, 12);
+    G.cyl(x, y + 0.85, z, 0.49, 0.07, shade(col, 0.7), 0, 12);
+    obbs.push(makeOBB(x, z, 0.48, 0.48, 0, y, y + 0.92));
+    containers.push({ x, z, y, f: y > 1 ? 1 : 0, type: 'hamper' });
+  }
+  function windows(x1, z1, x2, z2, nIn, y0, y1, width, spacing, start = 1.5) {
+    const len = Math.hypot(x2 - x1, z2 - z1), dx = (x2 - x1) / len, dz = (z2 - z1) / len, yaw = Math.atan2(-dz, dx);
+    for (let t = start + width / 2; t <= len - width / 2 - 0.5; t += spacing) {
+      const cx = x1 + dx * t + nIn[0] * 0.17, cz = z1 + dz * t + nIn[1] * 0.17;
+      G.box(cx, y0, cz, width, y1 - y0, 0.03, yaw, COL.glassNight, MAT.GLOW);
+      const ox = nIn[0] * 0.03, oz = nIn[1] * 0.03;
+      G.box(cx + ox, y0 - 0.06, cz + oz, width + 0.16, 0.08, 0.06, yaw, COL.trim);
+      G.box(cx + ox, y1, cz + oz, width + 0.16, 0.08, 0.06, yaw, COL.trim);
+      for (const q of [-0.5, -1 / 6, 1 / 6, 0.5]) G.box(cx + ox + dx * q * width, y0, cz + oz + dz * q * width, 0.05, y1 - y0, 0.05, yaw, COL.trim);
+      for (const f of [1 / 3, 2 / 3]) G.box(cx + ox, y0 + (y1 - y0) * f, cz + oz, width, 0.04, 0.05, yaw, COL.trim);
+    }
+  }
+  function trackLights(x0, x1, z0, z1, y, hole = null, dz = 3.3, dx = 2.3) {
+    for (let z = z0 + dz / 2; z < z1; z += dz) {
+      const inHole = hole && z > hole[2] && z < hole[3];
+      const runs = inHole ? [[x0, hole[0]], [hole[1], x1]] : [[x0, x1]];
+      for (const [a, b] of runs) G.box((a + b) / 2, y - 0.04, z, b - a - 0.6, 0.04, 0.05, 0, COL.white);
+      for (let x = x0 + 1; x < x1 - 0.6; x += dx) {
+        if (inHole && x > hole[0] - 0.3 && x < hole[1] + 0.3) continue;
+        G.box(x, y - 0.2, z, 0.1, 0.16, 0.1, 0, COL.white);
+        G.box(x, y - 0.22, z, 0.08, 0.02, 0.08, 0, COL.bulb, MAT.GLOW);
+      }
+    }
+  }
+  function doorway(cx, cz, yaw, w) { // local +z points into the store
+    const F = frame(cx, cz, yaw), dark = hex('#0b101c'), snow = hex('#c9d2dc');
+    for (const q of [-1, 1]) F.box(q * (w / 2 + 0.4), 0, 0, 0.8, 4.0, 0.8, COL.brick, MAT.BRICK, { hit: true });
+    F.box(0, 3.3, 0, w + 1.6, ROOF - 3.3, 0.3, COL.wall, 0, { hit: true });
+    for (const lx of [-w / 2 + 0.04, -0.04, 0.04, w / 2 - 0.04]) F.box(lx, 0, 0, 0.07, 3.3, 0.09, COL.steel);
+    F.box(0, 3.2, 0, w, 0.1, 0.1, COL.steel);
+    for (const q of [-1, 1]) F.box(q * 0.22, 0.9, 0.07, 0.04, 1.3, 0.04, COL.steel);
+    F.hit(0, 0, w, 0.16, 0, 3.3, false, true);
+    F.box(0, -0.1, -1.8, w + 0.4, 0.1, 3.4, snow);
+    F.box(0, 0, -3.5, w + 0.8, 4, 0.2, dark, MAT.GLOW);
+    for (const q of [-1, 1]) F.box(q * (w / 2 + 0.1), 0, -2.0, 0.2, 4, 3.0, dark, MAT.GLOW);
+    F.box(0, 3.4, -2.0, w + 0.8, 0.2, 3.2, dark, MAT.GLOW);
+    for (let i = 0; i < 14; i++) F.box(R(-w / 2, w / 2), R(0.3, 3.0), R(-3.2, -1.2), 0.04, 0.04, 0.04, hex('#e8eef5'), MAT.GLOW);
+    { const [ex, ez] = F.w(0, 0.3); exitSign(ex, 3.45, ez, yaw); }
+    { const [mx, mz] = F.w(0, 1.3); G.box(mx, 0.002, mz, w + 0.4, 0.012, 1.6, yaw, hex('#2c2c2e'), MAT.CARPET); }
+    const [ex, ez] = F.w(0.6, -1.0), [ix, iz] = F.w(0, 1.1);
+    return { x: ix, z: iz, ex, ez };
+  }
 
-  const slabs = [[0, 62, 0, 8], [0, 24, 8, 24], [40, 62, 8, 24], [0, 62, 24, 32], [28, 52, 32, 48], [24, 28, 32, 34], [24, 28, 43, 48]];
+  // ---- floors / slabs / roof ----
+  G.box(W / 2, -0.1, D / 2, W, 0.1, D, 0, COL.concrete, MAT.CONCRETE);
+  G.box(11, -0.08, 27, 22, 0.083, 26, 0, COL.hardwood, MAT.WOOD);
+  G.box(32, -0.08, 34.5, 16, 0.083, 11, 0, COL.tile, MAT.TILE);
+  const slabs = [[0, 64, 0, 12], [0, 24, 12, 28], [40, 64, 12, 28], [0, 64, 28, 40]];
   for (const [x0, x1, z0, z1] of slabs) {
-    const back = z0 >= 32;
-    G.box((x0 + x1) / 2, F1 - 0.05, (z0 + z1) / 2, x1 - x0, 0.05, z1 - z0, 0, back ? hex('#cfc8bb') : COL.upWood, back ? MAT.TILE : MAT.WOOD);
-    G.box((x0 + x1) / 2, F1 - 0.4, (z0 + z1) / 2, x1 - x0, 0.35, z1 - z0, 0, back ? hex('#e8e6e1') : COL.ceilWood, back ? MAT.TILE : MAT.PLANK);
+    G.box((x0 + x1) / 2, F1 - 0.05, (z0 + z1) / 2, x1 - x0, 0.05, z1 - z0, 0, COL.upWood, MAT.WOOD);
+    G.box((x0 + x1) / 2, F1 - 0.4, (z0 + z1) / 2, x1 - x0, 0.35, z1 - z0, 0, COL.ceilWood, MAT.PLANK);
     obbs.push(makeOBB((x0 + x1) / 2, (z0 + z1) / 2, (x1 - x0) / 2, (z1 - z0) / 2, 0, F1 - 0.4, F1, true, false));
   }
-  G.box(31, 9, 16, 62, 0.3, 32, 0, COL.ceil, MAT.PLANK);          // upstairs ceiling
-  G.box(38, 7.5, 40, 28, 0.2, 16, 0, hex('#e8e6e1'), MAT.TILE);    // back office drop ceiling
-  G.box(66, 4.4, 16, 8, 0.2, 32, 0, COL.ceilWood, MAT.PLANK);     // single-story entrance/café
-  G.box(60, 4.4, 36, 16, 0.2, 8, 0, COL.ceilWood, MAT.PLANK);     // coffee corner
-  trackLights(0.5, 61.5, 0, 32, F1 - 0.4, [24, 40, 8, 24]);
-  trackLights(62.2, 69.8, 12, 32, 4.4);
-  trackLights(52.2, 67.8, 32, 40, 4.4);
-  trackLights(0.5, 61.5, 0, 32, 9);
-  panelLights(28, 52, 32, 48, F1 - 0.4);
-  panelLights(28, 52, 32, 48, 7.5);
+  G.box(W / 2, ROOF, D / 2, W, 0.3, D, 0, COL.ceil, MAT.PLANK);
+  // round skylight over the atrium — smashed
+  G.cyl(32, ROOF - 0.04, 20, 4.6, 0.04, COL.trim, 0, 28);
+  G.cyl(32, ROOF - 0.07, 20, 4.2, 0.04, hex('#16223a'), MAT.GLOW, 28);
+  for (let i = 0; i < 4; i++) G.box(32, ROOF - 0.1, 20, 8.4, 0.04, 0.07, i * Math.PI / 4, COL.trim);
+  G.cyl(32.4, ROOF - 0.13, 19.6, 2.3, 0.04, hex('#04060c'), MAT.GLOW, 7);
+  trackLights(0.5, 63.5, 0, 40, F1 - 0.4, [24, 40, 12, 28]);
+  trackLights(0.5, 63.5, 0, 40, ROOF, [26.5, 37.5, 14.5, 25.5]);
 
-  // ---- exterior walls ----
-  wall(0, 0, 62, 0, 0, 9, COL.wall);
-  wall(62, 0, 70, 0, 0, 4.5, COL.wall);
-  wall(70, 0, 70, 32, 0, 4.5, COL.wall);
-  wall(62, 0, 62, 32, F1, 9, COL.wall);
-  wall(68, 32, 70, 32, 0, 4.5, COL.wall);
-  wall(68, 32, 68, 40, 0, 4.5, COL.wall);
-  wall(52, 40, 68, 40, 0, 4.5, COL.wall);
-  wall(52, 32, 52, 48, 0, 9, COL.backWall);
-  wall(52, 32, 62, 32, F1, 9, COL.wall);
-  wall(24, 48, 52, 48, 0, 9, COL.backWall);
-  wall(24, 32, 24, 48, 0, 9, COL.backWall);
-  wall(0, 14, 24, 32, 0, 9, COL.ship, MAT.SHIPLAP);
-  wall(0, 0, 0, 14, 0, 9, COL.ship, MAT.SHIPLAP);
-  windows(0, 0, 62, 0, [0, 1], 0.9, 3.6, 2.2, 4.4, 1.0);
-  windows(0, 0, 62, 0, [0, 1], 5.4, 8.2, 2.2, 4.4, 1.0);
-  windows(0, 14, 24, 32, [0.6, -0.8], 5.4, 8.2, 1.8, 4.0, 2.0);
-  windows(0, 14, 24, 32, [0.6, -0.8], 0.9, 3.6, 1.8, 6.0, 4.0);
-  windows(0, 0, 0, 14, [1, 0], 5.4, 8.2, 1.8, 4.5, 1.5);
-  windows(70, 0, 70, 12, [-1, 0], 0.9, 3.4, 1.8, 5, 2.5);
-  windows(70, 25, 70, 32, [-1, 0], 0.9, 3.4, 1.8, 4, 1.2);
-  windows(62, 0, 62, 32, [-1, 0], 5.4, 8.2, 1.8, 4.6, 1.5);
-  windows(52, 40, 68, 40, [0, -1], 1.2, 3.4, 1.4, 20, 6.5);
-  windows(52, 32, 62, 32, [0, -1], 5.4, 8.2, 1.8, 4.6, 1.0);
+  // ---- outer walls, doors ----
+  wall(0, 0, 29.2, 0, 0, ROOF, COL.wall);
+  wall(34.8, 0, 64, 0, 0, ROOF, COL.wall);
+  wall(0, 40, 64, 40, 0, ROOF, COL.ship, MAT.SHIPLAP);
+  wall(0, 0, 0, 40, 0, ROOF, COL.wall);
+  wall(64, 0, 64, 28.2, 0, ROOF, COL.wall);
+  wall(64, 31.8, 64, 40, 0, ROOF, COL.wall);
+  const frontDoor = doorway(32, 0, 0, 4);
+  const sideDoor = doorway(64, 30, -Math.PI / 2, 2);
+  windows(0, 0, 29, 0, [0, 1], 0.9, 3.6, 2.2, 4.6, 1.2);
+  windows(35, 0, 64, 0, [0, 1], 0.9, 3.6, 2.2, 4.6, 1.6);
+  windows(0, 0, 64, 0, [0, 1], 5.4, 8.2, 2.2, 4.6, 1.2);
+  windows(0, 0, 0, 40, [1, 0], 5.4, 8.2, 1.8, 4.4, 1.5);
+  windows(64, 0, 64, 28, [-1, 0], 0.9, 3.6, 1.8, 4.4, 1.5);
+  windows(64, 0, 64, 40, [-1, 0], 5.4, 8.2, 1.8, 4.4, 1.5);
+  windows(0, 40, 64, 40, [0, -1], 5.6, 8.2, 1.8, 7.5, 16);
 
-  // main entrance (east wall): glass doors between brick pillars — locked for the game
-  for (const zz of [19.6, 24.4]) solid(69.6, 0, zz, 0.8, 4.0, 0.8, 0, COL.brick, MAT.BRICK);
-  G.box(69.82, 0, 22, 0.04, 3.2, 4.0, 0, COL.glassNight, MAT.GLOW);
-  for (const zz of [20.05, 21.9, 22.1, 23.95]) G.box(69.78, 0, zz, 0.06, 3.2, 0.08, 0, COL.steel);
-  G.box(69.78, 3.2, 22, 0.08, 0.1, 4.0, 0, COL.steel);
-  for (const zz of [21.75, 22.25]) G.box(69.72, 0.9, zz, 0.04, 1.4, 0.04, 0, COL.steel);
-  rug(68.6, 0, 22, 1.6, 4.2, 0, hex('#2c2c2e'));
-  exitSign(69.75, 3.6, 22, -Math.PI / 2);
+  for (const [cx, cz] of [[23.6, 11.6], [40.4, 11.6], [23.6, 28.4], [40.4, 28.4], [12, 8], [12, 20], [12, 32], [52, 8], [52, 20], [52, 30]]) column(cx, cz, 0, ROOF);
 
-  // ---- closed café (behind a rolling grille) ----
-  wall(62, 12, 70, 12, 0, 4.4, COL.wall);
-  wall(62, 0, 62, 3, 0, 4.4, COL.wall, 0, 0.3, { noExtend: true });
-  wall(62, 9, 62, 12, 0, 4.4, COL.wall, 0, 0.3, { noExtend: true });
-  for (let zz = 3.05; zz < 9; zz += 0.16) G.box(62, 0, zz, 0.04, 3.2, 0.03, 0, COL.trim);
-  for (let y = 0.2; y < 3.2; y += 0.42) G.box(62, y, 6, 0.05, 0.03, 6, 0, COL.trim);
-  wall(62, 3, 62, 9, 0, 3.3, COL.trim, 0, 0.1, { noExtend: true, opaque: false });
-  G.box(62, 3.2, 6, 0.3, 1.2, 6, 0, COL.wall);
-  counter(67.5, 0, 7.5, Math.PI / 2, 5, 1.0, 1.05, 0);
-  for (const [tx, tz] of [[64, 2.5], [64, 5.5], [66, 3]]) roundTable(tx, 0, tz, 0.4, 0.75, COL.white, COL.white);
-  G.box(69.8, 2.0, 7.5, 0.05, 0.9, 3, 0, hex('#5a1e1e'), MAT.GLOW);
-
-  // ---- columns (both floors) ----
-  for (const [cx, cz] of [[24, 8], [40, 8], [24, 24], [40, 24], [12, 10], [14, 22], [50, 10], [56, 16.5], [48, 30]]) column(cx, cz, 0, 9);
-
-  // ---- elevator (both floors, doors closed) ----
-  solid(26, 0, 29.5, 4, 9, 4, 0, COL.ship, MAT.SHIPLAP);
+  // ---- elevator (doors stay shut) ----
+  solid(46, 0, 33.5, 4, ROOF, 3.6, 0, COL.ship, MAT.SHIPLAP);
   for (const fy of [0, F1]) {
-    G.box(26, fy, 27.47, 1.4, 2.3, 0.06, 0, COL.white);
-    G.box(26, fy, 27.43, 0.02, 2.3, 0.02, 0, shade(COL.white, 0.8));
-    G.box(27.1, fy + 1.1, 27.45, 0.08, 0.2, 0.03, 0, COL.steel);
+    G.box(46, fy, 31.67, 1.4, 2.3, 0.06, 0, COL.white);
+    G.box(46, fy, 31.63, 0.02, 2.3, 0.02, 0, shade(COL.white, 0.8));
+    G.box(47.1, fy + 1.1, 31.65, 0.08, 0.2, 0.03, 0, COL.steel);
+  }
+
+  // ---- the big staircase (west side of the atrium, climbs toward the front) ----
+  const S1 = { x0: 24.2, x1: 26.2, zBot: 26, zTop: 12 };
+  { const n = 15, dz = (S1.zBot - S1.zTop) / n;
+    for (let k = 0; k < n; k++) {
+      const zc = S1.zBot - (k + 0.5) * dz, top = (k + 0.5) * 0.3;
+      G.box(25.2, 0, zc, 2.0, top - 0.05, dz, 0, COL.white);
+      G.box(25.2, top - 0.05, zc, 2.0, 0.06, dz + 0.04, 0, COL.woodLight, MAT.WOOD);
+    }
+    for (let q = 0; q < 4; q++) {
+      const za = S1.zBot - q * 3.5, zb = za - 3.5, yTop = ((S1.zBot - zb) / 14) * F1 + 1.0;
+      for (const xx of [S1.x0 - 0.07, S1.x1 + 0.07]) {
+        solid(xx, 0, (za + zb) / 2, 0.12, yTop - 0.9, 3.5, 0, COL.white);
+        solid(xx, yTop - 0.9, (za + zb) / 2, 0.06, 0.9, 3.5, 0, COL.trim, 0, { opaque: false });
+        G.box(xx, yTop - 0.05, (za + zb) / 2, 0.1, 0.06, 3.5, 0, COL.trim);
+      }
+    }
+    solid(25.2, 0, 11.95, 2.3, F1 - 0.4, 0.2, 0, COL.white);
   }
 
   // =========================================================
   // GROUND FLOOR
   // =========================================================
-  // ---- atrium staircase (rises east, x 28 → 40) ----
-  const S1 = { x0: 28, x1: 40, z0: 21.5, z1: 23.5 };
-  for (let k = 0; k < 15; k++) {
-    const xa = S1.x0 + k * 0.8, top = (k + 0.5) * 0.3;
-    G.box(xa + 0.4, 0, 22.5, 0.8, top - 0.05, 2.0, 0, COL.white);
-    G.box(xa + 0.4, top - 0.05, 22.5, 0.84, 0.06, 2.0, 0, COL.woodLight, MAT.WOOD);
-  }
-  for (let q = 0; q < 4; q++) {
-    const xa = S1.x0 + q * 3, xb = xa + 3, yTop = ((xb - S1.x0) / 12) * F1 + 1.0;
-    for (const zz of [S1.z0 - 0.06, S1.z1 + 0.06]) {
-      solid((xa + xb) / 2, 0, zz, 3, yTop - 0.9, 0.12, 0, COL.white);
-      solid((xa + xb) / 2, yTop - 0.9, zz, 3, 0.9, 0.06, 0, COL.trim, 0, { opaque: false });
-      G.box((xa + xb) / 2, yTop - 0.05, zz, 3, 0.06, 0.1, 0, COL.trim);
-    }
-  }
-  solid(40, 0, 22.5, 0.2, F1 - 0.4, 2.2, 0, COL.white);
-
-  // ---- atrium (under the opening) ----
-  tree(32, 0, 15, 6.2, 1.9);
-  displayTable(27, 0, 11, 0, 2.6, 1.0, 0.86, COL.white, 'gifts');
-  displayTable(37, 0, 11, 0, 2.6, 1.0, 0.86, COL.white, 'gifts');
-  displayTable(27, 0, 18.5, 0, 2.6, 1.0, 0.86, COL.white, 'vases');
-  displayTable(37, 0, 18.5, 0, 2.6, 1.0, 0.86, COL.white, 'gifts');
-  for (let i = 0; i < 5; i++) pendant(28 + i * 2, 9, 21, 6.4 + (i % 2) * 0.3, 0.2);
-  pendant(31, 9, 9.5, 6.8, 0.25); pendant(33, 9, 9.5, 6.5, 0.22);
-
-  // ---- front center: dining displays ----
-  diningSet(27.5, 0, 4.5, 0, 3.2, 1.0, COL.woodLight, COL.woodMid, null, false);
-  diningSet(35, 0, 4.5, 0, 2.2, 1.1, COL.marble, COL.olive, COL.red, true);
-  for (const [px, pz] of [[26.5, 4.5], [28.5, 4.5]]) wovenPendant(px, F1 - 0.4, pz, 3.0, 0.38);
-  counter(38.6, 0, 1.2, 0, 2.2, 0.55, 0.9, 0);
-
-  // ---- west: living rooms along the windows ----
-  livingSet(5, 0, 5, 0, COL.cream, COL.tan, hex('#cfc6b7'), true);
-  livingSet(12.5, 0, 5, 0, COL.navy, COL.cream, hex('#8a8e8c'), false);
-  livingSet(19.6, 0, 5, 0, COL.tan, COL.cream, hex('#d8cfbf'), false);
-  livingSet(7, 0, 11.2, Math.PI, COL.sage, COL.cream, hex('#c2b8a6'), false);
-  livingSet(18, 0, 11, Math.PI, COL.cream, COL.rust, hex('#b9b2a5'), true);
-  diningSet(10, 0, 17.3, 0, 2.4, 1.0, COL.woodMid, COL.black, hex('#9b9488'), false);
-  diningSet(18.5, 0, 22.5, 0, 2.4, 1.0, COL.woodLight, COL.cream, null, true);
-  diningSet(20.5, 0, 17.3, 0, 2.0, 1.0, COL.woodDark, COL.woodLight, null, false);
-  // pillows + throws shelving along the angled wall
-  for (let t = 4; t < 26; t += 5.2) {
-    const x = 0 + 0.8 * t + 0.6 * 0.4, z = 14 + 0.6 * t - 0.8 * 0.4;
-    shelfWall(x, 0, z, Math.atan2(-0.6, 0.8) + Math.PI, 4.4, 'pillows', 2.1, 0.45, COL.white);
-  }
-  for (const [lx, lz] of [[3, 13.2], [14.5, 14.5], [22.5, 14.2]]) floorLamp(lx, 0, lz);
-  // hearth display by the elevator
-  solid(32.5, 0, 31.35, 3.2, 2.6, 0.6, 0, COL.stone, MAT.BRICK);
-  G.box(32.5, 0.25, 31.0, 1.4, 0.9, 0.05, 0, hex('#2a1a12'));
-  G.box(32.5, 0.3, 30.99, 1.1, 0.4, 0.04, 0, hex('#ff8a3a'), MAT.GLOW);
-  G.box(32.5, 1.6, 31.0, 3.4, 0.1, 0.75, 0, COL.woodMid);
-  livingSet(32.5, 0, 27.9, Math.PI, COL.cream, COL.navy, hex('#cfc6b7'), false);
-  diningSet(37.7, 0, 27.3, Math.PI / 2, 2.0, 1.0, COL.woodMid, COL.cream, null, true);
-  tree(22.6, 0, 26, 2.4, 0.8);
-
-  // ---- ornament shop (front, east of center) ----
-  for (const ox of [42.5, 46]) {
-    const F = frame(ox, 3.6, 0);
+  // atrium: tree, ornament shop (where he came down)
+  tree(33, 0, 20, 6.2, 1.9);
+  { const F = frame(36.5, 15.2, 0.2);
     F.box(0, 0, 0, 2.6, 1.0, 1.2, COL.white);
-    for (let i = 0; i < 18; i++) F.sphere(R(-1.1, 1.1), 1.08, R(-0.45, 0.45), 0.09, pc(['#b3262f', '#e8e2d6', '#c9a24b', '#1f3b6b', '#2f5a3f', '#f2f0ea']), 0, 6);
+    for (let i = 0; i < 18; i++) F.sphere(R(-1.1, 1.1), 1.08, R(-0.45, 0.45), 0.09, pc(['#b3262f', '#e8e2d6', '#c9a24b', '#1f3b6b', '#2f5a3f']), 0, 6);
     F.box(0, 1.0, -0.5, 2.6, 1.0, 0.06, COL.white);
-    F.box(-0.6, 2.0, -0.5, 1.5, 0.06, 0.07, COL.white, 0, { yaw: 0.6 });
-    F.box(0.6, 2.0, -0.5, 1.5, 0.06, 0.07, COL.white, 0, { yaw: -0.6 });
-    for (let i = 0; i < 9; i++) F.box(-1.1 + i * 0.27, 1.25 + R(0, 0.5), -0.44, 0.06, 0.24, 0.04, pc(PAL.gifts));
-    F.hit(0, 0, 2.6, 1.2, 0, 2.0);
+    F.hit(0, 0, 2.6, 1.2, 0, 2.0); }
+  { // the smashed one
+    solid(30.2, 0, 23.3, 2.6, 0.5, 1.2, 0.5, COL.white);
+    G.box(31.2, 0.5, 23.0, 2.4, 0.06, 1.0, 0.9, COL.white);
+    for (let i = 0; i < 46; i++) { const a = R(0, TAU), r = R(0.3, 4.2); G.sphere(31 + Math.cos(a) * r, 0.07, 22.5 + Math.sin(a) * r * 0.8, R(0.05, 0.09), pc(['#b3262f', '#e8e2d6', '#c9a24b', '#1f3b6b', '#2f5a3f', '#dfe8ee']), 0, 5); }
+    for (let i = 0; i < 40; i++) { const a = R(0, TAU), r = R(0.2, 5); G.box(32 + Math.cos(a) * r, 0.005, 20.5 + Math.sin(a) * r, R(0.08, 0.3), 0.012, R(0.05, 0.2), R(0, 3), hex('#cfe0ea'), MAT.GLOW); }
   }
-  tree(49.6, 0, 6, 3.4, 1.15);
-  displayTable(43, 0, 8.6, 0, 2.4, 1.1, 0.95, COL.white, 'gifts');
-  gondola(46.7, 0, 11.5, 0, 3.6, 'gifts', 1.5);
-  pendant(44, F1 - 0.4, 6, 2.9, 0.22); pendant(45, F1 - 0.4, 6.4, 3.1, 0.18);
+  displayTable(29.5, 0, 15, 0, 2.4, 1.0, 0.86, COL.white, 'gifts');
+  displayTable(37.5, 0, 25, 0, 2.4, 1.0, 0.86, COL.white, 'vases');
+  for (let i = 0; i < 5; i++) pendant(28.5 + i * 2, ROOF, 13.2, 6.4 + (i % 2) * 0.3, 0.2);
 
-  // ---- glassware / dinnerware (tile area) ----
-  shelfWall(57, 0, 0.55, 0, 9, 'plates', 2.2, 0.42, COL.woodLight);
-  gondola(54.6, 0, 6.2, Math.PI / 2, 4.5, 'glass', 1.5);
-  gondola(58.2, 0, 6.2, Math.PI / 2, 4.5, 'plates', 1.5);
-  roundTable(56.3, 0, 10.6, 0.75, 0.76, hex('#6b4a33'), hex('#6b4a33'), 'plates');
-  pendant(56.3, F1 - 0.4, 10.6, 2.6, 0.22);
+  // front: registers and gifts (west of the doors)
+  counter(25.5, 0, 5, 0, 3.0, 1.0, 1.05, 2);
+  counter(20.5, 0, 5, 0, 3.0, 1.0, 1.05, 2);
+  shelfWall(23, 0, 3.4, Math.PI, 7.6, 'mixed', 1.5, 0.4, COL.woodLight);
+  gondola(7, 0, 4, 0, 4.2, 'gifts', 1.5);
+  gondola(7, 0, 9.5, 0, 4.2, 'gifts', 1.5);
+  gondola(16, 0, 10, 0, 4, 'vases', 1.5);
+  shelfWall(0.55, 0, 7, Math.PI / 2, 10, 'vases', 2.2, 0.42, COL.woodLight);
+  tree(3, 0, 12.3, 2.6, 0.85);
+  plant(28.6, 0, 1.2, 1.8); plant(35.4, 0, 1.2, 1.8);
+  displayTable(37.5, 0, 7.5, 0, 2.4, 1.1, 0.9, COL.woodLight, 'gifts');
 
-  // ---- front registers ----
-  counter(54.3, 0, 14, 0, 3.0, 1.0, 1.05, 2);
-  counter(58.6, 0, 14, 0, 3.0, 1.0, 1.05, 2);
-  shelfWall(56.5, 0, 15.25, Math.PI, 7, 'mixed', 1.6, 0.4, COL.woodLight);
-
-  // ---- entrance zone ----
-  displayTable(65.5, 0, 22, Math.PI / 2, 2.6, 1.2, 0.9, COL.woodLight, 'gifts');
-  for (let i = 0; i < 4; i++) G.box(68.9, i * 0.12, 18.6, 0.5, 0.11, 0.38, 0, COL.metal);
-  obbs.push(makeOBB(68.9, 18.6, 0.25, 0.2, 0, 0, 0.5, false));
-  gondola(65.5, 0, 27.5, 0, 3.6, 'mixed', 1.4);
-  displayTable(65.5, 0, 16, 0, 2.4, 1.0, 0.9, COL.white, 'vases');
-  plant(68.8, 0, 26.5, 1.8);
-  plant(68.8, 0, 13.5, 1.8);
-
-  // ---- kitchen (hardwood) ----
-  shelfWall(47.5, 0, 31.6, Math.PI, 9.6, 'cook', 2.4, 0.45, COL.woodLight);
-  counter(48, 0, 25.6, 0, 8, 1.2, 1.05, 3);
-  solid(52.6, 0, 25.6, 0.9, 2.0, 0.5, 0, COL.black);
-  for (let i = 0; i < 6; i++) G.box(52.6 + R(-0.3, 0.3), 0.5 + i * 0.25, 25.86, 0.25, 0.18, 0.03, 0, pc(PAL.appl));
-  for (const tx of [46.5, 51.5]) {
-    const F = frame(tx, 19.6, 0);
+  // west: kitchen department
+  shelfWall(0.55, 0, 20.5, Math.PI / 2, 10, 'cook', 2.4, 0.45, COL.woodLight);
+  shelfWall(0.55, 0, 33, Math.PI / 2, 12, 'appl', 2.4, 0.45, COL.woodLight);
+  shelfWall(11.5, 0, 39.45, Math.PI, 17, 'cook', 2.4, 0.45, COL.woodLight);
+  counter(11, 0, 17, 0, 7, 1.2, 1.05, 3);
+  for (const tx of [7, 15.5]) {
+    const F = frame(tx, 24, 0);
     F.box(0, 0, 0, 3.4, 0.92, 0.9, COL.woodLight);
     F.box(0, 0.25, 0, 3.3, 0.03, 0.8, COL.white);
-    items(F, -1.6, 1.6, 0.28, 0, 0.7, 'cook', 0.3);
-    for (let i = 0; i < 5; i++) mixer(F.w(-1.3 + i * 0.65, 0)[0], 0.92, F.w(-1.3 + i * 0.65, 0)[1], pc(['#2b2b2b', '#e9e6df', '#8aa4b8', '#3d5a4e', '#9b2f2f', '#d7d9db']));
+    for (let i = 0; i < 5; i++) { const [mx, mz] = F.w(-1.3 + i * 0.65, 0); mixer(mx, 0.92, mz, pc(['#2b2b2b', '#e9e6df', '#8aa4b8', '#3d5a4e', '#9b2f2f', '#d7d9db'])); }
     F.hit(0, 0, 3.4, 0.9, 0, 0.92);
   }
-  { // marble island with black base
-    const F = frame(57.8, 21.8, 0);
-    F.box(0, 0, 0, 2.4, 0.86, 1.1, COL.black);
-    F.box(0, 0.86, 0, 2.5, 0.06, 1.2, COL.marble);
-    items(F, -1.1, 1.1, 0.92, 0, 0.9, 'cook', 0.3);
-    F.hit(0, 0, 2.5, 1.2, 0, 0.92);
-  }
-  barrel(55.2, 0, 19.6); barrel(55.7, 0, 20.3); barrel(59.6, 0, 23.4);
-  gondola(56.5, 0, 28.6, 0, 4.6, 'cook', 1.6);
-  gondola(43.3, 0, 21.5, Math.PI / 2, 5, 'cook', 1.6);
-  for (const [px, pz] of [[46, 19.6], [51.5, 19.6]]) pendant(px, F1 - 0.4, pz, 2.6, 0.22, hex('#fbf6ea'));
-  solid(60.6, 0, 18.2, 0.8, 1.0, 0.8, 0, COL.white); solid(61.0, 0, 19.3, 0.6, 1.25, 0.6, 0, COL.white);
-  G.box(60.6, 1.0, 18.2, 0.35, 0.4, 0.3, 0, COL.steel);
-  // employee doors (left open) to the back room
-  door(41.5, 0, 31.85, Math.PI, 2.0, 2.4, COL.white, true, 1.1);
-  exitSign(41.5, 2.7, 31.8, Math.PI);
+  { const F = frame(11, 30, 0);
+    F.box(0, 0, 0, 2.4, 0.86, 1.1, COL.black); F.box(0, 0.86, 0, 2.5, 0.06, 1.2, COL.marble);
+    items(F, -1.1, 1.1, 0.92, 0, 0.9, 'cook', 0.3); F.hit(0, 0, 2.5, 1.2, 0, 0.92); }
+  gondola(19.5, 0, 21, Math.PI / 2, 5, 'cook', 1.6);
+  gondola(5, 0, 35, 0, 4.2, 'appl', 1.6);
+  gondola(17, 0, 35, 0, 4.2, 'cook', 1.6);
+  gondola(20.5, 0, 30, Math.PI / 2, 4, 'appl', 1.6);
+  barrel(3, 0, 27); barrel(14, 0, 27.5); barrel(8.5, 0, 31.5);
+  for (const [px, pz] of [[7, 24], [15.5, 24]]) pendant(px, F1 - 0.4, pz, 2.7, 0.22, hex('#fbf6ea'));
 
-  // ---- coffee & electrics corner (single story) ----
-  wall(52, 32, 53, 32, 0, 4.4, COL.wall, 0, 0.3, { noExtend: true });
-  wall(67, 32, 68, 32, 0, 4.4, COL.wall, 0, 0.3, { noExtend: true });
-  G.box(60, 3.6, 32, 16, 0.8, 0.3, 0, COL.wall);
-  shelfWall(55.5, 0, 39.6, Math.PI, 6.5, 'appl', 2.3, 0.45, COL.woodLight);
-  shelfWall(64.7, 0, 39.6, Math.PI, 6, 'appl', 2.3, 0.45, COL.woodLight);
-  shelfWall(52.4, 0, 35.8, Math.PI / 2, 6.8, 'appl', 2.3, 0.45, COL.woodLight);
-  shelfWall(67.6, 0, 35.8, -Math.PI / 2, 6.6, 'appl', 2.0, 0.42, COL.white);
-  for (const [px, pz, s] of [[58.5, 35.2, 1.0], [61.5, 35.6, 0.9]]) {
-    solid(px, 0, pz, 1.0 * s, 1.05, 0.8 * s, 0, COL.white);
-    G.box(px, 1.05, pz, 0.45, 0.42, 0.38, 0, COL.steel);
-  }
-  { const F = frame(64.2, 34.6, 0); F.box(0, 0, 0, 2.2, 0.9, 1.0, COL.woodLight, 0, { hit: true }); items(F, -1, 1, 0.9, 0, 0.8, 'appl', 0.4); }
-  barrel(56, 0, 37.5); barrel(63, 0, 37.8);
-  for (const [px, pz] of [[58, 36], [62, 36]]) pendant(px, 4.4, pz, 2.7, 0.2);
-  solid(57.5, 0, 33.4, 0.6, 1.6, 0.6, 0, hex('#7a1f2b'));
+  // north: glassware and dinnerware
+  shelfWall(33, 0, 39.45, Math.PI, 17, 'glass', 2.4, 0.42, COL.white);
+  gondola(28, 0, 34, Math.PI / 2, 4.6, 'glass', 1.5);
+  gondola(33, 0, 34, Math.PI / 2, 4.6, 'plates', 1.5);
+  gondola(38, 0, 34, Math.PI / 2, 4.6, 'plates', 1.5);
+  roundTable(42, 0, 30.2, 0.75, 0.76, hex('#6b4a33'), hex('#6b4a33'), 'plates');
 
-  // =========================================================
-  // BACK OF HOUSE (ground)
-  // =========================================================
-  wall(24, 32, 40.5, 32, 0, F1 - 0.4, COL.backWall, 0, 0.3, { noExtend: true });
-  wall(42.5, 32, 52, 32, 0, F1 - 0.4, COL.backWall, 0, 0.3, { noExtend: true });
-  // employee stairs (rise north, z 34 → 43)
-  const S2 = { x0: 24.2, x1: 27.8, z0: 34, z1: 43 };
-  for (let k = 0; k < 15; k++) {
-    const za = S2.z0 + k * 0.6, top = (k + 0.5) * 0.3;
-    G.box(26, 0, za + 0.3, 3.6, top - 0.04, 0.6, 0, hex('#8e9399'));
-    G.box(26, top - 0.04, za + 0.3, 3.6, 0.05, 0.64, 0, hex('#2a2a2c'));
-  }
-  wall(28, 34, 28, 48, 0, F1 - 0.4, COL.backWall, 0, 0.3, { noExtend: true });
-  wall(28, 32, 28, 43, F1, 7.5, COL.backWall, 0, 0.3, { noExtend: true });
-  wall(24, 43, 28, 43, 0, F1 - 0.45, COL.backWall, 0, 0.2, { noExtend: true });
-  wall(24, 34, 28, 34, F1, F1 + 1.05, COL.trim, 0, 0.08, { noExtend: true, opaque: false });
-  G.box(27.75, 1.0, 38.5, 0.06, 0.06, 9.5, Math.atan2(0, 1), COL.trim);
-  { // sloped handrail along the stair
-    const len = Math.hypot(9, F1), ang = Math.atan2(F1, 9);
-    const steps = 18;
-    for (let i = 0; i < steps; i++) { const t = (i + 0.5) / steps; G.box(27.7, 0.95 + t * F1, 34 + t * 9, 0.06, 0.05, len / steps + 0.02, 0, COL.trim); }
-    void ang;
-  }
-  // stockroom shelving
-  for (const sz of [34.4, 36.6, 38.8]) metalShelf(34.2, 0, sz, 0, 9);
-  metalShelf(40.6, 0, 36.6, Math.PI / 2, 4.6);
-  // lockers + carts area
-  { const F = frame(51.6, 35.5, -Math.PI / 2); for (let i = 0; i < 8; i++) { F.box(-2 + i * 0.5 + 0.25, 0, 0, 0.48, 1.9, 0.5, COL.locker); F.box(-2 + i * 0.5 + 0.25, 0.9, 0.26, 0.04, 0.12, 0.02, COL.steel); } F.hit(0, 0, 4, 0.5, 0, 1.9); }
-  for (const [cx, cz] of [[45.5, 34.2], [48.2, 37.5]]) {
-    const F = frame(cx, cz, R(-0.3, 0.3));
-    for (const y of [0.15, 0.85, 1.55]) F.box(0, y, 0, 1.2, 0.03, 0.55, COL.steel);
-    for (const ex of [-0.58, 0.58]) for (const ez of [-0.25, 0.25]) F.box(ex, 0, ez, 0.03, 1.6, 0.03, COL.steel);
-    items(F, -0.55, 0.55, 0.88, 0, 0.45, 'boxes', 0.5);
-    F.hit(0, 0, 1.2, 0.55, 0, 1.6, false);
-  }
-  { const F = frame(44.3, 38.6, 0); F.box(0, 0, 0, 1.6, 0.9, 0.7, COL.white, 0, { hit: true }); F.box(0, 0.9, 0, 1.7, 0.04, 0.75, COL.woodLight); }
-  // warehouse
-  for (const [cx, cz] of [[36, 44], [44, 44]]) { solid(cx, 0, cz, 0.35, F1 - 0.4, 0.35, 0, COL.white); }
-  boxPile(31.5, 0, 45.5, 6, 1.4); boxPile(40.5, 0, 42, 5, 1.2); boxPile(48.5, 0, 45.5, 6, 1.4); boxPile(47.5, 0, 41.5, 3, 0.8);
-  { // sale-floor furniture waiting in the back
-    sofa(34.5, 0, 41.6, 0.3, 2.2, COL.cream);
-    roundTable(37.2, 0, 46.2, 0.5, 0.76, COL.white, COL.white);
-    chair(38.2, 0, 46.4, -1.2, COL.black, false);
-  }
-  G.box(38.5, 0.05, 47.8, 4.2, 3.4, 0.08, 0, hex('#8c9196'));
-  for (let y = 0.15; y < 3.4; y += 0.14) G.box(38.5, y, 47.74, 4.2, 0.03, 0.02, 0, hex('#767b80'));
-  door(44.8, 0, 47.85, Math.PI, 1.0, 2.2, hex('#3b4a57'));
-  exitSign(44.8, 2.5, 47.75, Math.PI);
-  for (const dz of [42.5, 46.5]) G.cyl(38, 3.5, dz, 0.35, 27, hex('#e6e3dc'), 0, 12, 'x');
-  G.cyl(30, 3.85, 40, 0.12, 16, COL.black, 0, 8, 'z');
+  // east: dining tables
+  diningSet(46, 0, 17.5, 0, 2.4, 1.0, COL.woodLight, COL.woodMid, hex('#9b9488'), false);
+  diningSet(55, 0, 17, 0, 2.6, 1.0, COL.marble, COL.olive, COL.red, true);
+  diningSet(60, 0, 23.5, Math.PI / 2, 2.2, 1.0, COL.woodDark, COL.woodLight, null, false);
+  diningSet(46.5, 0, 24.5, 0, 2.2, 1.0, COL.woodMid, COL.cream, null, true);
+  diningSet(53.5, 0, 25, 0, 2.0, 1.0, COL.woodLight, COL.black, hex('#b9b2a5'), false);
+  for (const [px, pz] of [[46, 17.5], [55, 17]]) wovenPendant(px, F1 - 0.4, pz, 3.0, 0.38);
+
+  // south-east and north-east: the downstairs furniture corner
+  livingSet(46, 0, 4.8, 0, COL.cream, COL.tan, hex('#cfc6b7'), true);
+  livingSet(53.2, 0, 4.8, 0, COL.navy, COL.cream, hex('#8a8e8c'), false);
+  livingSet(60, 0, 4.8, 0, COL.tan, COL.cream, hex('#d8cfbf'), false);
+  livingSet(49.5, 0, 10.9, Math.PI, COL.sage, COL.cream, hex('#c2b8a6'), false);
+  livingSet(58, 0, 10.9, Math.PI, COL.cream, COL.rust, hex('#b9b2a5'), true);
+  livingSet(56, 0, 35.4, Math.PI, COL.cream, COL.navy, hex('#cfc6b7'), false);
+  shelfWall(56, 0, 39.45, Math.PI, 12, 'pillows', 2.1, 0.45, COL.white);
+  floorLamp(50.5, 0, 37.5); floorLamp(62.4, 0, 14);
+  pot(62.3, 0, 26.6); hamper(22.2, 0, 37.6); pot(42.2, 0, 37.8); pot(1.6, 0, 14.6);
 
   // =========================================================
-  // UPSTAIRS (y = 4.5)
+  // UPSTAIRS
   // =========================================================
-  const Y = F1;
-  // atrium cable rail (gap where the stairs arrive at x=40, z 21.5-23.5)
   function rail(x1, z1, x2, z2) {
     const len = Math.hypot(x2 - x1, z2 - z1), yaw = Math.atan2(-(z2 - z1), x2 - x1);
     const cx = (x1 + x2) / 2, cz = (z1 + z2) / 2;
@@ -655,137 +586,98 @@ function buildLevel() {
     G.box(cx, Y - 0.4, cz, len, 0.4, 0.12, yaw, COL.white);
     obbs.push(makeOBB(cx, cz, len / 2, 0.06, yaw, Y - 0.4, Y + 1.05, false, true));
   }
-  rail(24, 8, 40, 8); rail(24, 8, 24, 24); rail(24, 24, 40, 24); rail(40, 8, 40, 21.4); rail(40, 23.6, 40, 24);
+  rail(26.4, 12, 40, 12); rail(40, 12, 40, 28); rail(24, 28, 40, 28); rail(24, 12.3, 24, 28);
 
-  // living rooms (west, along windows)
+  // west: living rooms
   livingSet(5, Y, 4.8, 0, COL.cream, COL.cream, hex('#d8cfbf'), true);
-  livingSet(12.5, Y, 4.8, 0, COL.tan, COL.cream, hex('#cfc6b7'), false);
-  livingSet(19.6, Y, 4.8, 0, COL.cream, COL.sage, hex('#bdb5a7'), false);
-  livingSet(7.5, Y, 11, Math.PI, COL.navy, COL.cream, hex('#a9a69f'), false);
-  livingSet(18.5, Y, 11.4, Math.PI, COL.cream, COL.tan, hex('#d0c7b8'), true);
-  // dining + bar stools
-  diningSet(11, Y, 17.6, 0, 2.6, 1.0, COL.woodLight, COL.black, hex('#9b9488'), false);
-  diningSet(18, Y, 22.4, 0, 2.2, 1.0, COL.woodMid, COL.cream, null, true);
+  livingSet(12.4, Y, 4.8, 0, COL.tan, COL.cream, hex('#cfc6b7'), false);
+  livingSet(19.5, Y, 4.8, 0, COL.cream, COL.sage, hex('#bdb5a7'), false);
+  livingSet(8, Y, 10.9, Math.PI, COL.navy, COL.cream, hex('#a9a69f'), false);
+  livingSet(17.5, Y, 10.9, Math.PI, COL.cream, COL.tan, hex('#d0c7b8'), true);
+  livingSet(17, Y, 17.5, Math.PI / 2, COL.olive, COL.cream, hex('#bdb5a7'), false);
+  livingSet(17.5, Y, 24.4, 0, hex('#d9c7a8'), COL.cream, hex('#cfc6b7'), false);
+  // the rug wall
+  for (let i = 0; i < 8; i++) G.box(0.22, Y + 0.5, 14.8 + i * 1.65, 0.06, 2.7, 1.5, 0, pc(['#8a3b35', '#3c4a57', '#b7a58d', '#6f7556', '#c9c2b6', '#5a3d2b', '#a35d45']), MAT.CARPET);
+  for (let i = 0; i < 17; i++) G.cyl(5, Y, 16 + i * 0.5, 0.21, 2.2 + (i % 3) * 0.12, pc(['#8a3b35', '#3c4a57', '#b7a58d', '#6f7556', '#c9c2b6', '#a35d45', '#d8cfbf']), MAT.CARPET, 8);
+  obbs.push(makeOBB(5, 20, 0.26, 4.3, 0, Y, Y + 2.2));
+  rug(9, Y, 20, 4, 6, 0, hex('#8a3b35')); rug(9.3, Y + 0.012, 20.4, 3, 4.5, 0.15, hex('#3c4a57'));
+  pot(1.7, Y, 26.3); hamper(2.4, Y, 13.4);
+
+  // north-west: bath corner — towels, big planters, hampers
+  shelfWall(6.5, Y, 39.45, Math.PI, 11, 'pillows', 2.3, 0.45, COL.white);
+  shelfWall(0.55, Y, 34.2, Math.PI / 2, 8, 'vases', 2.3, 0.42, COL.white);
+  pot(3, Y, 31.2); pot(5.6, Y, 33.6); hamper(8.6, Y, 31.6); hamper(10.8, Y, 34.8); pot(12.6, Y, 37.6); hamper(3, Y, 37.3); pot(7.6, Y, 36.8);
+  plant(13.8, Y, 31, 1.7); plant(1.6, Y, 29.4, 1.5);
+  gondola(11.5, Y, 29.4, 0, 3.6, 'pillows', 1.4);
+
+  // north: beds
+  for (const [bx, col] of [[19.5, hex('#d9d4c9')], [25.5, hex('#8e9a86')], [31.5, hex('#5b6b7d')], [37.5, hex('#c9b8a3')]]) bed(bx, Y, 38.35, Math.PI, col);
+  rug(28.5, Y, 35.4, 22, 3.2, 0, hex('#d6cfc2'));
+
+  // north-east: clearance, tucked behind the elevator
+  for (const [sx, sz] of [[49.6, 30.6], [62, 30.2]]) { G.box(sx, Y, sz, 0.05, 1.5, 0.05, 0, COL.black); G.box(sx, Y + 1.1, sz, 0.9, 0.5, 0.04, 0, COL.red); }
+  sofa(54.5, Y, 32.6, 0.35, 2.2, COL.tan);
+  gondola(58, Y, 38.6, 0, 5, 'mixed', 1.5);
+  displayTable(51, Y, 35.2, Math.PI / 2, 2.4, 1.0, 0.85, COL.white, 'mixed');
+  boxPile(61, Y, 35.6, 4, 0.9);
+  swivel(57.5, Y, 34.6, 2.2, COL.rust); chair(50, Y, 38.6, 0.4, COL.woodDark, false); chair(50.9, Y, 38.9, -0.3, COL.woodDark, false);
+  hamper(52.4, Y, 38.6); pot(56.3, Y, 36.4); hamper(62.2, Y, 32.6);
+
+  // east: lighting
+  for (const cx of [45.5, 51, 57]) for (const cz of [15.5, 20, 24.5]) {
+    solid(cx, Y, cz, 1.9, 0.8, 0.5, 0, COL.woodMid);
+    tableLamp(cx - 0.5, Y + 0.8, cz); tableLamp(cx + 0.5, Y + 0.8, cz, COL.white);
+  }
+  for (const [lx, lz] of [[48.3, 17.8], [54, 22.3], [60.5, 17], [60.5, 25]]) floorLamp(lx, Y, lz);
+  shelfWall(63.45, Y, 20, -Math.PI / 2, 12, 'vases', 2.3, 0.42, COL.white);
+  for (let i = 0; i < 5; i++) pendant(45 + i * 3.6, ROOF, 20 + (i % 2) * 2, 7.2 + (i % 3) * 0.3, 0.2);
   for (let i = 0; i < 6; i++) {
-    const sx = 41.4, sz = 10.2 + i * 1.6;
-    G.cyl(sx, Y, sz, 0.18, 0.04, COL.black, 0, 8);
-    G.cyl(sx, Y, sz, 0.03, 0.7, COL.black, 0, 6);
+    const sx = 41.4, sz = 13.4 + i * 2.5;
+    G.cyl(sx, Y, sz, 0.18, 0.04, COL.black, 0, 8); G.cyl(sx, Y, sz, 0.03, 0.7, COL.black, 0, 6);
     G.box(sx, Y + 0.7, sz, 0.42, 0.08, 0.42, 0, pc(['#c49a6c', '#ece6da', '#2b2b2b', '#a87b4f']));
-    G.box(sx + 0.18, Y + 0.78, sz, 0.06, 0.3, 0.42, 0, COL.woodMid);
-    obbs.push(makeOBB(sx, sz, 0.22, 0.22, 0, Y, Y + 1.1, false));
+    obbs.push(makeOBB(sx, sz, 0.22, 0.22, 0, Y, Y + 1.0, false));
   }
-  // lamps & consoles along the atrium west edge
-  for (const cz of [11, 15, 19]) {
-    solid(21.6, Y, cz, 0.5, 0.8, 1.8, 0, COL.woodMid);
-    tableLamp(21.6, Y + 0.8, cz - 0.5); tableLamp(21.6, Y + 0.8, cz + 0.45, COL.white);
-  }
-  // east showroom
-  livingSet(46, Y, 4.8, 0, COL.cream, COL.tan, hex('#d8cfbf'), true);
-  livingSet(53.5, Y, 4.8, 0, hex('#d9c7a8'), COL.cream, hex('#cfc6b7'), false);
-  livingSet(58.6, Y, 11.5, -Math.PI / 2, COL.cream, COL.cream, hex('#cfc6b7'), false);
-  livingSet(46.5, Y, 12.2, Math.PI, COL.olive, COL.cream, hex('#bdb5a7'), false);
-  diningSet(46.5, Y, 19.6, 0, 3.0, 1.0, COL.woodLight, COL.black, hex('#9e968a'), false);
-  diningSet(53.6, Y, 20.3, 0, 2.2, 1.1, COL.woodMid, COL.cream, null, true);
-  shelfWall(61.6, Y, 20.5, -Math.PI / 2, 8, 'pillows', 2.4, 0.45, COL.white);
-  // bedroom zone along the north wall
-  for (const [bx, col] of [[50.2, hex('#d9d4c9')], [55.4, hex('#8e9a86')], [59.8, hex('#5b6b7d')]]) bed(bx, Y, 30.3, Math.PI, col);
-  rug(55, Y, 28.6, 13, 4.5, 0, hex('#d6cfc2'));
-  // design desk + fabric wall near the elevator
-  { const F = frame(33.5, 28.4, 0);
+
+  // south: dining, design desk, register
+  diningSet(31, Y, 4.6, 0, 2.6, 1.0, COL.woodLight, COL.black, hex('#9b9488'), false);
+  diningSet(38.5, Y, 5.2, 0, 2.2, 1.0, COL.woodMid, COL.cream, null, true);
+  diningSet(34.5, Y, 9.6, 0, 2.0, 1.0, COL.woodDark, COL.woodLight, null, false);
+  counter(45.5, Y, 9.8, Math.PI, 4.2, 0.9, 1.05, 2);
+  { const F = frame(47, 4.2, 0);
     F.box(0, Y + 0.72, 0, 5.2, 0.06, 1.1, COL.woodLight);
     for (const ex of [-2.5, 2.5]) F.box(ex, Y, 0, 0.12, 0.72, 1.0, COL.woodLight);
     for (const ex of [-1.6, 0, 1.6]) { F.box(ex, Y + 0.78, -0.3, 0.12, 0.1, 0.12, COL.steel); F.box(ex, Y + 0.88, -0.32, 0.62, 0.42, 0.03, COL.steel); F.box(ex, Y + 0.93, -0.30, 0.56, 0.32, 0.01, hex('#202428'), MAT.GLOW); }
     F.hit(0, 0, 5.2, 1.1, Y + 0.68, Y + 0.78); F.hit(0, 0, 5.1, 1.0, Y, Y + 0.78, false);
-    for (const ex of [-1.6, 0, 1.6]) { const [cx, cz] = F.w(ex, 0.85); chair(cx, Y, cz, Math.PI, COL.woodLight, true); }
-  }
-  { const F = frame(34.5, 31.75, Math.PI);
-    for (let i = 0; i < 26; i++) F.box(-3.2 + i * 0.25, Y + 0.6, 0, 0.22, R(1.2, 1.6), 0.05, pc(['#a8b0b5', '#6d7b86', '#d9d4c9', '#3c4a57', '#8e9a86', '#c9b8a3', '#f0ece4']));
-    F.hit(0, 0, 6.6, 0.15, Y, Y + 2.3); }
-  tree(23.0, Y, 26.1, 2.6, 0.8); tree(41.2, Y, 26.2, 2.6, 0.8);
-  // upstairs register by the windows
-  counter(12.5, Y, 13.7, Math.PI, 4.2, 0.9, 1.05, 2);
-  for (let i = 0; i < 4; i++) art(2 + i * 4.4 + 2.2, Y + 1.4, 0.2, 0, 1.0, 1.3);
-  art(61.8, Y + 1.5, 6, -Math.PI / 2, 1.4, 1.8);
-  for (const [px, pz] of [[12.5, 7.5], [46, 8], [53.5, 8]]) wovenPendant(px, 9, pz, 7.6, 0.45);
-  // doorway to the back hallway (upstairs), restrooms sign area
-  wall(24, 32, 44, 32, Y, 9, COL.ship, MAT.SHIPLAP, 0.3, { noExtend: true });
-  wall(46, 32, 52, 32, Y, 9, COL.ship, MAT.SHIPLAP, 0.3, { noExtend: true });
-  G.box(45, Y + 2.6, 32, 2.0, 9 - Y - 2.6, 0.3, 0, COL.ship, MAT.SHIPLAP);
-  exitSign(45, Y + 2.75, 31.82, Math.PI);
+    for (const ex of [-1.6, 0, 1.6]) { const [cx, cz] = F.w(ex, 0.85); chair(cx, Y, cz, Math.PI, COL.woodLight, true); } }
+  livingSet(56, Y, 4.8, 0, COL.cream, COL.tan, hex('#d8cfbf'), true);
+  livingSet(58.5, Y, 10.6, Math.PI, COL.sage, COL.cream, hex('#bdb5a7'), false);
+  tree(42.6, Y, 30, 2.6, 0.8); tree(22.4, Y, 29.6, 2.6, 0.8);
+  for (const [px, pz] of [[12.4, 7.5], [31, 4.6], [56, 8]]) wovenPendant(px, ROOF, pz, 7.6, 0.45);
 
   // =========================================================
-  // BACK OF HOUSE (upstairs): break room, coat room, hallway
+  // game data
   // =========================================================
-  wall(44, 32, 44, 43.5, Y, 7.5, COL.backWall, 0, 0.2, { noExtend: true });
-  wall(46, 32, 46, 37, Y, 7.5, COL.backWall, 0, 0.2, { noExtend: true });
-  wall(46, 38.5, 46, 43.5, Y, 7.5, COL.backWall, 0, 0.2, { noExtend: true });
-  wall(28, 43.5, 36, 43.5, Y, 7.5, COL.backWall, 0, 0.2, { noExtend: true });
-  wall(37.5, 43.5, 44, 43.5, Y, 7.5, COL.backWall, 0, 0.2, { noExtend: true });
-  wall(46, 43.5, 52, 43.5, Y, 7.5, COL.backWall, 0, 0.2, { noExtend: true });
-  G.box(46, Y + 2.2, 37.75, 0.2, 7.5 - Y - 2.2, 1.5, 0, COL.backWall);
-  G.box(36.75, Y + 2.2, 43.5, 1.5, 7.5 - Y - 2.2, 0.2, 0, COL.backWall);
-  // break room
-  { const carpet = hex('#3f5450');
-    G.box(36, Y + 0.001, 37.75, 15.8, 0.01, 11.3, 0, carpet, MAT.CARPET);
-    for (const [tx, tz] of [[31.5, 35.5], [31.5, 39], [36.5, 35.5], [36.5, 39], [41, 37]]) {
-      const F = frame(tx, tz, R(-0.15, 0.15));
-      F.box(0, Y + 0.72, 0, 1.8, 0.04, 0.75, hex('#2a2a2c'));
-      F.box(0, Y, 0, 0.06, 0.72, 0.06, COL.steel); F.box(0, Y, 0, 0.9, 0.04, 0.5, COL.steel);
-      F.hit(0, 0, 1.8, 0.75, Y + 0.68, Y + 0.76); F.hit(0, 0, 1.0, 0.6, Y, Y + 0.76, false);
-      for (const s of [-1, 1]) { const [cx, cz] = F.w(R(-0.4, 0.4), s * 0.75); chair(cx, Y, cz, (s > 0 ? Math.PI : 0) + R(-0.4, 0.4), hex('#3a3a3c'), true); }
-    }
-    solid(29.0, Y, 42.4, 1.6, 0.95, 0.8, 0, COL.woodLight);
-    G.box(28.7, Y + 0.95, 42.4, 0.6, 0.35, 0.45, 0, COL.black);
-    solid(30.4, Y, 42.6, 0.9, 1.9, 0.75, 0, COL.white);
-    exitSign(31, Y + 2.6, 32.15, 0);
-  }
-  // coat room
-  { G.box(49, Y + 1.7, 43.1, 5.2, 0.04, 0.5, 0, COL.steel);
-    for (let i = 0; i < 16; i++) G.box(46.8 + i * 0.3, Y + 0.85, 43.0, 0.24, 0.85, R(0.35, 0.5), 0, pc(['#1f2329', '#2f3b55', '#3a3a3c', '#4b5a3e', '#6b2c2c', '#262626']));
-    obbs.push(makeOBB(49, 43.0, 2.6, 0.3, 0, Y, Y + 1.8));
-    const F = frame(51.6, 37.5, -Math.PI / 2);
-    for (let i = 0; i < 9; i++) F.box(-2.25 + i * 0.5 + 0.25, Y, 0, 0.48, 1.9, 0.5, COL.locker);
-    F.hit(0, 0, 4.5, 0.5, Y, Y + 1.9);
-    solid(48.6, Y, 36, 1.8, 0.45, 0.45, 0, COL.woodLight);
-  }
-  // hallway: restrooms + office doors
-  for (const dx of [31.5, 34.5]) door(dx, Y, 47.85, Math.PI, 0.95, 2.2, COL.white);
-  for (const dx of [41, 49]) door(dx, Y, 47.85, Math.PI, 0.95, 2.2, hex('#d9d6cf'));
-  for (const dx of [32, 40, 48]) { G.box(dx, Y + 1.2, 43.62, 1.2, 0.9, 0.03, 0, COL.woodLight); G.box(dx, Y + 1.25, 43.64, 1.05, 0.8, 0.01, 0, hex('#c9b38d')); }
-  { const F = frame(39, 46.2, 0); for (const y of [0.15, 0.6, 1.0]) F.box(0, Y + y, 0, 1.0, 0.04, 0.5, COL.black); F.hit(0, 0, 1.0, 0.5, Y, Y + 1.05, false); }
-
-  // =========================================================
-  // walkable surfaces, stairs, zones
-  // =========================================================
-  const surfaces = [{ x0: 0, x1: 70, z0: 0, z1: 48, y: 0 }];
+  const surfaces = [{ x0: 0, x1: W, z0: 0, z1: D, y: 0 }];
   for (const [x0, x1, z0, z1] of slabs) surfaces.push({ x0, x1, z0, z1, y: F1 });
-  const ramps = [
-    { x0: S1.x0, x1: S1.x1, z0: S1.z0, z1: S1.z1, axis: 'x', a0: S1.x0, a1: S1.x1, y0: 0, y1: F1 },
-    { x0: S2.x0, x1: S2.x1, z0: S2.z0, z1: S2.z1, axis: 'z', a0: S2.z0, a1: S2.z1, y0: 0, y1: F1 },
-  ];
-  const stairs = [
-    { bottom: [27.4, 22.5], top: [40.6, 22.5], name: 'Atrium stairs' },
-    { bottom: [26, 33.4], top: [26, 43.6], name: 'Employee stairs' },
-  ];
-  const polys = [
-    [[0, 0], [70, 0], [70, 32], [68, 32], [68, 40], [52, 40], [52, 48], [24, 48], [24, 32], [0, 14]],
-    [[0, 0], [62, 0], [62, 32], [52, 32], [52, 48], [24, 48], [24, 32], [0, 14]],
-  ];
+  const ramps = [{ x0: S1.x0, x1: S1.x1, z0: S1.zTop, z1: S1.zBot, axis: 'z', a0: S1.zBot, a1: S1.zTop, y0: 0, y1: F1 }];
+  const stairs = [{ bottom: [25.2, 26.8], top: [25.2, 11.3], name: 'Stairs' }];
+  const rect = [[0, 0], [W, 0], [W, D], [0, D]];
   const zones = [
-    [1, 28, 52, 32, 43.5, 'Break Room'], [1, 46, 52, 32, 43.5, 'Coat Room'], [1, 24, 52, 43.5, 48, 'Back Hallway'],
-    [1, 44, 46, 32, 43.5, 'Back Hallway'], [1, 24, 28, 32, 48, 'Back Stairs'],
-    [1, 24, 40, 24, 32, 'Design Desk'], [1, 42, 62, 24, 32, 'Bedrooms'], [1, 24, 40, 0, 24, 'Balcony'],
-    [1, 0, 24, 0, 13, 'Upstairs Living Rooms'], [1, 0, 24, 13, 32, 'Upstairs Dining'], [1, 40, 62, 0, 24, 'Upstairs Showroom'],
-    [0, 24, 28, 32, 48, 'Back Stairs'], [0, 28, 40, 32, 40, 'Stockroom'], [0, 24, 52, 40, 48, 'Warehouse'], [0, 40, 52, 32, 40, 'Back Room'],
-    [0, 52, 68, 32, 40, 'Coffee Corner'], [0, 62, 70, 12, 32, 'Entrance'], [0, 40, 62, 16, 32, 'Kitchen'],
-    [0, 52, 62, 12, 16, 'Front Registers'], [0, 52, 62, 0, 12, 'Glassware'], [0, 40, 52, 0, 16, 'Ornament Shop'],
-    [0, 24, 40, 8, 24, 'Atrium'], [0, 24, 40, 0, 8, 'Front Dining'], [0, 24, 40, 24, 32, 'Hearth'],
-    [0, 0, 24, 0, 14, 'Living Rooms'], [0, 0, 24, 14, 32, 'Dining Gallery'],
+    [1, 0, 15, 28, 40, 'Bath Corner'], [1, 15, 44, 28, 40, 'Bedrooms'], [1, 44, 64, 28, 40, 'Clearance'],
+    [1, 0, 24, 12, 28, 'Rug Wall'], [1, 0, 24, 0, 12, 'Upstairs Living Rooms'], [1, 24, 40, 12, 28, 'Balcony'],
+    [1, 24, 52, 0, 12, 'Upstairs Dining'], [1, 52, 64, 0, 12, 'Upstairs Living Rooms'], [1, 40, 64, 12, 28, 'Lighting'],
+    [0, 0, 24, 14, 40, 'Kitchen'], [0, 0, 28, 0, 14, 'Registers'], [0, 28, 40, 0, 12, 'Front Doors'],
+    [0, 24, 40, 12, 28, 'Atrium'], [0, 24, 44, 28, 40, 'Glassware'], [0, 40, 64, 0, 14, 'Living Rooms'],
+    [0, 40, 64, 14, 28, 'Dining Tables'], [0, 44, 64, 28, 40, 'Side Door'],
   ];
   return {
-    geo: G, obbs, surfaces, ramps, stairs, polys, zones, F1,
-    width: 70, depth: 48,
-    playerSpawn: [44.5, 0, 14.5, -Math.PI / 2],
-    seekerSpawns: [[68.2, 20.8], [68.2, 22], [68.2, 23.2], [67.4, 21.4], [67.4, 22.6]],
+    geo: G, obbs, surfaces, ramps, stairs, polys: [rect, rect], zones, F1, width: W, depth: D, containers,
+    doors: { front: frontDoor, side: sideDoor },
+    clueSpots: [[0, 10, 26.5], [0, 57, 8], [0, 50, 21], [0, 31, 36.8], [0, 12, 7], [0, 61, 37.6], [0, 4, 37.4],
+      [1, 28, 8.5], [1, 50, 13.6], [1, 60.5, 27], [1, 13, 27], [1, 22.5, 34.5], [1, 43, 37.5], [1, 9, 8]],
+    keySpots: [[0, 11, 17, 1.08], [0, 25.5, 5, 1.08], [1, 45.5, 9.8, 1.08]],
+    trapSpots: [[0, 31, 11, 'z', 2.6], [0, 41.3, 20, 'x', 2.4], [0, 33, 29, 'z', 2.4], [0, 25.2, 27.4, 'x', 2.0], [0, 44, 13.2, 'z', 2.4], [0, 22.8, 14, 'z', 2.6],
+      [1, 25.2, 10.7, 'x', 2.0], [1, 41.6, 29.2, 'z', 2.2], [1, 15, 29.2, 'z', 2.2], [1, 49.4, 31.2, 'x', 2.4], [1, 22.4, 20, 'x', 2.6], [1, 42.4, 11.2, 'z', 2.2], [1, 30, 29.6, 'z', 2.2]],
+    playerSpawn: [36, 0, 27, 0.35],
   };
 }
