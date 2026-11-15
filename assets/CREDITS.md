@@ -12,11 +12,10 @@ Everything here is free to use. Nothing uses a real store name, logo or brand.
 | `models/dining_chair_02.glb`, `painted_wooden_chair_01.glb` | Poly Haven | CC0 |
 | `models/coffee_table_round_01.glb`, `modern_coffee_table_01.glb`, `side_table_01.glb` | Poly Haven | CC0 |
 | `models/potted_plant_01.glb`, `potted_plant_02.glb` | Poly Haven | CC0 |
+| `sounds/hear.mp3` | Generated with Piper text-to-speech (voice `en_US-ljspeech-medium`, trained on the public-domain LJ Speech recordings), then pitched down with gravel and reverb | free to use |
 
 Models were downloaded as 1K glTF from polyhaven.com and packed with
 `gltf-transform optimize in.gltf out.glb --texture-size 1024 --texture-compress webp --compress meshopt`.
-
-| `sounds/hear.mp3` | Generated with Piper text-to-speech (voice `en_US-ljspeech-medium`, trained on the public-domain LJ Speech recordings), then pitched down with gravel and reverb | free to use |
 
 Code libraries: three.js (MIT), bundled into `index.html` by `tools/build.py`.
 Reflections use three.js's built-in RoomEnvironment.

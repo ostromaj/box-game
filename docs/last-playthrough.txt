@@ -1,0 +1,124 @@
+=== RUN on easy ===
+  [    0.3 cine   ] say      —: 8:59 PM. Snowing.
+  [   13.9 cine   ] say      DAD: Huh. One minute till they close.
+  [   16.7 cine   ] say      MOM: Perfect. Good time to pop into Box. Five minutes, tops.
+  [   20.1 cine   ] say      DAD: In and out.
+  [   21.9 cine   ] say      —: You and Leo exchange a look. It is never five minutes.
+  [   30.6 cine   ] say      DANA: Hi folks! Just so you know, we close in one minute.
+  [   33.8 cine   ] say      DAD: Oh, we’ll be quick.
+  [   36.5 cine   ] say      —: Her smile stays on. Her eyes do not.
+  [   42.5 cine   ] say      DAD: So, could I get this one in a custom fabric?
+  [   45.3 cine   ] say      MARCUS: …Yes. Online, or at the—
+  [   47.5 cine   ] say      DAD: What are my options in, like, a performance velvet? And what’s the lead time? Ballpark.
+  [   54.2 cine   ] say      —: 9:00.
+  [   56.5 cine   ] say      —: Mom picks up a plate and studies the bottom.
+  [   62.8 cine   ] say      —: On a completely different shelf.
+  [   68.1 cine   ] say      PRIYA: (sigh)
+  [   73.2 cine   ] say      —: Mom picks up another plate.
+  [   76.1 cine   ] say      PRIYA: What are they still doing here?
+  [   78.5 cine   ] say      MARCUS: He asked about performance velvet.
+  [   80.9 cine   ] say      PRIYA: Does she know we close at nine?
+  [   83.6 cine   ] say      DANA: …She knows.
+  [   86.2 cine   ] say      DAD: Hey! Do you guys have this in the back?
+  [   89.0 cine   ] say      —: All three close their eyes at the same time.
+  [   92.6 cine   ] say      —: Mom and Dad will be a while.
+  [   95.0 explore] msg      Show Leo around the store
+  [   95.0 explore] say      LEO: Hold my hand! Don’t let go! I want to see EVERYTHING.
+== scene opening: 96s, now explore
+  [  101.0 explore] say      LEO: This couch is squishy. Dad’s gonna sit on all of them.
+  [  106.1 explore] say      MARCUS: It’s nine-oh-six.
+  [  114.6 explore] say      LEO: It’s SO big. Do you think it’s real?
+  [  130.6 explore] say      LEO: Mom has a mixer like that. She never uses it.
+  [  144.7 explore] say      LEO: Don’t touch anything. Dad says.
+  found Leo after 7.8s walk
+  [  148.3 explore] say      PRIYA: (muttering) It goes on the OTHER shelf…
+  [  165.0 explore] say      LEO: Hide and seek! You count. No peeking!
+  [  176.0 explore] msg      Find Leo — listen for the giggling
+  [  183.8 explore] say      LEO: You found me! Again! Again!
+  [  190.1 explore] say      LEO: These pots are big enough to fit a whole kid!
+  [  202.7 explore] say      LEO: This one’s mine. I live here now.
+  [  219.3 explore] say      LEO: Everything here has a red tag. Is it broken?
+  [  230.6 explore] say      LEO: Can we get a lamp shaped like a mushroom?
+  [  240.6 explore] say      LEO: Spin the stools! Spin them!
+  [  278.9 explore] say      LEO: Why is everybody smiling now? They were grumpy before.
+  [  282.3 explore] say      PRIYA: Finding everything okay?
+  [  297.6 explore] say      LEO: Rugs! Rugs! Rugs!
+  [  297.7 explore] msg      Leo has seen it all. It’s getting late.
+  found Leo after 10.7s walk
+  [  340.1 explore] say      LEO: Hide and seek! You count. No peeking!
+  [  350.7 explore] msg      Find Leo — listen for the giggling
+  [  360.3 explore] say      PRIYA: Can I help you find something?
+  [  361.4 explore] say      LEO: How did you find me so fast?!
+  [  364.0 explore] say      —: She was pointing at it. She is still pointing at it.
+  [  372.3 explore] say      LEO: He hasn’t blinked. I’ve been counting.
+  [  383.2 explore] say      LEO: That lady was over THERE a second ago.
+  [  386.2 explore] say      LEO: They’re all humming the same song.
+  [  396.0 explore] say      LEO: I don’t like it here anymore.
+  [  401.9 explore] say      LEO: Did you hear bells?
+  [  414.3 explore] say      LEO: Why did the lights do that?
+  [  436.3 explore] say      LEO: Where are they all going? They’re all walking the same way.
+  [  459.3 explore] say      LEO: It’s too quiet. Hold my hand tighter.
+  [  472.7 explore] say      DAD: Ooh. Feel this one. Performance velvet.
+  [  484.3 explore] say      LEO: I want Mom. Can we go find Mom?
+== explore ended at t=600s stage=return hide-and-seek found=2
+  [  487.9 explore] say      LEO: Wait. I can see everything from up top! Come on!
+  [  487.9 explore] msg      Follow Leo to the balcony railing
+  to balcony: {'t': 14.8, 'd': 4, 'mode': 'cine'}
+  [  504.1 cine   ] say      —: Voices below. Every employee is standing around Mom and Dad. All of them are smiling.
+  [  508.0 cine   ] say      DAD: We’re just browsing, we’ll be out of your hair in—
+  [  511.0 cine   ] say      MANAGER: We told you not to stay too late.
+  [  513.8 cine   ] say      MOM: It’s been, what, ten minutes?
+  [  517.2 cine   ] say      MANAGER: You don’t want to be here after it’s too late.
+  [  523.3 cine   ] say      LEO: …What was that?
+  [  525.3 cine   ] say      —: Every one of them looks up. Straight at you.
+  [  528.3 cine   ] say      LEO: (whisper) They can see us.
+  [  530.5 explore] msg      Go downstairs to Mom and Dad
+== scene balcony: 27s, now explore
+  downstairs: {'t': 11.1, 'd': 6.4, 'mode': 'cine'}
+  [  542.3 cine   ] say      MOM: There you are! Come on, we’re—
+  [  543.9 cine   ] say      MANAGER: Here he is.
+  [  549.6 cine   ] say      —: Mom screams. The staff fold their hands and bow their heads.
+  [  555.7 cine   ] say      LEO: (whisper) …Is he part of the store?
+  [  564.1 cine   ] say      DAD: THE KIDS! Somebody—
+  [  565.5 cine   ] say      MARCUS: This way, sir. We’re closed.
+  [  568.3 cine   ] say      MOM: NO— LEO! Let GO of me!
+  [  570.3 cine   ] say      PRIYA: Thank you for shopping with us.
+  [  605.6 play   ] msg      It took Leo upstairs. Find him.
+== scene crash: 64s, now play
+== scene doors: 0s, now play
+== hunt: {'scares': 4, 'chases': 2, 'hides': 2, 'hidSecs': 77, 'ran': 5, 'crouched': 1, 'peered': True, 'steps': [['clue', 13, True], ['clue', 25, True], ['clue', 100, True], ['keys', 121, True], ['leo', 230, True]], 'mode': 'play', 'time': 230, 'clues': 3, 'keys': True, 'reason': ''}
+  [  617.6 play   ] msg      Look for Leo’s things. They glow. Each one makes his crying easier to follow.
+  [  618.9 play   ] msg      Leo’s mitten. The crying is easier to hear now.
+  [  627.6 play   ] msg      This door is locked too. She just smiles.
+  [  630.2 play   ] msg      His toy train. He has to be somewhere upstairs.
+  [  640.6 play   ] msg      Listen for the bells. Follow the crying.
+  [  651.3 play   ] msg      He’s close. Crouch (C) behind something, or climb into a pot or hamper (E).
+  [  654.8 play   ] msg      HE SEES YOU!
+  [  660.1 play   ] msg      Bells on a string. Crouch to slip under them.
+  [  662.4 play   ] msg      Empty. You climb in.
+  [  678.0 play   ] KRAMPUS  “I can hear you”
+  [  681.4 play   ] msg      You’ll need the store keys to get out. There’s a ring behind every register.
+  [  705.7 play   ] msg      His scarf. The crying is coming from the rug wall.
+  [  709.8 play   ] msg      Follow the crying. Look inside the pots and hampers.
+  [  726.9 play   ] msg      The store keys! These open the front doors.
+  [  745.3 play   ] msg      HE SEES YOU!
+  [  759.0 play   ] msg      Empty. You climb in.
+  [  759.5 play   ] KRAMPUS  “I can hear you”
+  [  770.8 play   ] msg      Don’t move.
+  [  779.8 play   ] KRAMPUS  “I can hear you”
+  [  801.3 play   ] msg      He’s leaving. Wait for the bells to fade.
+  [  801.3 play   ] KRAMPUS  “I can hear you”
+== escape: {'mode': 'cine', 't': 13.5, 'gap': 3.1, 'back': 1, 'reason': ''}
+  [  835.8 play   ] msg      “I knew you’d find me.”  RUN — front doors!
+  [  844.3 play   ] msg      Leo fell! Go back for him!
+  [  845.2 play   ] msg      You’ve got him. RUN!
+  [  852.8 cine   ] say      MOM: OVER HERE! RUN!
+  [  856.3 cine   ] say      DANA: We’re CLOSED—
+  [  860.2 cine   ] say      —: The others haven’t moved. They’re still smiling. One of them waves.
+  [  866.5 cine   ] say      DAD: …We’ll order the sofa online.
+  [  869.3 cine   ] say      MOM: David.
+  [  870.9 cine   ] say      —: Leo is holding his fist closed. You nudge him. He opens his hand.
+  [  874.4 cine   ] say      —: A tiny brass bell.
+== scene ending: 39s, now end
+end screen: end | YOU GOT LEO OUT | Escaped in 4:04 on Easy — new best!He spotted you 2 times. You hid 2 times.
+errors: []
