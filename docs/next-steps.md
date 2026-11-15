@@ -15,7 +15,10 @@ escape → ending. `tools/playthrough.py` runs all of it on autopilot and writes
 you from the balcony scene, bow when Krampus lands, walk your parents out, and watch from the glass in the hunt.
 
 **The hunt**
-- Fair chases: get about 13 m ahead and he loses you; he grabs your coat once before a catch counts (twice on Easy, never on Hard).
+- Fair chases: get about 11 m ahead and he loses you; he grabs your coat twice before a catch counts (three times on Easy, once on Hard).
+- He never teleports. He starts the hunt where he walked to with the sack, has to walk over to pull you out of a pot, and in the finale he rages where he stands until you have a head start.
+- He is smaller (about one and a half times Dad), hunched, with long hanging arms and a lurching walk.
+- Hide-and-seek starts only after Leo has seen everything on his list. Easy shows Leo's things and the keys on the map.
 - He is slow to notice you far away and quick up close. He carries the sack across the upstairs while you get your bearings.
 - One-time hints, a goal line, a "crying" direction marker (and a "bells" marker on Easy and on phones).
 - Staff knock on the glass if you loiter by a door.

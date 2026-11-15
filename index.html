@@ -64,7 +64,7 @@
   body::before, body::after { content: ""; position: fixed; left: 0; right: 0; height: 0; background: #000; z-index: 13; transition: height .6s; pointer-events: none; }
   body::before { top: 0; } body::after { bottom: 0; }
   body.cine::before, body.cine::after { height: 9vh; }
-  #sub { position: fixed; left: 50%; bottom: 11vh; transform: translateX(-50%); width: min(92vw, 760px); text-align: center; font-size: clamp(15px, 2.6vw, 21px); line-height: 1.4; text-shadow: 0 2px 8px #000, 0 0 2px #000; opacity: 0; transition: opacity .25s; z-index: 15; pointer-events: none; }
+  #sub { position: fixed; left: 50%; bottom: 11vh; transform: translateX(-50%); width: fit-content; max-width: min(92vw, 760px); text-align: center; font-size: clamp(17px, 2.6vw, 22px); font-weight: 600; line-height: 1.35; text-shadow: 0 2px 6px #000, 0 0 2px #000; background: rgba(6,6,8,.72); padding: 8px 16px 9px; border-radius: 12px; opacity: 0; transition: opacity .25s; z-index: 15; pointer-events: none; }
   #sub b { display: block; font-size: .62em; letter-spacing: .22em; color: #f0c98a; margin-bottom: 2px; }
   #sub .nar { font-style: italic; color: #e8e2d6; }
   #titlecard { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; z-index: 16; opacity: 0; transition: opacity 1.2s; pointer-events: none; }
@@ -86,7 +86,9 @@
   #ears span { position: absolute; transform: translate(-50%, -50%); font-size: 12px; font-weight: 700; letter-spacing: .08em; white-space: nowrap; opacity: 0; transition: opacity .3s; text-shadow: 0 1px 5px #000; background: rgba(20,18,16,.45); padding: 2px 8px; border-radius: 999px; }
   .tipline { display: inline-block; margin-top: 8px; font-size: 14px; opacity: .8; font-style: italic; }
   body.stare #top, body.stare #hint, body.stare #where, body.stare #stance, body.stare #minimap, body.stare #btnPause { opacity: 0; transition: opacity .6s; }
-  body.touch #sub { width: min(60vw, 760px); }
+  body.touch #sub { max-width: 60vw; font-size: clamp(19px, 5.4vmin, 27px); bottom: 7vh; }
+  body.touch.cine #sub { max-width: 90vw; }
+  @media (orientation: portrait) { body.touch #sub { max-width: 92vw; font-size: clamp(19px, 5.2vw, 26px); bottom: 14vh; } }
   #fatal { display: none; position: fixed; inset: 0; align-items: center; justify-content: center; padding: 30px; text-align: center; z-index: 50; background: #141210; }
 </style>
 </head>
@@ -6825,7 +6827,7 @@ const ACT = (() => {
 
   // ---------- Krampus ----------
   const KC = { fur: '#2a1e17', fur2: '#3b2a1f', skin: '#2b1916', horn: '#cdbf9f', hornTip: '#5e5038', eye: '#ffae1f', tongue: '#a8222e', teeth: '#e8e2d0', chain: '#7d8288', bell: '#d6b24a', sack: '#8a6a46', hoof: '#151110' };
-  const KD = { hip: 1.62, spine: 0.45, chest: 0.9, neck: 0.3, shW: 0.44, upper: 0.8, fore: 0.74, hand: 0.3, thigh: 0.68, shin: 0.66, meta: 0.44, hipW: 0.22 };
+  const KD = { hip: 1.62, spine: 0.45, chest: 0.9, neck: 0.3, shW: 0.46, upper: 0.86, fore: 0.92, hand: 0.3, thigh: 0.68, shin: 0.66, meta: 0.44, hipW: 0.22 };
   function tufts(g, n, cx, cy, cz, rx, ry, rz, len, seed, keep) {
     const r = mulberry32(seed);
     for (let i = 0; i < n; i++) {
@@ -6844,8 +6846,8 @@ const ACT = (() => {
     const pts = [], rad = [];
     for (let i = 0; i <= 16; i++) {
       const t = i / 16, a = t * 2.6;
-      pts.push([side * (0.08 + 0.3 * t + 0.12 * Math.sin(a)), 0.2 + 0.58 * Math.sin(Math.min(a, 1.9)) - 0.32 * Math.max(0, t - 0.6), 0.02 + 0.5 * (1 - Math.cos(a)) * 0.6]);
-      rad.push(0.085 * (1 - t) + 0.008);
+      pts.push([side * (0.08 + 0.4 * t + 0.16 * Math.sin(a)), 0.2 + 0.78 * Math.sin(Math.min(a, 1.9)) - 0.4 * Math.max(0, t - 0.6), 0.02 + 0.62 * (1 - Math.cos(a)) * 0.6]);
+      rad.push(0.09 * (1 - t) + 0.006);
     }
     g.tube(pts, rad, H(KC.horn), MAT.CERAMIC, 8);
     for (let i = 2; i < 14; i += 2) { const p = pts[i]; g.push(A.T(p[0], p[1], p[2])); g.sphere(0, 0, 0, rad[i] * 1.08, shade(H(KC.horn), 0.85), MAT.CERAMIC, 6); g.pop(); }
@@ -6872,6 +6874,9 @@ const ACT = (() => {
         const pts = []; for (let i = 0; i <= 20; i++) { const t = i / 20; pts.push([lerp(-0.42, 0.38, t), lerp(0.95, 0.05, t), -0.33 - 0.06 * Math.sin(t * Math.PI)]); }
         for (let i = 0; i < 20; i++) { const p = pts[i], q = pts[i + 1]; g.push(A.mul(A.T(p[0], p[1], p[2]), A.alignY([q[0] - p[0], q[1] - p[1], q[2] - p[2]]))); g.push(i % 2 ? A.Ry(Math.PI / 2) : A.I()); g.push(A.Rx(Math.PI / 2)); g.torus(0, 0, 0, 0.04, 0.011, H(KC.chain), MAT.METAL, 8, 4); g.pop(); g.pop(); g.pop(); }
         g.tube([[0.35, 0.95, -0.12], [0.45, 0.6, 0.25], [0.3, 0.2, 0.42]], 0.03, H('#5a4530'), MAT.LEATHER, 6, false);
+        // ribs showing through the hide, and a row of bone spines down the back
+        for (let i = 0; i < 4; i++) for (const sd of [-1, 1]) g.tube([[sd * 0.04, 0.5 - i * 0.09, -0.335], [sd * 0.16, 0.47 - i * 0.09, -0.31], [sd * 0.26, 0.43 - i * 0.09, -0.22]], [0.016, 0.014, 0.008], H('#6b5348'), MAT.SKIN, 5);
+        for (let i = 0; i < 7; i++) { const y = 0.98 - i * 0.14, L = 0.2 - Math.abs(i - 2) * 0.022; g.push(A.chain(A.T(0, y, 0.3 + 0.05 * Math.sin(i * 0.6)), A.Rx(1.15))); g.lathe(0, 0, 0, [[0.035, 0], [0.022, L * 0.5], [0, L]], H(KC.horn), MAT.CERAMIC, 6); g.pop(); }
       } else if (part === 'neck') {
         g.capsule(0.34, 0.2, 0.24, H(KC.fur), MAT.FUR, 12);
         g.push(A.T(0, 0.05, 0)); tufts(g, 40, 0, -0.15, 0, 0.22, 0.2, 0.22, 0.3, 44); g.pop();
@@ -6883,7 +6888,7 @@ const ACT = (() => {
         g.ellipsoid(0, 0.2, -0.1, 0.16, 0.06, 0.12, shade(skin, 0.8), MAT.SKIN, 12, 6);
         for (const s of [-1, 1]) {
           g.ellipsoid(s * 0.078, 0.14, -0.135, 0.062, 0.046, 0.04, H('#050202'), 0, 10, 6);            // sunken socket
-          g.ellipsoid(s * 0.078, 0.138, -0.162, 0.043, 0.031, 0.014, H('#ff2600'), MAT.GLOW, 10, 6);  // ember eye
+          g.ellipsoid(s * 0.078, 0.138, -0.162, 0.05, 0.036, 0.014, H('#ff2600'), MAT.GLOW, 10, 6);  // ember eye
           g.ellipsoid(s * 0.078, 0.138, -0.172, 0.013, 0.013, 0.004, H('#ffb040'), MAT.GLOW, 6, 4);
           g.ellipsoid(s * 0.078, 0.138, -0.176, 0.004, 0.017, 0.003, H('#100000'), 0, 6, 4);          // slit pupil
           g.ellipsoid(s * 0.085, 0.185, -0.15, 0.07, 0.022, 0.05, shade(skin, 0.55), MAT.SKIN, 8, 5);   // heavy brow
@@ -6910,10 +6915,10 @@ const ACT = (() => {
       } else if (part === 'hand') {
         g.ellipsoid(0, -0.08, 0, 0.09, 0.1, 0.05, H(KC.skin), MAT.SKIN, 10, 6);
         for (let i = 0; i < 4; i++) {
-          const x = -0.06 + i * 0.04, L = 0.17 - Math.abs(i - 1.5) * 0.02;
+          const x = -0.06 + i * 0.04, L = 0.2 - Math.abs(i - 1.5) * 0.02;
           const pts = [[x, -0.14, 0], [x * 1.1, -0.14 - L * 0.5, -0.025], [x * 1.15, -0.14 - L, -0.07]];
           g.tube(pts, [0.019, 0.016, 0.012], H(KC.skin), MAT.SKIN, 6);
-          g.push(A.mul(A.T(...pts[2]), A.alignY([0, -0.6, -0.8]))); g.lathe(0, 0, 0, [[0.014, 0], [0.01, 0.07], [0, 0.17]], H('#120d0a'), MAT.CERAMIC, 6); g.pop();
+          g.push(A.mul(A.T(...pts[2]), A.alignY([0, -0.6, -0.8]))); g.lathe(0, 0, 0, [[0.016, 0], [0.011, 0.12], [0, 0.3]], H('#120d0a'), MAT.CERAMIC, 6); g.pop();
         }
         g.tube([[0.07, -0.08, -0.02], [0.11, -0.13, -0.06], [0.12, -0.18, -0.09]], [0.02, 0.016, 0.012], H(KC.skin), MAT.SKIN, 6);
       } else if (part === 'thigh') {
@@ -6937,36 +6942,55 @@ const ACT = (() => {
     });
   }
   function kPose(k, t) {
-    const P = { hip: KD.hip, pelvisX: 0.08, lean: 0.2, twist: 0, neckX: -0.15, headY: 0, headX: 0.12, headZ: 0, jaw: 0.08,
+    const P = { roll: 0, hip: KD.hip, pelvisX: 0.08, lean: 0.2, twist: 0, neckX: -0.15, headY: 0, headX: 0.12, headZ: 0, jaw: 0.08,
       shX: [0.12, 0.12], shY: [0, 0], shZ: [0.22, 0.22], el: [0.35, 0.35], wr: [0.25, 0.25],
       hipX: [0.35, 0.35], kn: [1.1, 1.1], an: [0.75, 0.75], sackRot: 0 };
     const ph = k.phase || 0, an = k.anim || 'idle';
     const br = Math.sin(t * 1.3);
+    // He never stands like a person. He goes hunched, head low and forward, lurching onto one side with every other
+    // step, both arms hanging so low the claws nearly drag. With a child in the sack, one fist holds the rope.
+    // (angles: a positive Rx swings a hanging limb forward and tips an upright one back, so a forward hunch is a negative lean)
+    const carry = () => { if (!k.sackFull) return; P.shX[1] = 0.15 - P.lean * 0.6; P.shY[1] = -0.4; P.shZ[1] = 0.05; P.el[1] = 1.55; P.wr[1] = 0.3; };   // fist at the collarbone, on the rope
     if (an === 'walk' || an === 'run') {
       const run = an === 'run';
       for (const [i, o] of [[0, Math.PI], [1, 0]]) {
         const p = ph + o;
-        P.hipX[i] = 0.35 + (run ? 0.75 : 0.42) * Math.sin(p);
-        P.kn[i] = 1.1 + (run ? 0.7 : 0.4) * Math.max(0, Math.sin(p - 1.0));
-        P.an[i] = 0.75 + 0.3 * Math.sin(p + 0.6);
-        P.shX[i] = 0.35 - (run ? 0.9 : 0.4) * Math.sin(p);
-        P.el[i] = run ? 0.9 : 0.5;
+        P.hipX[i] = (run ? 0.55 : 0.5) + (run ? 0.8 : 0.5) * Math.sin(p);
+        P.kn[i] = (run ? 1.25 : 1.3) + (run ? 0.75 : 0.45) * Math.max(0, Math.sin(p - 1.0));
+        P.an[i] = 0.8 + 0.3 * Math.sin(p + 0.6);
       }
-      P.hip = KD.hip - Math.abs(Math.cos(ph)) * (run ? 0.12 : 0.06);
-      P.lean = run ? 0.6 : 0.28; P.neckX = run ? -0.6 : -0.25; P.twist = 0.12 * Math.sin(ph);
-      P.sackRot = 0.12 * Math.sin(ph * 2);
+      const lurch = Math.max(0, Math.sin(ph));                                  // drops onto the left leg
+      P.hip = KD.hip - (run ? 0.2 : 0.16) - Math.abs(Math.cos(ph)) * (run ? 0.12 : 0.05) - lurch * (run ? 0.05 : 0.11);
+      P.roll = (run ? 0.1 : 0.17) * Math.sin(ph); P.twist = (run ? 0.2 : 0.16) * Math.sin(ph);
+      P.lean = run ? -0.95 : -0.62; P.neckX = run ? 0.5 : 0.3; P.headX = run ? 0.35 : 0.18;
+      P.headY = run ? 0 : 0.45 * Math.sin(t * 0.8) + 0.1 * Math.sin(t * 2.9);  // searching, side to side
+      P.headZ = run ? 0.1 * Math.sin(ph) : 0.16 * Math.sin(t * 1.3) + (Math.sin(t * 0.37) > 0.93 ? 0.35 : 0);   // and now and then it snaps over
+      P.jaw = run ? 0.5 : 0.12 + 0.06 * Math.sin(t * 1.7);
+      // the long arm: hangs and sways when he prowls, rakes the air when he runs
+      for (const [i, sg] of [[0, 1], [1, -1]]) {
+        P.shX[i] = run ? 0.45 + sg * 0.4 * Math.sin(ph) : 0.5 - sg * 0.2 * Math.sin(ph);
+        P.shZ[i] = run ? 0.5 : 0.3 + i * 0.1; P.el[i] = run ? 0.55 : 0.2 + i * 0.25 + 0.1 * Math.sin(ph + i); P.wr[i] = run ? 0.75 : 0.55;
+      }
+      carry();
+      P.sackRot = (run ? 0.22 : 0.14) * Math.sin(ph * 2);
     } else if (an === 'crouch') {
       P.hip = 0.95; P.hipX = [1.1, 0.95]; P.kn = [2.1, 2.0]; P.an = [1.2, 1.3]; P.lean = 0.9; P.neckX = -1.1; P.shX = [1.0, 1.1]; P.el = [0.6, 0.7]; P.shZ = [0.4, 0.4];
     } else if (an === 'leap') {
       P.hip = KD.hip + 0.1; P.hipX = [-0.2, 0.9]; P.kn = [0.3, 1.6]; P.an = [0.2, 0.9]; P.lean = 0.2; P.neckX = -0.3; P.shX = [2.4, 2.6]; P.shZ = [0.3, 0.3]; P.el = [0.3, 0.3];
     } else if (an === 'land') {
       P.hip = 1.0; P.hipX = [1.0, 1.2]; P.kn = [2.0, 2.1]; P.an = [1.2, 1.3]; P.lean = 0.95; P.neckX = -1.2; P.shX = [0.9, 0.7]; P.shZ = [1.1, 1.1]; P.el = [0.3, 0.3];
+    } else if (k.gest && (k.gest.name === 'peer' || k.gest.name === 'scare')) {
+      P.lean += 0.03 * br; P.shX = [0.12 + 0.05 * br, 0.12 - 0.05 * br];   // the two close-ups were staged from this upright stance
     } else {
-      P.lean += 0.03 * br; P.shX = [0.12 + 0.05 * br, 0.12 - 0.05 * br];
+      // standing: hunched, breathing, head sweeping, claws flexing
+      P.hip = KD.hip - 0.14; P.hipX = [0.5, 0.42]; P.kn = [1.32, 1.24]; P.lean = -0.5 - 0.04 * br; P.neckX = 0.25; P.headX = 0.15;
+      P.headY = 0.55 * Math.sin(t * 0.55); P.headZ = 0.14 * Math.sin(t * 0.9) + (Math.sin(t * 0.31) > 0.94 ? 0.38 : 0);
+      P.shX = [0.42 + 0.05 * br, 0.4 - 0.04 * br]; P.shZ = [0.36, 0.42]; P.el = [0.25, 0.5]; P.wr = [0.45 + 0.25 * Math.sin(t * 2.1), 0.5 + 0.2 * Math.sin(t * 1.6 + 1)];
+      carry();
     }
     if (k.look) {
       const dx = k.look[0] - k.x, dz = k.look[2] - k.z; let d = Math.atan2(dx, -dz) - k.yaw; while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU;
-      P.headY = clamp(d, -1.0, 1.0); P.twist += clamp(d - P.headY, -0.5, 0.5);
+      P.headY = clamp(d, -1.0, 1.0); P.headZ *= 0.4; P.twist += clamp(d - P.headY, -0.5, 0.5);
       const dy = k.look[1] - (k.y + 2.6); P.headX += clamp(-Math.atan2(dy, Math.hypot(dx, dz)) * 0.7, -0.5, 0.6);
     }
     const gs = k.gest;
@@ -6976,9 +7000,10 @@ const ACT = (() => {
         const set = (key, i, v) => { if (i == null) P[key] = lerp(P[key], v, w); else P[key][i] = lerp(P[key][i], v, w); };
         if (gs.name === 'roar') { set('jaw', null, 0.75); set('neckX', null, -1.1); set('headX', null, -0.35); for (const i of [0, 1]) { set('shZ', i, 0.95); set('shX', i, 0.8); set('el', i, 0.6); } }
         if (gs.name === 'swipe') { const u = clamp(age / 0.35, 0, 1); set('shX', 1, lerp(-0.6, 1.9, u)); set('shZ', 1, lerp(0.9, 0.1, u)); set('el', 1, 0.25); set('twist', null, lerp(0.5, -0.5, u)); }
-        if (gs.name === 'grab') { set('shX', 1, 1.6); set('el', 1, 0.3); set('lean', null, 0.8); set('jaw', null, 0.4); }
+        if (gs.name === 'grab') { set('shX', 1, 1.9); set('shZ', 1, 0.15); set('el', 1, 0.3); set('lean', null, -0.8); set('jaw', null, 0.4); }
         if (gs.name === 'rise') { const u = smooth(age / (gs.dur || 2.5)); set('hip', null, lerp(0.95, KD.hip, u)); for (const i of [0, 1]) { set('hipX', i, lerp(1.1, 0.35, u)); set('kn', i, lerp(2.1, 1.1, u)); set('an', i, lerp(1.25, 0.75, u)); } set('lean', null, lerp(0.95, 0.2, u)); set('neckX', null, lerp(-1.2, -0.15, u)); }
         if (gs.name === 'tilt') { set('headZ', null, 0.35); }
+        if (gs.name === 'lunge') { set('shX', 0, 2.3); set('shZ', 0, 0.15); set('el', 0, 0.25); set('wr', 0, 0.2); set('jaw', null, 0.75); }   // the long arm, only when he is nearly on you
         // bent double over a hiding place, hands on the rim, face in the opening
         if (gs.name === 'peer') { set('hip', null, 0.82); set('lean', null, -1.15 + 0.04 * Math.sin(t * 0.9)); set('neckX', null, -0.2); set('headX', null, -0.5 + 0.06 * Math.sin(t * 0.5)); set('headY', null, 0.25 * Math.sin(t * 0.21)); set('jaw', null, 0.2 + 0.14 * Math.sin(t * 0.7)); set('headZ', null, 0.4 * Math.sin(t * 0.33)); for (const i of [0, 1]) { set('hipX', i, 1.25); set('kn', i, 2.2); set('an', i, 1.25); set('shX', i, 1.0); set('el', i, 0.5); set('shZ', i, 0.4); } }
         // the catch: hunched to your height, arms wide, jaw unhinged
@@ -6993,7 +7018,7 @@ const ACT = (() => {
     const P = kPose(k, t), s = k.scale || 1;
     const root = A.chain(A.T(k.x, k.y, k.z), A.Ry(-k.yaw), A.S(s));
     const pel = A.chain(root, A.T(0, P.hip, 0), A.Ry(P.twist * 0.4), A.Rx(P.pelvisX));
-    const ch = A.chain(pel, A.T(0, KD.spine, 0), A.Rx(P.lean), A.Ry(P.twist * 0.6));
+    const ch = A.chain(pel, A.T(0, KD.spine, 0), A.Rz(P.roll || 0), A.Rx(P.lean), A.Ry(P.twist * 0.6));
     const nk = A.chain(ch, A.T(0, KD.chest * 0.92, -0.08), A.Rx(P.neckX));
     const hd = A.chain(nk, A.T(0, KD.neck, -0.02), A.Ry(P.headY), A.Rx(P.headX), A.Rz(P.headZ));
     buf.emit(kPart('pelvis'), pel); buf.emit(kPart('chest'), ch); buf.emit(kPart('neck'), nk); buf.emit(kPart('head'), hd);
@@ -7065,9 +7090,9 @@ const ACT = (() => {
   if (isTouch) document.body.classList.add('touch');
   const debug = /debug/.test(location.search);
   const DIFF = {
-    easy:   { label: 'Easy',   rage: 3.85, behind: 15, spd: 0.88, range: 13, rate: 0.7, grace: 35, map: true, lose: 11, slips: 2 },
-    normal: { label: 'Normal', rage: 4.2,  behind: 14, spd: 1.0,  range: 15, rate: 0.9, grace: 30, map: false, lose: 13, slips: 1 },
-    hard:   { label: 'Hard',   rage: 4.5,  behind: 12, spd: 1.08, range: 19, rate: 1.3, grace: 20, map: false, lose: 15, slips: 0 },
+    easy:   { label: 'Easy',   rage: 3.7,  behind: 20, spd: 0.78, range: 11, rate: 0.5, grace: 40, map: true, lose: 9,  slips: 3, traps: 2, hunch: 70 },
+    normal: { label: 'Normal', rage: 4.0,  behind: 18, spd: 0.9,  range: 13, rate: 0.7, grace: 32, map: false, lose: 11, slips: 2, traps: 3, hunch: 52 },
+    hard:   { label: 'Hard',   rage: 4.4,  behind: 15, spd: 1.04, range: 17, rate: 1.1, grace: 22, map: false, lose: 14, slips: 1, traps: 4, hunch: 42 },
   };
   const CLUES = [
     { name: 'mitten', col: '#d0342c', text: 'Leo’s mitten. The crying is easier to hear now.' },
@@ -7290,7 +7315,8 @@ const ACT = (() => {
   const cast = {};
   const mkA = (idn, x, z, yaw, extra) => (cast[idn] = Object.assign({ id: idn, x, y: 0, z, yaw, anim: 'idle', phase: 0, speed: 1.3, path: null, face: {}, gest: null, look: null, visible: false, seed: Math.random() * 9 }, extra || {}));
   for (const idn of ['dad', 'mom', 'you', 'leo', 'dana', 'marcus', 'priya', 'manager']) mkA(idn, 0, 0, 0);
-  const KV = { x: 0, y: -50, z: 0, yaw: 0, anim: 'idle', phase: 0, visible: false, sackFull: false, gest: null, look: null };
+  const KS = 0.84;   // Krampus's size everywhere (1 = about twice Dad's height)
+  const KV = { x: 0, y: -50, z: 0, yaw: 0, anim: 'idle', phase: 0, visible: false, sackFull: false, gest: null, look: null, scale: KS };
   const CAR = { x: 70, z: -14, yaw: Math.PI + 0.25, visible: true, lights: false, inside: false };
   const SKY = { broken: false };
   const DISPLAY = { smashed: false };
@@ -7617,7 +7643,7 @@ const ACT = (() => {
     const [kf, kx, kz, kh] = LV.keySpots[(Math.random() * LV.keySpots.length) | 0];
     items.push({ kind: 'keys', x: kx, z: kz, y: (kf ? F1 : 0) + kh, f: kf, taken: false });
     const traps = shuffle(LV.trapSpots.map(([f, x, z, ax, len]) => ({ f, x, z, ax, len, on: false, cool: 0 })));
-    for (let i = 0; i < 4; i++) traps[i].on = true;
+    for (let i = 0; i < D.traps; i++) traps[i].on = true;
     K = { x: -50, z: -50, y: -50, yaw: 0, state: 'wait', path: null, pi: 0, t: 0, look: 0, step: 0, stuck: 0, lastP: [0, 0], seeing: false, lastSeen: null, searchLeft: 0, repath: 0, spd: 0, sawT: 99, stun: 0 };
     G = { hearCool: 8, peerCool: 25, peerAt: 0, D, phase: 'grace', t: D.grace, time: 0, huntT: 0, clues: 0, keys: false, items, traps, broC, bro: { state: 'hidden', x: bc.x, z: bc.z, y: bc.y }, trail: [], hiding: null, back: null,
       alert: 0, noiseT: 0, hunchT: 30, lightT: 70, cryT: 2, doorT: 7, lingerT: 0, knockCool: 0, tipT: 5, tips: {}, breathT: 0, sightings: 0, hides: 0, slips: D.slips, dead: shuffle([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]), reason: '', extraStun: 0 };
@@ -7648,11 +7674,12 @@ const ACT = (() => {
   function interact() {
     if (mode === 'explore') return exploreInteract();
     if (mode !== 'play') return;
-    if (G.hiding != null) { if (K.state === 'peer') return caught('You moved. He was looking right at you.'); [P.x, P.z] = G.back; G.hiding = null; return; }
+    if (G.hiding != null) { if (K.state === 'peer') return caught('You moved. He was looking right at you.'); [P.x, P.z] = G.back; G.hiding = null; G.seenHide = false; return; }
     const i = nearContainer(); if (i < 0) return;
     if (G.bro.state === 'hidden' && i === G.broC) return rescue();
     if (G.phase === 'escape') { showMsg('No time to hide. RUN!', 1.5); return; }
-    if (K.state === 'chase' && (K.seeing || K.sawT < 1.5)) return caught('He watched you climb into the ' + LV.containers[i].type + '.');
+    G.seenHide = K.state === 'chase' && (K.seeing || K.sawT < 1.5);
+    if (G.seenHide) { K.lastSeen = [LV.containers[i].x, LV.containers[i].z, LV.containers[i].f]; K.repath = 0; showMsg('He saw you climb in! Get out and RUN!', 3); }
     G.hiding = i; G.back = [P.x, P.z]; G.hides++;
     P.x = LV.containers[i].x; P.z = LV.containers[i].z; P.vx = P.vz = 0;
     if (G.bro.state === 'hidden') showMsg('Empty. You climb in.', 1.6);
@@ -7661,22 +7688,8 @@ const ACT = (() => {
     const L = cast.leo, c = LV.containers[G.broC];
     placeA(L, c.x + 0.6, c.z, P.yaw, { y: P.y, face: { eyes: 'wide', mouth: 'o', brows: 'sad' } });
     G.bro = { state: 'follow', x: L.x, z: L.z, y: L.y }; G.phase = 'escape'; G.trail = []; P.crouch = false;
-    { const dist = upstairsDist(), mine = dist[rNode(1, P.x, P.z)];
-      let best = -1, bd = 1e9, far = -1, fd = -1e9;
-      for (const n of REACH) {
-        if (n < GN || !(dist[n] < 1e8)) continue;
-        const [x, z] = nodePos(n), d = Math.hypot(x - P.x, z - P.z);
-        if (d < 5) continue;
-        const lead = dist[n] - mine;
-        if (lead > fd) { fd = lead; far = n; }
-        if (lead < G.D.behind * 0.75) continue;
-        const score = Math.abs(lead - G.D.behind) + Math.abs(d - G.D.behind) * 0.4;
-        if (score < bd) { bd = score; best = n; }
-      }
-      const at = best >= 0 ? best : far;
-      if (at >= 0) { const [x, z] = nodePos(at); K.x = x; K.z = z; K.y = F1; K.lastP = [x, z]; K.path = null; G.extraStun = best >= 0 ? 0 : clamp((G.D.behind - fd) / G.D.rage, 0, 4); }
-    }
-    K.state = 'rage'; K.stun = 2.4 + G.extraStun; K.repath = 0;
+    G.udist = upstairsDist(); K.path = null; K.lastP = [K.x, K.z]; K.hold = 0;
+    K.state = 'rage'; K.stun = 2.4; K.repath = 0;
     for (let i = 0; i < 16; i++) ZT[i] = Math.max(ZT[i], 0.5);
     roar(); boxSmash();
     showMsg(G.keys ? '“I knew you’d find me.”  RUN — front doors!' : '“I knew you’d find me.”  RUN — but you still need the keys!', 4);
@@ -7685,7 +7698,8 @@ const ACT = (() => {
   // ---------------- Krampus (hunt AI) ----------------
   function goTo(x, z, f) { const p = routeY(K.x, K.z, K.y, x, z, f); if (p && p.length) { K.path = p; K.pi = 1; return true; } K.path = null; return false; }
   function pickPatrol() {
-    const n = (Math.random() < 0.7 && SPOTS.length) ? SPOTS[(Math.random() * SPOTS.length) | 0] : REACH[(Math.random() * REACH.length) | 0];
+    let n = (Math.random() < 0.7 && SPOTS.length) ? SPOTS[(Math.random() * SPOTS.length) | 0] : REACH[(Math.random() * REACH.length) | 0];
+    if (G.clues >= 3) for (let i = 0; i < 30 && n < GN; i++) n = REACH[(Math.random() * REACH.length) | 0];   // all three found: he keeps to the upstairs, near his prize
     const [x, z, f] = nodePos(n); K.state = 'patrol';
     if (!goTo(x, z, f)) { K.state = 'look'; K.t = 0.5; K.look = K.yaw; }
   }
@@ -7703,7 +7717,7 @@ const ACT = (() => {
     if (G.hiding != null) return 0;
     let range = (G.D.range + 2 * level()) * (ZL[lightZone(P.x, P.z, floorOf(P.y))] < 0.5 ? 0.7 : 1);
     if (K.state === 'chase') range = Math.min(range, G.D.lose);   // outrun him by this much and he loses you
-    const ex = K.x, ey = K.y + 2.4, ez = K.z, eye = P.y + EYE(), body = P.y + lerp(0.7, 0.3, P.ct);
+    const ex = K.x, ey = K.y + 2.4 * KS / 1.1, ez = K.z, eye = P.y + EYE(), body = P.y + lerp(0.7, 0.3, P.ct);
     const dx = P.x - ex, dz = P.z - ez, dy = eye - ey, d = Math.hypot(dx, dz, dy * 0.6);
     if (d > range) return 0;
     if (d > 1.8) { const fx = Math.sin(K.yaw), fz = -Math.cos(K.yaw); if ((dx * fx + dz * fz) / Math.max(0.001, Math.hypot(dx, dz)) < Math.cos(55 * Math.PI / 180)) return 0; }
@@ -7738,7 +7752,8 @@ const ACT = (() => {
       if (G.peerLook > 0 && KV._eye) { G.peerLook -= dt; const e = KV._eye, ey = P.y + EYE(); P.yaw = turnTo(P.yaw, Math.atan2(e[0] - P.x, -(e[2] - P.z)), dt * 2.5); P.pitch = lerp(P.pitch, clamp(Math.atan2(e[1] - ey, Math.hypot(e[0] - P.x, e[2] - P.z)), -1.3, 1.3), Math.min(1, dt * 3)); }
       if (K.peerT > 9 && !K.peerSaid) { K.peerSaid = true; krampusSay('I can hear you', 1); }
       if (K.peerT > K.peerDur) { KV.gest = null; K.peerSaid = false; K.state = 'look'; K.t = 2.6; K.look = K.yaw + 2.4; G.alert = 0; showMsg('He’s leaving. Wait for the bells to fade.', 3, 'tip'); }
-      Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: 1.1, sackFull: false, look: null });
+      // the stare was staged for his old size, so he swells as he bends over the opening (all you can see is the face)
+      Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: lerp(KS, 1.1, smooth(K.peerT / 0.8)), sackFull: false, look: null });
       return true;
     }
     if (c && sameFloor && K.state !== 'chase' && K.state !== 'rush') {
@@ -7764,11 +7779,20 @@ const ACT = (() => {
           if (d < 0.1) K.ci++; else { K.x += dx / d * m; K.z += dz / d * m; K.yaw = turnTo(K.yaw, Math.atan2(dx, -dz), dt * 6); }
           const before = K.step; K.step += 2.5 * dt * 0.62;
           if (Math.floor(before) !== Math.floor(K.step)) { const [v, pan] = hear(K.x, K.z, F1, 34); jingle(v * 0.45, pan, 4); thud(v * 0.45, pan, 300); if (Math.random() < 0.5) sob(v * 0.35, pan); }
-          Object.assign(KV, { x: K.x, y: F1, z: K.z, yaw: K.yaw, visible: true, scale: 1.1, anim: 'walk', phase: K.step * Math.PI * 1.6, sackFull: true, look: null, gest: null });
+          Object.assign(KV, { x: K.x, y: F1, z: K.z, yaw: K.yaw, visible: true, scale: KS, anim: 'walk', phase: K.step * Math.PI * 1.6, sackFull: true, look: null, gest: null });
           return;
         }
       }
       KV.visible = false; return;
+    }
+    // The finale never moves him: he starts from wherever he really is. He roars and tears the place apart until you
+    // have a head start toward the stairs (so running past him while he rages is safe), then he comes.
+    if (K.state === 'rage' && K.hold != null) {
+      K.hold += dt; const fd = LV.doors.front;
+      const lead = floorOf(K.y) === 1 && floorOf(P.y) === 1 ? G.udist[rNode(1, K.x, K.z)] - G.udist[rNode(1, P.x, P.z)]
+        : floorOf(K.y) === 1 ? 99 : Math.hypot(K.x - fd.x, K.z - fd.z) - Math.hypot(P.x - fd.x, P.z - fd.z) - (floorOf(P.y) === 1 ? 30 : 0);
+      if ((K.hold > 2.4 && lead >= G.D.behind) || K.hold > 11) K.hold = null; else K.stun = Math.max(K.stun, 0.2);
+      if (K.hold != null && Math.random() < dt * 1.5) { burstPlates(K.x + (Math.random() - 0.5) * 2, K.y + 1.2, K.z + (Math.random() - 0.5) * 2, 8); const [v] = hear(K.x, K.z, K.y, 30); if (v > 0.02) boxSmash(); KV.gest = { name: 'roar', t0: NOW, dur: 1.4 }; }
     }
     if (K.stun > 0) { K.stun -= dt; K.spd = 0; Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle' }); if (!KV.gest) KV.gest = { name: 'roar', t0: NOW, dur: 1.4 }; return; }
     const sameFloor = Math.abs(K.y - P.y) < 1, dP = Math.hypot(P.x - K.x, P.z - K.z);
@@ -7797,14 +7821,15 @@ const ACT = (() => {
           if (G.slips > 0) {   // he gets a fistful of coat, and you tear free: once (twice on Easy, never on Hard)
             G.slips--; K.stun = 2.8; KV.gest = { name: 'roar', t0: NOW, dur: 1.6 }; roar(); thud(0.7, 0, 500); FEAR = 1; cam.shake = 0.6; G.alert = 1;
             try { if (navigator.vibrate) navigator.vibrate(120); } catch (e) {}
-            showMsg(G.slips > 0 ? 'He got your coat. You tore free! RUN!' : 'He got your coat. You tore free! He won’t miss again. RUN!', 3.2);
+            showMsg(G.slips > 0 ? 'He got your coat. You tore free! RUN!' : 'He got your coat. You tore free! He won’t miss again. RUN!', 3.2); K.state = 'chase';
             return;
           }
           return caught('Krampus caught you.');
         }
+        if (G.seenHide && G.hiding != null && sameFloor && dP < 1.9) return caught('He watched you climb into the ' + LV.containers[G.hiding].type + '.');
         K.repath -= dt;
         if (K.repath <= 0) { K.repath = 0.4; goTo(K.lastSeen[0], K.lastSeen[1], K.lastSeen[2]); }
-        if (!K.seeing && (!K.path || K.pi >= K.path.length)) { K.state = 'search'; K.t = 2.2; K.look = K.yaw; K.searchLeft = 2 + Math.min(2, G.clues); G.alert = 0.6; if (msgT <= 0.3) showMsg(G.hiding != null ? 'He lost you. Stay still.' : 'He lost you. Hide before he looks around.', 2.6, 'tip'); }
+        if (!K.seeing && (!K.path || K.pi >= K.path.length)) { G.seenHide = false; K.state = 'search'; K.t = 2.2; K.look = K.yaw; K.searchLeft = 2 + Math.min(2, G.clues); G.alert = 0.6; if (msgT <= 0.3) showMsg(G.hiding != null ? 'He lost you. Stay still.' : 'He lost you. Hide before he looks around.', 2.6, 'tip'); }
       } else if (K.state === 'look' || K.state === 'search') {
         K.t -= dt; K.yaw = K.look + Math.sin((2.2 - K.t) * 1.9) * 1.2;
         if (K.t <= 0) {
@@ -7819,7 +7844,7 @@ const ACT = (() => {
       if (G.breathT <= 0 && sameFloor && dP < 6.5 && K.state !== 'chase' && G.hiding == null && !inView(K.x, K.y, K.z, 1.1)) { G.breathT = 3.2 + Math.random() * 2; const [v, pan] = hear(K.x, K.z, K.y, 9); breath(0.12 + v * 0.3, pan); }
       G.hunchT -= dt;
       if (G.hunchT <= 0) {
-        G.hunchT = 42 - 6 * level();
+        G.hunchT = G.D.hunch - 6 * level();
         if (K.state === 'patrol' || K.state === 'look') { const a = Math.random() * TAU, r = 5 + Math.random() * 7; K.state = 'patrol'; if (!goTo(P.x + Math.cos(a) * r, P.z + Math.sin(a) * r, floorOf(P.y))) pickPatrol(); }
       }
     }
@@ -7849,8 +7874,9 @@ const ACT = (() => {
         else if (K.state === 'searchwalk') { K.state = 'search'; K.t = 2; K.look = K.yaw; }
       }
     } else K.spd = 0;
+    if ((K.state === 'chase' || K.state === 'rage') && dP < 3.4 && sameFloor && (!KV.gest || KV.gest.name !== 'lunge')) KV.gest = { name: 'lunge', t0: NOW, dur: 1.2 };
     if ((K.state === 'chase' && K.seeing) || (K.state === 'rage' && dP < 6)) K.yaw = turnTo(K.yaw, Math.atan2(P.x - K.x, -(P.z - K.z)), dt * 8);
-    Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, scale: 1.1, anim: K.spd > 3 ? 'run' : K.spd > 0 ? 'walk' : 'idle', phase: K.step * Math.PI * 1.6, sackFull: false, look: K.state === 'chase' || K.state === 'rage' ? [P.x, P.y + 1, P.z] : null });
+    Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, scale: KS, anim: K.spd > 3 ? 'run' : K.spd > 0 ? 'walk' : 'idle', phase: K.step * Math.PI * 1.6, sackFull: false, look: K.state === 'chase' || K.state === 'rage' ? [P.x, P.y + 1, P.z] : null });
   }
 
   // ---------------- player ----------------
@@ -7887,7 +7913,7 @@ const ACT = (() => {
         const c = CLUES[G.clues]; G.clues++; tone(660, 0.2, 0.2, 'triangle'); tone(880, 0.3, 0.2, 'triangle', 0.12);
         const bc = LV.containers[G.broC];
         showMsg(c.text || ('His scarf. The crying is coming from ' + placeName(bc.x, bc.z, bc.y) + '.'), 4.5);
-        killLights(3); let add = 2; for (const t of G.traps) if (!t.on && add > 0) { t.on = true; add--; }
+        killLights(3); let add = G.D.map ? 1 : 2; for (const t of G.traps) if (!t.on && add > 0) { t.on = true; add--; }
       }
     }
     for (const t of G.traps) {
@@ -8133,14 +8159,14 @@ const ACT = (() => {
     L.y = surfaceY(L.x, L.z, L.y);
     L.holdHand = s.mode !== 'lead' && Math.hypot(L.x - P.x, L.z - P.z) < 1.0 ? 0 : null;
     if (EX.stage === 'explore') for (const [f, x, z, r, line] of LV.leoSpots) if (!s.said.has(line) && floorOf(P.y) === f && Math.hypot(P.x - x, P.z - z) < r && subT <= 0) { s.said.add(line); say('LEO', line, 2.8); break; }
-    if (EX.stage === 'explore' && ((EX.t > 70 && EX.hs === 0) || (EX.t > 330 && EX.hs === 1)) && subT <= 0) startHideSeek();
+    if (EX.stage === 'explore' && s.mode === 'follow' && listDone() >= LIST.length && subT <= 0 && (EX.hs === 0 || (EX.hs === 1 && EX.found >= 1 && EX.t > ACT_AT[2] + 20))) startHideSeek();
   }
   function startHideSeek() {
     const s = EX.leo; EX.hs++;
     const f = floorOf(P.y), cands = LV.containers.map((c, i) => [c, i]).filter(([c]) => c.f === f).sort((a, b) => Math.hypot(a[0].x - P.x, a[0].z - P.z) - Math.hypot(b[0].x - P.x, b[0].z - P.z));
     if (!cands.length) { EX.hs--; return; }
     const pickI = cands[Math.min(cands.length - 1, 1 + ((Math.random() * Math.min(4, cands.length - 1)) | 0))][1];
-    say('LEO', 'Hide and seek! You count. No peeking!', 2.6);
+    say('LEO', EX.hs === 1 ? 'I saw everything! Now hide-and-seek! You count. No peeking!' : 'One more game! You count. No peeking!', 3);
     s.mode = 'counting'; s.count = 10; s.hideIdx = pickI; cast.leo.holdHand = null;
     const tick = () => {
       if (!EX || EX.leo !== s || s.mode !== 'counting') { $('peek').style.opacity = 0; return; }
@@ -8223,6 +8249,7 @@ const ACT = (() => {
       mg.translate(Wd / 2, H / 2); mg.scale(s / MAP_S, s / MAP_S); mg.translate(-P.x * MAP_S, -(LV.depth - P.z) * MAP_S);
       mg.globalAlpha = 0.9; mg.drawImage(mapImg[f], 0, 0); mg.globalAlpha = 1;
       const sx = (x) => x * MAP_S, sz = (z) => (LV.depth - z) * MAP_S;
+      if (mode === 'play' && G.D.map) for (const it of G.items) if (!it.taken && it.f === f) { mg.fillStyle = it.kind === 'keys' ? '#e0a03a' : '#3aa0e0'; mg.beginPath(); mg.arc(sx(it.x), sz(it.z), 3.5, 0, TAU); mg.fill(); }
       if (mode === 'play' && (G.D.map || debug) && KV.visible && floorOf(K.y) === f) { mg.fillStyle = '#7a1010'; mg.beginPath(); mg.arc(sx(K.x), sz(K.z), 4, 0, TAU); mg.fill(); }
       if (mode === 'explore' && EX.stage === 'return' && f === 1) { mg.fillStyle = '#e0a03a'; mg.beginPath(); mg.arc(sx(40.9), sz(16.4), 5, 0, TAU); mg.fill(); }
       if (mode === 'explore' && EX.stage === 'explore') for (const [, i] of LIST) { const [lf, lx, lz, , line] = LV.leoSpots[i]; if (lf === f && !EX.leo.said.has(line)) { mg.strokeStyle = '#e0a03a'; mg.lineWidth = 2; mg.beginPath(); mg.arc(sx(lx), sz(lz), 5, 0, TAU); mg.stroke(); } }
@@ -8411,22 +8438,22 @@ const ACT = (() => {
     move([24.3, 1.75, 30.2], [30.0, 1.4, 19.0], [24.0, 1.6, 30.6], [29.5, 3.5, 21.5], 0.8, 0.95, 1.05);
     for (let i = 0; i < 12; i++) { KV.y = Math.max(0, 9.5 - 9.8 * Math.pow((i + 1) / 12, 2)); yield 0.04; }
     KV.y = 0; KV.anim = 'land'; DISPLAY.smashed = true; burstOrnaments(29.5, 1, 21.5, 90); boxSmash(); thud(0.9, 0, 200); cam.shake = 1.2;
-    for (const k of ['mom', 'dad']) { C[k].face = { eyes: 'wide', mouth: 'open', brows: 'up' }; C[k].look = [29.5, 2.5, 21.5]; }
+    for (const k of ['mom', 'dad']) { C[k].face = { eyes: 'wide', mouth: 'open', brows: 'up' }; C[k].look = [29.5, 2.1, 21.5]; }
     for (const k of STAFF) { C[k].look = null; C[k].gest = { name: 'bow', t0: NOW }; }   // heads down, hands folded
     C.you.face = { eyes: 'wide', mouth: 'o', brows: 'up' }; C.leo.face = { eyes: 'wide', mouth: 'o', brows: 'up' };
     yield 0.8;
     KV.anim = 'idle'; KV.gest = { name: 'rise', t0: NOW, dur: 2.6 };
-    cut([27.2, 1.0, 25.6], [29.5, 2.0, 21.5], 0.95);
+    cut([27.2, 0.9, 25.6], [29.5, 1.7, 21.5], 0.95);
     yield 1.3; jingle(0.25, 0, 3); yield 1.5;
     cut([29.6, 1.55, 17.9], [32.7, 1.4, 13.9], 0.85);
     yield say('', 'Mom screams. The staff fold their hands and bow their heads.', 3.0);
     KV.gest = null;
     KV.look = head(C.you);
-    cut([27.0, 2.5, 24.9], [29.5, 2.95, 21.5], 0.75);
+    cut([27.2, 2.0, 24.7], [29.5, 2.3, 21.5], 0.7);
     yield 1.8;
     KV.look = head(C.leo); KV.gest = { name: 'tilt', t0: NOW, dur: 2 };
     yield 1.2;
-    C.leo.look = [29.5, 2.8, 21.5];
+    C.leo.look = [29.5, 2.3, 21.5];
     { const L = C.leo, fx = Math.sin(L.yaw), fz = -Math.cos(L.yaw); cut([L.x + fx * 0.95, 1.0, L.z + fz * 0.95], [L.x, 0.95, L.z], 0.6); }
     yield say('LEO', '(whisper) …Is he part of the store?', 2.4);
     cut([29.9, 1.6, 29.7], [26.7, 1.2, 26.1], 1.0);
@@ -8437,7 +8464,7 @@ const ACT = (() => {
     yield 0.6;
     KV.anim = 'crouch'; KV.yaw = Math.atan2(31 - KV.x, -(30 - KV.z)); yield 0.45;
     KV.anim = 'leap'; jingle(0.3, 0, 6);
-    follow(() => [[33.2, 1.3, 23.9], [KV.x, KV.y + 2.0, KV.z]], 1.05);
+    follow(() => [[33.2, 1.3, 23.9], [KV.x, KV.y + 1.6, KV.z]], 1.05);
     { const sx = KV.x, sz = KV.z; for (let i = 0; i < 20; i++) { const u = (i + 1) / 20; KV.x = lerp(sx, 31, u); KV.z = lerp(sz, 30.5, u); KV.y = F1 * u + 4.2 * Math.sin(u * Math.PI); yield 0.04; } }
     KV.y = F1; KV.anim = 'land'; thud(0.6, 0.3, 300); yield 0.5;
     KV.anim = 'walk'; KV.yaw = -Math.PI / 2 - 0.4;
@@ -8576,9 +8603,10 @@ const ACT = (() => {
     if (mode !== 'play') return;
     // jumpscare first: he is suddenly right there, and the camera is dragged up to his face
     mode = 'scare'; G.reason = reason; SCARE = { t: 0, from: [P.x, P.y + EYE(), P.z], yaw: P.yaw, pitch: P.pitch };
-    if (!(Math.hypot(K.x - P.x, K.z - P.z) < 1.5 && Math.abs(K.y - P.y) < 1)) { K.x = P.x + Math.sin(P.yaw) * 1.15; K.z = P.z - Math.cos(P.yaw) * 1.15; K.y = P.y; }
+    // he is only ever where he walked to. If he is not within arm's reach (he took Leo, not you), skip the face-to-face and end the round.
+    if (!(Math.hypot(K.x - P.x, K.z - P.z) < 2.6 && Math.abs(K.y - P.y) < 1)) { scream(); roar(); FEAR = 1; $('hud').style.display = 'none'; $('msg').style.opacity = 0; return endCaught(); }
     K.yaw = Math.atan2(P.x - K.x, -(P.z - K.z));
-    Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: 1.1, look: null, gest: { name: 'scare', t0: NOW } });
+    Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: 1.1, look: null, gest: { name: 'scare', t0: NOW } });   // face-to-face close-up, staged at his old size
     scream(); FEAR = 1; $('hud').style.display = 'none'; $('msg').style.opacity = 0;
     try { if (navigator.vibrate) navigator.vibrate([60, 30, 220]); } catch (e) {}
   }
@@ -8596,7 +8624,7 @@ const ACT = (() => {
   }
   function win() {
     if (mode !== 'play') return;
-    KV.scale = 1; FEAR = 0;
+    KV.scale = KS; FEAR = 0;
     const t = Math.floor(G.time), prev = getBest(diffKey), best = !prev || t < prev;
     if (best) setBest(diffKey, t);
     $('hud').style.display = 'none';
@@ -8740,7 +8768,7 @@ const ACT = (() => {
     updatePlayer(dt); if (mode !== 'play') return;
     if (G.phase === 'grace') {
       G.t -= dt;
-      if (G.t <= 0) { G.phase = 'hunt'; dropKrampus(); pickPatrol(); jingle(0.35, 0, 8); showMsg('Listen for the bells. Follow the crying.', 4); }
+      if (G.t <= 0) { G.phase = 'hunt'; if (!K.carry) dropKrampus(); pickPatrol(); jingle(0.35, 0, 8); showMsg('Listen for the bells. Follow the crying.', 4); }
     } else if (G.phase === 'hunt') { G.huntT += dt; G.lightT -= dt; if (G.lightT <= 0) { G.lightT = 70; killLights(1); } }
     updateKrampus(dt); if (mode !== 'play') return;
     updateBrother(dt);
@@ -8815,7 +8843,7 @@ const ACT = (() => {
     // test hooks for the scares: hide in the nearest pot/hamper and bring him over; or get caught on the spot
     peer: () => { G.phase = 'hunt'; const i = nearContainer(); if (i < 0) return false; if (G.hiding == null) { G.hiding = i; G.back = [P.x, P.z]; P.x = LV.containers[i].x; P.z = LV.containers[i].z; } const c = LV.containers[i]; K.x = c.x + 1.1; K.z = c.z + 0.3; K.y = P.y; K.stun = 0; startPeer(c); return true; },
     view: (pos, look, fov) => { DBGCAM = pos ? { pos, look, fov } : null; },
-    scare: () => { G.phase = 'hunt'; caught('Test.'); }, kstate: () => K && K.state, fear: () => FEAR,
+    scare: () => { G.phase = 'hunt'; K.x = P.x + Math.sin(P.yaw) * 1.15; K.z = P.z - Math.cos(P.yaw) * 1.15; K.y = P.y; caught('Test.'); }, kstate: () => K && K.state, fear: () => FEAR,
     container: (i) => LV.containers[i], tickN: (n, dt = 1 / 30) => { for (let i = 0; i < n && mode === 'play'; i++) { NOW += dt; tick(dt); } },
     reachable: (f, x, z) => { const n = rNode(f, x, z); if (n < 0) return 99; const [nx, nz] = nodePos(n); return Math.hypot(nx - x, nz - z); },
     path: (x0, z0, f0, x1, z1, f1) => { const p = route(x0, z0, f0, x1, z1, f1); return p ? p.length : null; },

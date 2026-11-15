@@ -9,9 +9,9 @@
   if (isTouch) document.body.classList.add('touch');
   const debug = /debug/.test(location.search);
   const DIFF = {
-    easy:   { label: 'Easy',   rage: 3.85, behind: 15, spd: 0.88, range: 13, rate: 0.7, grace: 35, map: true, lose: 11, slips: 2 },
-    normal: { label: 'Normal', rage: 4.2,  behind: 14, spd: 1.0,  range: 15, rate: 0.9, grace: 30, map: false, lose: 13, slips: 1 },
-    hard:   { label: 'Hard',   rage: 4.5,  behind: 12, spd: 1.08, range: 19, rate: 1.3, grace: 20, map: false, lose: 15, slips: 0 },
+    easy:   { label: 'Easy',   rage: 3.7,  behind: 20, spd: 0.78, range: 11, rate: 0.5, grace: 40, map: true, lose: 9,  slips: 3, traps: 2, hunch: 70 },
+    normal: { label: 'Normal', rage: 4.0,  behind: 18, spd: 0.9,  range: 13, rate: 0.7, grace: 32, map: false, lose: 11, slips: 2, traps: 3, hunch: 52 },
+    hard:   { label: 'Hard',   rage: 4.4,  behind: 15, spd: 1.04, range: 17, rate: 1.1, grace: 22, map: false, lose: 14, slips: 1, traps: 4, hunch: 42 },
   };
   const CLUES = [
     { name: 'mitten', col: '#d0342c', text: 'Leo’s mitten. The crying is easier to hear now.' },
@@ -234,7 +234,8 @@
   const cast = {};
   const mkA = (idn, x, z, yaw, extra) => (cast[idn] = Object.assign({ id: idn, x, y: 0, z, yaw, anim: 'idle', phase: 0, speed: 1.3, path: null, face: {}, gest: null, look: null, visible: false, seed: Math.random() * 9 }, extra || {}));
   for (const idn of ['dad', 'mom', 'you', 'leo', 'dana', 'marcus', 'priya', 'manager']) mkA(idn, 0, 0, 0);
-  const KV = { x: 0, y: -50, z: 0, yaw: 0, anim: 'idle', phase: 0, visible: false, sackFull: false, gest: null, look: null };
+  const KS = 0.84;   // Krampus's size everywhere (1 = about twice Dad's height)
+  const KV = { x: 0, y: -50, z: 0, yaw: 0, anim: 'idle', phase: 0, visible: false, sackFull: false, gest: null, look: null, scale: KS };
   const CAR = { x: 70, z: -14, yaw: Math.PI + 0.25, visible: true, lights: false, inside: false };
   const SKY = { broken: false };
   const DISPLAY = { smashed: false };
@@ -561,7 +562,7 @@
     const [kf, kx, kz, kh] = LV.keySpots[(Math.random() * LV.keySpots.length) | 0];
     items.push({ kind: 'keys', x: kx, z: kz, y: (kf ? F1 : 0) + kh, f: kf, taken: false });
     const traps = shuffle(LV.trapSpots.map(([f, x, z, ax, len]) => ({ f, x, z, ax, len, on: false, cool: 0 })));
-    for (let i = 0; i < 4; i++) traps[i].on = true;
+    for (let i = 0; i < D.traps; i++) traps[i].on = true;
     K = { x: -50, z: -50, y: -50, yaw: 0, state: 'wait', path: null, pi: 0, t: 0, look: 0, step: 0, stuck: 0, lastP: [0, 0], seeing: false, lastSeen: null, searchLeft: 0, repath: 0, spd: 0, sawT: 99, stun: 0 };
     G = { hearCool: 8, peerCool: 25, peerAt: 0, D, phase: 'grace', t: D.grace, time: 0, huntT: 0, clues: 0, keys: false, items, traps, broC, bro: { state: 'hidden', x: bc.x, z: bc.z, y: bc.y }, trail: [], hiding: null, back: null,
       alert: 0, noiseT: 0, hunchT: 30, lightT: 70, cryT: 2, doorT: 7, lingerT: 0, knockCool: 0, tipT: 5, tips: {}, breathT: 0, sightings: 0, hides: 0, slips: D.slips, dead: shuffle([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]), reason: '', extraStun: 0 };
@@ -592,11 +593,12 @@
   function interact() {
     if (mode === 'explore') return exploreInteract();
     if (mode !== 'play') return;
-    if (G.hiding != null) { if (K.state === 'peer') return caught('You moved. He was looking right at you.'); [P.x, P.z] = G.back; G.hiding = null; return; }
+    if (G.hiding != null) { if (K.state === 'peer') return caught('You moved. He was looking right at you.'); [P.x, P.z] = G.back; G.hiding = null; G.seenHide = false; return; }
     const i = nearContainer(); if (i < 0) return;
     if (G.bro.state === 'hidden' && i === G.broC) return rescue();
     if (G.phase === 'escape') { showMsg('No time to hide. RUN!', 1.5); return; }
-    if (K.state === 'chase' && (K.seeing || K.sawT < 1.5)) return caught('He watched you climb into the ' + LV.containers[i].type + '.');
+    G.seenHide = K.state === 'chase' && (K.seeing || K.sawT < 1.5);
+    if (G.seenHide) { K.lastSeen = [LV.containers[i].x, LV.containers[i].z, LV.containers[i].f]; K.repath = 0; showMsg('He saw you climb in! Get out and RUN!', 3); }
     G.hiding = i; G.back = [P.x, P.z]; G.hides++;
     P.x = LV.containers[i].x; P.z = LV.containers[i].z; P.vx = P.vz = 0;
     if (G.bro.state === 'hidden') showMsg('Empty. You climb in.', 1.6);
@@ -605,22 +607,8 @@
     const L = cast.leo, c = LV.containers[G.broC];
     placeA(L, c.x + 0.6, c.z, P.yaw, { y: P.y, face: { eyes: 'wide', mouth: 'o', brows: 'sad' } });
     G.bro = { state: 'follow', x: L.x, z: L.z, y: L.y }; G.phase = 'escape'; G.trail = []; P.crouch = false;
-    { const dist = upstairsDist(), mine = dist[rNode(1, P.x, P.z)];
-      let best = -1, bd = 1e9, far = -1, fd = -1e9;
-      for (const n of REACH) {
-        if (n < GN || !(dist[n] < 1e8)) continue;
-        const [x, z] = nodePos(n), d = Math.hypot(x - P.x, z - P.z);
-        if (d < 5) continue;
-        const lead = dist[n] - mine;
-        if (lead > fd) { fd = lead; far = n; }
-        if (lead < G.D.behind * 0.75) continue;
-        const score = Math.abs(lead - G.D.behind) + Math.abs(d - G.D.behind) * 0.4;
-        if (score < bd) { bd = score; best = n; }
-      }
-      const at = best >= 0 ? best : far;
-      if (at >= 0) { const [x, z] = nodePos(at); K.x = x; K.z = z; K.y = F1; K.lastP = [x, z]; K.path = null; G.extraStun = best >= 0 ? 0 : clamp((G.D.behind - fd) / G.D.rage, 0, 4); }
-    }
-    K.state = 'rage'; K.stun = 2.4 + G.extraStun; K.repath = 0;
+    G.udist = upstairsDist(); K.path = null; K.lastP = [K.x, K.z]; K.hold = 0;
+    K.state = 'rage'; K.stun = 2.4; K.repath = 0;
     for (let i = 0; i < 16; i++) ZT[i] = Math.max(ZT[i], 0.5);
     roar(); boxSmash();
     showMsg(G.keys ? '“I knew you’d find me.”  RUN — front doors!' : '“I knew you’d find me.”  RUN — but you still need the keys!', 4);
@@ -629,7 +617,8 @@
   // ---------------- Krampus (hunt AI) ----------------
   function goTo(x, z, f) { const p = routeY(K.x, K.z, K.y, x, z, f); if (p && p.length) { K.path = p; K.pi = 1; return true; } K.path = null; return false; }
   function pickPatrol() {
-    const n = (Math.random() < 0.7 && SPOTS.length) ? SPOTS[(Math.random() * SPOTS.length) | 0] : REACH[(Math.random() * REACH.length) | 0];
+    let n = (Math.random() < 0.7 && SPOTS.length) ? SPOTS[(Math.random() * SPOTS.length) | 0] : REACH[(Math.random() * REACH.length) | 0];
+    if (G.clues >= 3) for (let i = 0; i < 30 && n < GN; i++) n = REACH[(Math.random() * REACH.length) | 0];   // all three found: he keeps to the upstairs, near his prize
     const [x, z, f] = nodePos(n); K.state = 'patrol';
     if (!goTo(x, z, f)) { K.state = 'look'; K.t = 0.5; K.look = K.yaw; }
   }
@@ -647,7 +636,7 @@
     if (G.hiding != null) return 0;
     let range = (G.D.range + 2 * level()) * (ZL[lightZone(P.x, P.z, floorOf(P.y))] < 0.5 ? 0.7 : 1);
     if (K.state === 'chase') range = Math.min(range, G.D.lose);   // outrun him by this much and he loses you
-    const ex = K.x, ey = K.y + 2.4, ez = K.z, eye = P.y + EYE(), body = P.y + lerp(0.7, 0.3, P.ct);
+    const ex = K.x, ey = K.y + 2.4 * KS / 1.1, ez = K.z, eye = P.y + EYE(), body = P.y + lerp(0.7, 0.3, P.ct);
     const dx = P.x - ex, dz = P.z - ez, dy = eye - ey, d = Math.hypot(dx, dz, dy * 0.6);
     if (d > range) return 0;
     if (d > 1.8) { const fx = Math.sin(K.yaw), fz = -Math.cos(K.yaw); if ((dx * fx + dz * fz) / Math.max(0.001, Math.hypot(dx, dz)) < Math.cos(55 * Math.PI / 180)) return 0; }
@@ -682,7 +671,8 @@
       if (G.peerLook > 0 && KV._eye) { G.peerLook -= dt; const e = KV._eye, ey = P.y + EYE(); P.yaw = turnTo(P.yaw, Math.atan2(e[0] - P.x, -(e[2] - P.z)), dt * 2.5); P.pitch = lerp(P.pitch, clamp(Math.atan2(e[1] - ey, Math.hypot(e[0] - P.x, e[2] - P.z)), -1.3, 1.3), Math.min(1, dt * 3)); }
       if (K.peerT > 9 && !K.peerSaid) { K.peerSaid = true; krampusSay('I can hear you', 1); }
       if (K.peerT > K.peerDur) { KV.gest = null; K.peerSaid = false; K.state = 'look'; K.t = 2.6; K.look = K.yaw + 2.4; G.alert = 0; showMsg('He’s leaving. Wait for the bells to fade.', 3, 'tip'); }
-      Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: 1.1, sackFull: false, look: null });
+      // the stare was staged for his old size, so he swells as he bends over the opening (all you can see is the face)
+      Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: lerp(KS, 1.1, smooth(K.peerT / 0.8)), sackFull: false, look: null });
       return true;
     }
     if (c && sameFloor && K.state !== 'chase' && K.state !== 'rush') {
@@ -708,11 +698,20 @@
           if (d < 0.1) K.ci++; else { K.x += dx / d * m; K.z += dz / d * m; K.yaw = turnTo(K.yaw, Math.atan2(dx, -dz), dt * 6); }
           const before = K.step; K.step += 2.5 * dt * 0.62;
           if (Math.floor(before) !== Math.floor(K.step)) { const [v, pan] = hear(K.x, K.z, F1, 34); jingle(v * 0.45, pan, 4); thud(v * 0.45, pan, 300); if (Math.random() < 0.5) sob(v * 0.35, pan); }
-          Object.assign(KV, { x: K.x, y: F1, z: K.z, yaw: K.yaw, visible: true, scale: 1.1, anim: 'walk', phase: K.step * Math.PI * 1.6, sackFull: true, look: null, gest: null });
+          Object.assign(KV, { x: K.x, y: F1, z: K.z, yaw: K.yaw, visible: true, scale: KS, anim: 'walk', phase: K.step * Math.PI * 1.6, sackFull: true, look: null, gest: null });
           return;
         }
       }
       KV.visible = false; return;
+    }
+    // The finale never moves him: he starts from wherever he really is. He roars and tears the place apart until you
+    // have a head start toward the stairs (so running past him while he rages is safe), then he comes.
+    if (K.state === 'rage' && K.hold != null) {
+      K.hold += dt; const fd = LV.doors.front;
+      const lead = floorOf(K.y) === 1 && floorOf(P.y) === 1 ? G.udist[rNode(1, K.x, K.z)] - G.udist[rNode(1, P.x, P.z)]
+        : floorOf(K.y) === 1 ? 99 : Math.hypot(K.x - fd.x, K.z - fd.z) - Math.hypot(P.x - fd.x, P.z - fd.z) - (floorOf(P.y) === 1 ? 30 : 0);
+      if ((K.hold > 2.4 && lead >= G.D.behind) || K.hold > 11) K.hold = null; else K.stun = Math.max(K.stun, 0.2);
+      if (K.hold != null && Math.random() < dt * 1.5) { burstPlates(K.x + (Math.random() - 0.5) * 2, K.y + 1.2, K.z + (Math.random() - 0.5) * 2, 8); const [v] = hear(K.x, K.z, K.y, 30); if (v > 0.02) boxSmash(); KV.gest = { name: 'roar', t0: NOW, dur: 1.4 }; }
     }
     if (K.stun > 0) { K.stun -= dt; K.spd = 0; Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle' }); if (!KV.gest) KV.gest = { name: 'roar', t0: NOW, dur: 1.4 }; return; }
     const sameFloor = Math.abs(K.y - P.y) < 1, dP = Math.hypot(P.x - K.x, P.z - K.z);
@@ -741,14 +740,15 @@
           if (G.slips > 0) {   // he gets a fistful of coat, and you tear free: once (twice on Easy, never on Hard)
             G.slips--; K.stun = 2.8; KV.gest = { name: 'roar', t0: NOW, dur: 1.6 }; roar(); thud(0.7, 0, 500); FEAR = 1; cam.shake = 0.6; G.alert = 1;
             try { if (navigator.vibrate) navigator.vibrate(120); } catch (e) {}
-            showMsg(G.slips > 0 ? 'He got your coat. You tore free! RUN!' : 'He got your coat. You tore free! He won’t miss again. RUN!', 3.2);
+            showMsg(G.slips > 0 ? 'He got your coat. You tore free! RUN!' : 'He got your coat. You tore free! He won’t miss again. RUN!', 3.2); K.state = 'chase';
             return;
           }
           return caught('Krampus caught you.');
         }
+        if (G.seenHide && G.hiding != null && sameFloor && dP < 1.9) return caught('He watched you climb into the ' + LV.containers[G.hiding].type + '.');
         K.repath -= dt;
         if (K.repath <= 0) { K.repath = 0.4; goTo(K.lastSeen[0], K.lastSeen[1], K.lastSeen[2]); }
-        if (!K.seeing && (!K.path || K.pi >= K.path.length)) { K.state = 'search'; K.t = 2.2; K.look = K.yaw; K.searchLeft = 2 + Math.min(2, G.clues); G.alert = 0.6; if (msgT <= 0.3) showMsg(G.hiding != null ? 'He lost you. Stay still.' : 'He lost you. Hide before he looks around.', 2.6, 'tip'); }
+        if (!K.seeing && (!K.path || K.pi >= K.path.length)) { G.seenHide = false; K.state = 'search'; K.t = 2.2; K.look = K.yaw; K.searchLeft = 2 + Math.min(2, G.clues); G.alert = 0.6; if (msgT <= 0.3) showMsg(G.hiding != null ? 'He lost you. Stay still.' : 'He lost you. Hide before he looks around.', 2.6, 'tip'); }
       } else if (K.state === 'look' || K.state === 'search') {
         K.t -= dt; K.yaw = K.look + Math.sin((2.2 - K.t) * 1.9) * 1.2;
         if (K.t <= 0) {
@@ -763,7 +763,7 @@
       if (G.breathT <= 0 && sameFloor && dP < 6.5 && K.state !== 'chase' && G.hiding == null && !inView(K.x, K.y, K.z, 1.1)) { G.breathT = 3.2 + Math.random() * 2; const [v, pan] = hear(K.x, K.z, K.y, 9); breath(0.12 + v * 0.3, pan); }
       G.hunchT -= dt;
       if (G.hunchT <= 0) {
-        G.hunchT = 42 - 6 * level();
+        G.hunchT = G.D.hunch - 6 * level();
         if (K.state === 'patrol' || K.state === 'look') { const a = Math.random() * TAU, r = 5 + Math.random() * 7; K.state = 'patrol'; if (!goTo(P.x + Math.cos(a) * r, P.z + Math.sin(a) * r, floorOf(P.y))) pickPatrol(); }
       }
     }
@@ -793,8 +793,9 @@
         else if (K.state === 'searchwalk') { K.state = 'search'; K.t = 2; K.look = K.yaw; }
       }
     } else K.spd = 0;
+    if ((K.state === 'chase' || K.state === 'rage') && dP < 3.4 && sameFloor && (!KV.gest || KV.gest.name !== 'lunge')) KV.gest = { name: 'lunge', t0: NOW, dur: 1.2 };
     if ((K.state === 'chase' && K.seeing) || (K.state === 'rage' && dP < 6)) K.yaw = turnTo(K.yaw, Math.atan2(P.x - K.x, -(P.z - K.z)), dt * 8);
-    Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, scale: 1.1, anim: K.spd > 3 ? 'run' : K.spd > 0 ? 'walk' : 'idle', phase: K.step * Math.PI * 1.6, sackFull: false, look: K.state === 'chase' || K.state === 'rage' ? [P.x, P.y + 1, P.z] : null });
+    Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, scale: KS, anim: K.spd > 3 ? 'run' : K.spd > 0 ? 'walk' : 'idle', phase: K.step * Math.PI * 1.6, sackFull: false, look: K.state === 'chase' || K.state === 'rage' ? [P.x, P.y + 1, P.z] : null });
   }
 
   // ---------------- player ----------------
@@ -831,7 +832,7 @@
         const c = CLUES[G.clues]; G.clues++; tone(660, 0.2, 0.2, 'triangle'); tone(880, 0.3, 0.2, 'triangle', 0.12);
         const bc = LV.containers[G.broC];
         showMsg(c.text || ('His scarf. The crying is coming from ' + placeName(bc.x, bc.z, bc.y) + '.'), 4.5);
-        killLights(3); let add = 2; for (const t of G.traps) if (!t.on && add > 0) { t.on = true; add--; }
+        killLights(3); let add = G.D.map ? 1 : 2; for (const t of G.traps) if (!t.on && add > 0) { t.on = true; add--; }
       }
     }
     for (const t of G.traps) {
@@ -1077,14 +1078,14 @@
     L.y = surfaceY(L.x, L.z, L.y);
     L.holdHand = s.mode !== 'lead' && Math.hypot(L.x - P.x, L.z - P.z) < 1.0 ? 0 : null;
     if (EX.stage === 'explore') for (const [f, x, z, r, line] of LV.leoSpots) if (!s.said.has(line) && floorOf(P.y) === f && Math.hypot(P.x - x, P.z - z) < r && subT <= 0) { s.said.add(line); say('LEO', line, 2.8); break; }
-    if (EX.stage === 'explore' && ((EX.t > 70 && EX.hs === 0) || (EX.t > 330 && EX.hs === 1)) && subT <= 0) startHideSeek();
+    if (EX.stage === 'explore' && s.mode === 'follow' && listDone() >= LIST.length && subT <= 0 && (EX.hs === 0 || (EX.hs === 1 && EX.found >= 1 && EX.t > ACT_AT[2] + 20))) startHideSeek();
   }
   function startHideSeek() {
     const s = EX.leo; EX.hs++;
     const f = floorOf(P.y), cands = LV.containers.map((c, i) => [c, i]).filter(([c]) => c.f === f).sort((a, b) => Math.hypot(a[0].x - P.x, a[0].z - P.z) - Math.hypot(b[0].x - P.x, b[0].z - P.z));
     if (!cands.length) { EX.hs--; return; }
     const pickI = cands[Math.min(cands.length - 1, 1 + ((Math.random() * Math.min(4, cands.length - 1)) | 0))][1];
-    say('LEO', 'Hide and seek! You count. No peeking!', 2.6);
+    say('LEO', EX.hs === 1 ? 'I saw everything! Now hide-and-seek! You count. No peeking!' : 'One more game! You count. No peeking!', 3);
     s.mode = 'counting'; s.count = 10; s.hideIdx = pickI; cast.leo.holdHand = null;
     const tick = () => {
       if (!EX || EX.leo !== s || s.mode !== 'counting') { $('peek').style.opacity = 0; return; }
@@ -1167,6 +1168,7 @@
       mg.translate(Wd / 2, H / 2); mg.scale(s / MAP_S, s / MAP_S); mg.translate(-P.x * MAP_S, -(LV.depth - P.z) * MAP_S);
       mg.globalAlpha = 0.9; mg.drawImage(mapImg[f], 0, 0); mg.globalAlpha = 1;
       const sx = (x) => x * MAP_S, sz = (z) => (LV.depth - z) * MAP_S;
+      if (mode === 'play' && G.D.map) for (const it of G.items) if (!it.taken && it.f === f) { mg.fillStyle = it.kind === 'keys' ? '#e0a03a' : '#3aa0e0'; mg.beginPath(); mg.arc(sx(it.x), sz(it.z), 3.5, 0, TAU); mg.fill(); }
       if (mode === 'play' && (G.D.map || debug) && KV.visible && floorOf(K.y) === f) { mg.fillStyle = '#7a1010'; mg.beginPath(); mg.arc(sx(K.x), sz(K.z), 4, 0, TAU); mg.fill(); }
       if (mode === 'explore' && EX.stage === 'return' && f === 1) { mg.fillStyle = '#e0a03a'; mg.beginPath(); mg.arc(sx(40.9), sz(16.4), 5, 0, TAU); mg.fill(); }
       if (mode === 'explore' && EX.stage === 'explore') for (const [, i] of LIST) { const [lf, lx, lz, , line] = LV.leoSpots[i]; if (lf === f && !EX.leo.said.has(line)) { mg.strokeStyle = '#e0a03a'; mg.lineWidth = 2; mg.beginPath(); mg.arc(sx(lx), sz(lz), 5, 0, TAU); mg.stroke(); } }
@@ -1355,22 +1357,22 @@
     move([24.3, 1.75, 30.2], [30.0, 1.4, 19.0], [24.0, 1.6, 30.6], [29.5, 3.5, 21.5], 0.8, 0.95, 1.05);
     for (let i = 0; i < 12; i++) { KV.y = Math.max(0, 9.5 - 9.8 * Math.pow((i + 1) / 12, 2)); yield 0.04; }
     KV.y = 0; KV.anim = 'land'; DISPLAY.smashed = true; burstOrnaments(29.5, 1, 21.5, 90); boxSmash(); thud(0.9, 0, 200); cam.shake = 1.2;
-    for (const k of ['mom', 'dad']) { C[k].face = { eyes: 'wide', mouth: 'open', brows: 'up' }; C[k].look = [29.5, 2.5, 21.5]; }
+    for (const k of ['mom', 'dad']) { C[k].face = { eyes: 'wide', mouth: 'open', brows: 'up' }; C[k].look = [29.5, 2.1, 21.5]; }
     for (const k of STAFF) { C[k].look = null; C[k].gest = { name: 'bow', t0: NOW }; }   // heads down, hands folded
     C.you.face = { eyes: 'wide', mouth: 'o', brows: 'up' }; C.leo.face = { eyes: 'wide', mouth: 'o', brows: 'up' };
     yield 0.8;
     KV.anim = 'idle'; KV.gest = { name: 'rise', t0: NOW, dur: 2.6 };
-    cut([27.2, 1.0, 25.6], [29.5, 2.0, 21.5], 0.95);
+    cut([27.2, 0.9, 25.6], [29.5, 1.7, 21.5], 0.95);
     yield 1.3; jingle(0.25, 0, 3); yield 1.5;
     cut([29.6, 1.55, 17.9], [32.7, 1.4, 13.9], 0.85);
     yield say('', 'Mom screams. The staff fold their hands and bow their heads.', 3.0);
     KV.gest = null;
     KV.look = head(C.you);
-    cut([27.0, 2.5, 24.9], [29.5, 2.95, 21.5], 0.75);
+    cut([27.2, 2.0, 24.7], [29.5, 2.3, 21.5], 0.7);
     yield 1.8;
     KV.look = head(C.leo); KV.gest = { name: 'tilt', t0: NOW, dur: 2 };
     yield 1.2;
-    C.leo.look = [29.5, 2.8, 21.5];
+    C.leo.look = [29.5, 2.3, 21.5];
     { const L = C.leo, fx = Math.sin(L.yaw), fz = -Math.cos(L.yaw); cut([L.x + fx * 0.95, 1.0, L.z + fz * 0.95], [L.x, 0.95, L.z], 0.6); }
     yield say('LEO', '(whisper) …Is he part of the store?', 2.4);
     cut([29.9, 1.6, 29.7], [26.7, 1.2, 26.1], 1.0);
@@ -1381,7 +1383,7 @@
     yield 0.6;
     KV.anim = 'crouch'; KV.yaw = Math.atan2(31 - KV.x, -(30 - KV.z)); yield 0.45;
     KV.anim = 'leap'; jingle(0.3, 0, 6);
-    follow(() => [[33.2, 1.3, 23.9], [KV.x, KV.y + 2.0, KV.z]], 1.05);
+    follow(() => [[33.2, 1.3, 23.9], [KV.x, KV.y + 1.6, KV.z]], 1.05);
     { const sx = KV.x, sz = KV.z; for (let i = 0; i < 20; i++) { const u = (i + 1) / 20; KV.x = lerp(sx, 31, u); KV.z = lerp(sz, 30.5, u); KV.y = F1 * u + 4.2 * Math.sin(u * Math.PI); yield 0.04; } }
     KV.y = F1; KV.anim = 'land'; thud(0.6, 0.3, 300); yield 0.5;
     KV.anim = 'walk'; KV.yaw = -Math.PI / 2 - 0.4;
@@ -1520,9 +1522,10 @@
     if (mode !== 'play') return;
     // jumpscare first: he is suddenly right there, and the camera is dragged up to his face
     mode = 'scare'; G.reason = reason; SCARE = { t: 0, from: [P.x, P.y + EYE(), P.z], yaw: P.yaw, pitch: P.pitch };
-    if (!(Math.hypot(K.x - P.x, K.z - P.z) < 1.5 && Math.abs(K.y - P.y) < 1)) { K.x = P.x + Math.sin(P.yaw) * 1.15; K.z = P.z - Math.cos(P.yaw) * 1.15; K.y = P.y; }
+    // he is only ever where he walked to. If he is not within arm's reach (he took Leo, not you), skip the face-to-face and end the round.
+    if (!(Math.hypot(K.x - P.x, K.z - P.z) < 2.6 && Math.abs(K.y - P.y) < 1)) { scream(); roar(); FEAR = 1; $('hud').style.display = 'none'; $('msg').style.opacity = 0; return endCaught(); }
     K.yaw = Math.atan2(P.x - K.x, -(P.z - K.z));
-    Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: 1.1, look: null, gest: { name: 'scare', t0: NOW } });
+    Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: 1.1, look: null, gest: { name: 'scare', t0: NOW } });   // face-to-face close-up, staged at his old size
     scream(); FEAR = 1; $('hud').style.display = 'none'; $('msg').style.opacity = 0;
     try { if (navigator.vibrate) navigator.vibrate([60, 30, 220]); } catch (e) {}
   }
@@ -1540,7 +1543,7 @@
   }
   function win() {
     if (mode !== 'play') return;
-    KV.scale = 1; FEAR = 0;
+    KV.scale = KS; FEAR = 0;
     const t = Math.floor(G.time), prev = getBest(diffKey), best = !prev || t < prev;
     if (best) setBest(diffKey, t);
     $('hud').style.display = 'none';
@@ -1684,7 +1687,7 @@
     updatePlayer(dt); if (mode !== 'play') return;
     if (G.phase === 'grace') {
       G.t -= dt;
-      if (G.t <= 0) { G.phase = 'hunt'; dropKrampus(); pickPatrol(); jingle(0.35, 0, 8); showMsg('Listen for the bells. Follow the crying.', 4); }
+      if (G.t <= 0) { G.phase = 'hunt'; if (!K.carry) dropKrampus(); pickPatrol(); jingle(0.35, 0, 8); showMsg('Listen for the bells. Follow the crying.', 4); }
     } else if (G.phase === 'hunt') { G.huntT += dt; G.lightT -= dt; if (G.lightT <= 0) { G.lightT = 70; killLights(1); } }
     updateKrampus(dt); if (mode !== 'play') return;
     updateBrother(dt);
@@ -1759,7 +1762,7 @@
     // test hooks for the scares: hide in the nearest pot/hamper and bring him over; or get caught on the spot
     peer: () => { G.phase = 'hunt'; const i = nearContainer(); if (i < 0) return false; if (G.hiding == null) { G.hiding = i; G.back = [P.x, P.z]; P.x = LV.containers[i].x; P.z = LV.containers[i].z; } const c = LV.containers[i]; K.x = c.x + 1.1; K.z = c.z + 0.3; K.y = P.y; K.stun = 0; startPeer(c); return true; },
     view: (pos, look, fov) => { DBGCAM = pos ? { pos, look, fov } : null; },
-    scare: () => { G.phase = 'hunt'; caught('Test.'); }, kstate: () => K && K.state, fear: () => FEAR,
+    scare: () => { G.phase = 'hunt'; K.x = P.x + Math.sin(P.yaw) * 1.15; K.z = P.z - Math.cos(P.yaw) * 1.15; K.y = P.y; caught('Test.'); }, kstate: () => K && K.state, fear: () => FEAR,
     container: (i) => LV.containers[i], tickN: (n, dt = 1 / 30) => { for (let i = 0; i < n && mode === 'play'; i++) { NOW += dt; tick(dt); } },
     reachable: (f, x, z) => { const n = rNode(f, x, z); if (n < 0) return 99; const [nx, nz] = nodePos(n); return Math.hypot(nx - x, nz - z); },
     path: (x0, z0, f0, x1, z1, f1) => { const p = route(x0, z0, f0, x1, z1, f1); return p ? p.length : null; },
