@@ -180,10 +180,15 @@ class Geo {
       const n = [du[1] * dv[2] - du[2] * dv[1], du[2] * dv[0] - du[0] * dv[2], du[0] * dv[1] - du[1] * dv[0]], l = Math.hypot(...n) || 1;
       return [n[0] / l, n[1] / l, n[2] / l];
     };
+    const C0 = [0, 0, 0]; for (let i = 0; i < 6; i++) for (let j = 1; j < 6; j++) { const p = fn(i / 6, j / 6); C0[0] += p[0] / 30; C0[1] += p[1] / 30; C0[2] += p[2] / 30; }
     for (let i = 0; i < segU; i++) for (let j = 0; j < segV; j++) {
       const q = [[i, j], [i + 1, j], [i + 1, j + 1], [i, j + 1]].map(([a, b]) => [a / segU, b / segV]);
       const P = q.map(([u, v]) => fn(u, v));
-      const n = q.map(([u, v]) => { const uu = clamp(u, 0.002, 0.998), vv = clamp(v, 0.004, 0.996); return N(uu, vv); });
+      const n = q.map(([u, v], k) => {
+        const uu = clamp(u, 0.002, 0.998), vv = clamp(v, 0.004, 0.996), nn = N(uu, vv), pk = P[k];
+        // normals must point away from the middle of the shape, or the surface is drawn inside-out (and you see through its near side)
+        return (pk[0] - C0[0]) * nn[0] + (pk[1] - C0[1]) * nn[1] + (pk[2] - C0[2]) * nn[2] < 0 ? [-nn[0], -nn[1], -nn[2]] : nn;
+      });
       // keep normals pointing out from the centroid
       const c = fn(0.5, 0.5), m = [(P[0][0] + P[2][0]) / 2, (P[0][1] + P[2][1]) / 2, (P[0][2] + P[2][2]) / 2];
       void c; void m;

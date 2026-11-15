@@ -1227,7 +1227,7 @@
     gest(C.dad, 'nod', 1);
     yield say('DAD', 'In and out.', 1.8);
     C.leo.look = head(C.you); C.you.look = head(C.leo); C.you.face = { eyes: 'narrow', mouth: 'frown' }; C.leo.face = { mouth: 'smile', brows: 'up' };
-    cut([32.75, 1.02, -2.75], [32.7, 0.98, -3.75], 0.85);
+    cut([34.5, 1.18, -4.45], [32.5, 1.08, -3.68], 0.62);
     yield say('', 'You and Leo exchange a look. It is never five minutes.', 3.4);
     for (const k of ['dad', 'mom', 'you', 'leo']) C[k].look = null;
     par(function* () { for (let i = 0; i < 40; i++) { DOORS.front = Math.min(1, DOORS.front + 0.04); yield 0.02; } });
