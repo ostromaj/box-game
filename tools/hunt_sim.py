@@ -22,10 +22,11 @@ RUN = """(diff) => {
     while (B.mode === 'play' && t < 90) {
       const b = B.G.bro;
       if (b.down && b.down > 0.8) { AP.walk(b.x, b.z, 0, { run: true, near: 1.2, maxT: 4 }); AP.wait(0.25); t += 0.5; continue; }
-      AP.walk(fd.x, fd.z - 0.4, 0, { run: true, near: 0.5, maxT: 0.4 }); t += 0.4;
+      const r = AP.walk(fd.x, fd.z - 0.4, 0, { run: true, near: 0.5, maxT: 0.4 }); if (r.t < 0.1) AP.wait(0.4); t += 0.4;   // standing at a locked door still takes time
     }
     out = B.mode === 'cine' ? 'win' : B.mode === 'play' ? 'timeout' : 'caught in escape';
   } else if (B.mode === 'play') out = 'stuck';
+  if (out === 'timeout') st.dbg = { P: [B.P.x, B.P.y, B.P.z], K: [B.K.x, B.K.y, B.K.z, B.K.state, B.K.stun, B.K.path ? B.K.path.length : -1, B.K.pi], bro: B.G.bro, keys: B.G.keys, phase: B.G.phase, hiding: B.G.hiding };
   st.out = out; st.trace = window.__trace.slice(-36); window.__trace.length = 0; st.reason = B.G.reason; st.where = B.zoneName(B.P.x, B.P.z, B.P.y); st.total = +B.G.time.toFixed(0); st.sightings = B.G.sightings;
   return st;
 }"""
@@ -42,5 +43,6 @@ with sync_playwright() as p:
     for r in res:
         if r['out'] != 'win' and os.environ.get('TRACE'):
             for row in r['trace']: print('     ', *row)
+        if r.get('dbg'): print('   timeout state:', json.dumps(r['dbg'])[:600])
         if r['out'] != 'win': print("  lost:", r['out'], '|', r['reason'], '| at', r['total'], 's in', r['where'], '| clues', r['clues'], 'keys', r['keys'], '| chases', r['chases'], 'hides', r['hides'])
     print("errors:", errs[:3]); b.close()
