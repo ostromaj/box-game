@@ -33,7 +33,7 @@ you from the balcony scene, bow when Krampus lands, walk your parents out, and w
    in `src/level.js` the way `chair()` does.
 3. **Listen to the Krampus line** on a real device. It was generated and processed blind (text-to-speech pitched down, with
    gravel and reverb). If it is mush, re-run with less processing or record one.
-4. **Balance with real players.** The autopilot (`tools/hunt_sim.py`) wins about 7 in 10 on Easy, 3 in 10 on Normal and
+4. **Balance with real players.** The autopilot (`tools/hunt_sim.py`) wins about 7 in 10 on Easy, 1 in 3 on Normal and
    rarely on Hard, but it knows where everything is and panics in corners. Tune `DIFF` at the top of `src/game.js`.
 5. Keep the "Box" name and the shuffled layout; no real store name or private store details.
 
