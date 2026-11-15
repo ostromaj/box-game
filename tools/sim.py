@@ -10,7 +10,7 @@ with sync_playwright() as p:
     pg = b.new_page(viewport={"width": 1000, "height": 620})
     errs = []
     pg.on("pageerror", lambda e: errs.append(f"{e} {e.stack}"))
-    pg.goto((root / "index.html").as_uri() + "?debug=1"); pg.wait_for_timeout(2000)
+    pg.goto((root / "index.html").as_uri() + "?debug=1" + __import__("os").environ.get("BOXQ", "")); pg.wait_for_timeout(2000)
     r = pg.evaluate("""() => {
       const B = __box, L = B.LV, o = {};
       o.containers = L.containers.map(c => +B.reachable(c.f, c.x, c.z).toFixed(2));

@@ -5,7 +5,7 @@ A first-person horror hide-and-seek game set in a two-floor home-goods store cal
 You're a kid locked in the store after closing. Krampus came through the skylight and carried your little brother upstairs in a sack.
 
 ## Play
-Open `index.html` in a browser. It's one self-contained file with no downloads or libraries, and it works offline. Sound matters, so turn it on.
+Open `index.html` in a browser. It's one self-contained file (Three.js and the textures are built in), and it works offline. Sound matters, so turn it on.
 
 - **Computer:** WASD/arrows to move, mouse to look (click the view first), Shift to run (loud), C to crouch, E to hide in or look inside a pot or hamper, M for the map, Esc to pause.
 - **Phone/tablet:** left thumb moves, right thumb looks. Hide, Crouch and Run buttons are on the right. Landscape works best.
@@ -21,11 +21,20 @@ Open `index.html` in a browser. It's one self-contained file with no downloads o
 8. **The escape.** Opening the right hamper starts the finale: alarm lights, the bells go silent, and he charges straight at you. Your brother follows you. Run down the stairs to the front doors. They only open if you have the keys.
 
 ## Code
-- `src/engine.js`: small WebGL renderer, box/cylinder geometry, collision, line of sight, per-section lighting
+- `src/render3.js`: the Three.js drawing layer (PBR materials, textures, shadows, AO, bloom, depth of field, grain)
+- `src/engine.js`: geometry builder (boxes, lathes, tubes), math, collision, line of sight
 - `src/level.js`: the store (furniture builders and layout)
-- `src/game.js`: player, Krampus (A* across both floors), brother, clues, traps, lights, HUD, audio, touch controls
-- `tools/build.py`: inlines `src/` into `index.html`. Run it after editing anything in `src/`.
-- `tools/shots.py`, `tools/sim.py`, `tools/escape_sim.py`: headless screenshot, gameplay and finale checks (Playwright + Chrome)
+- `src/actors.js`: the family, the staff, Krampus, the car
+- `src/game.js`: player, Krampus (A* across both floors), brother, clues, traps, lights, cutscenes, HUD, audio, touch controls
+- `tools/build.py`: bundles Three.js + `render3.js` (esbuild), embeds `assets/textures`, inlines `src/` into `index.html`.
+  Run `npm install` once, then `python3 tools/build.py` after editing anything in `src/`.
+- `tools/shots.py`, `tools/scenes.py`, `tools/scares.py`, `tools/sim.py`, `tools/escape_sim.py`: headless checks (Playwright + Chrome)
+- `assets/CREDITS.md`: where the textures came from
+
+## Krampus
+- He says **"I can hear you"** when you're hiding and he's close.
+- Sometimes he then walks over, bends down and **stares into your hiding place** for about half a minute. Don't climb out.
+- If he catches you there's a **jumpscare** before the end screen.
 
 ## Story
 The full script is in `docs/script.md`. In the game it plays as story cards: eight before the round (you can skip them) and three after you escape. The animated cutscenes and the playable 10-minute exploration with Leo aren't built yet.

@@ -17,8 +17,8 @@ with sync_playwright() as p:
     errs = []
     pg.on("console", lambda m: errs.append(f"{m.type}: {m.text}") if m.type in ("error", "warning") else None)
     pg.on("pageerror", lambda e: errs.append(f"pageerror: {e} {e.stack}"))
-    pg.goto((root / "index.html").as_uri() + "?debug=1")
-    pg.wait_for_timeout(3000)
+    pg.goto((root / "index.html").as_uri() + "?debug=1" + __import__("os").environ.get("BOXQ", ""))
+    pg.wait_for_timeout(6000)
     if not pg.evaluate("() => !!window.__box"):
         print("errors:", errs[:20]); b.close(); sys.exit(1)
     print("stats", pg.evaluate("() => __box.stats()"))

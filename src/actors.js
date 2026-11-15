@@ -311,7 +311,7 @@ const ACT = (() => {
   function handPos(a, i) { const B = a._B; if (!B) return null; const d = dims(a.id); return A.p(B['wr' + i], 0, -d.hand * 0.5, 0); }
 
   // ---------- Krampus ----------
-  const KC = { fur: '#2a1e17', fur2: '#3b2a1f', skin: '#3d2420', horn: '#cdbf9f', hornTip: '#5e5038', eye: '#ffae1f', tongue: '#a8222e', teeth: '#e8e2d0', chain: '#7d8288', bell: '#d6b24a', sack: '#8a6a46', hoof: '#151110' };
+  const KC = { fur: '#2a1e17', fur2: '#3b2a1f', skin: '#2b1916', horn: '#cdbf9f', hornTip: '#5e5038', eye: '#ffae1f', tongue: '#a8222e', teeth: '#e8e2d0', chain: '#7d8288', bell: '#d6b24a', sack: '#8a6a46', hoof: '#151110' };
   const KD = { hip: 1.62, spine: 0.45, chest: 0.9, neck: 0.3, shW: 0.44, upper: 0.8, fore: 0.74, hand: 0.3, thigh: 0.68, shin: 0.66, meta: 0.44, hipW: 0.22 };
   function tufts(g, n, cx, cy, cz, rx, ry, rz, len, seed, keep) {
     const r = mulberry32(seed);
@@ -369,20 +369,23 @@ const ACT = (() => {
         g.ellipsoid(0, 0.08, -0.34, 0.06, 0.045, 0.04, H('#1a0f0d'), MAT.SKIN, 8, 5);
         g.ellipsoid(0, 0.2, -0.1, 0.16, 0.06, 0.12, shade(skin, 0.8), MAT.SKIN, 12, 6);
         for (const s of [-1, 1]) {
-          g.ellipsoid(s * 0.075, 0.14, -0.14, 0.045, 0.03, 0.03, H('#0c0605'), 0, 8, 5);
-          g.ellipsoid(s * 0.075, 0.14, -0.16, 0.03, 0.02, 0.014, H('#ffd25a'), MAT.GLOW, 8, 5);
-          g.ellipsoid(s * 0.075, 0.14, -0.168, 0.006, 0.014, 0.004, H('#200000'), 0, 6, 4);
+          g.ellipsoid(s * 0.078, 0.14, -0.135, 0.062, 0.046, 0.04, H('#050202'), 0, 10, 6);            // sunken socket
+          g.ellipsoid(s * 0.078, 0.138, -0.162, 0.043, 0.031, 0.014, H('#ff2600'), MAT.GLOW, 10, 6);  // ember eye
+          g.ellipsoid(s * 0.078, 0.138, -0.172, 0.013, 0.013, 0.004, H('#ffb040'), MAT.GLOW, 6, 4);
+          g.ellipsoid(s * 0.078, 0.138, -0.176, 0.004, 0.017, 0.003, H('#100000'), 0, 6, 4);          // slit pupil
+          g.ellipsoid(s * 0.085, 0.185, -0.15, 0.07, 0.022, 0.05, shade(skin, 0.55), MAT.SKIN, 8, 5);   // heavy brow
+          g.ellipsoid(s * 0.1, 0.06, -0.12, 0.03, 0.05, 0.06, shade(skin, 0.5), MAT.SKIN, 8, 5);       // hollow cheek
           g.push(A.chain(A.T(s * 0.16, 0.16, 0.05), A.Rz(-s * 1.2), A.Rx(-0.3))); g.lathe(0, 0, 0, [[0, 0], [0.05, 0.02], [0.035, 0.12], [0, 0.2]], shade(skin, 0.9), MAT.SKIN, 8); g.pop();
           horn(g, s);
         }
-        for (let i = -3; i <= 3; i++) { if (!i) continue; const fang = Math.abs(i) === 2; g.push(A.chain(A.T(i * 0.024, 0.0, -0.3 + Math.abs(i) * 0.012), A.Rx(Math.PI))); g.lathe(0, 0, 0, [[0.011, 0], [0.008, fang ? 0.04 : 0.02], [0, fang ? 0.075 : 0.035]], H(KC.teeth), MAT.CERAMIC, 6); g.pop(); }
+        for (let i = -5; i <= 5; i++) { if (!i) continue; const fang = Math.abs(i) === 2 || Math.abs(i) === 4, L = fang ? 0.12 : 0.045 + 0.02 * ((i * 7) % 3); g.push(A.chain(A.T(i * 0.02, 0.0, -0.31 + Math.abs(i) * 0.016), A.Rx(Math.PI), A.Rz(i * 0.03))); g.lathe(0, 0, 0, [[0.011, 0], [0.008, L * 0.5], [0, L]], shade(H(KC.teeth), 0.8 + 0.2 * ((i * 5) % 2)), MAT.CERAMIC, 6); g.pop(); }
         g.push(A.T(0, -0.04, -0.12)); tufts(g, 26, 0, -0.06, -0.02, 0.1, 0.06, 0.1, 0.2, 55, (x, y) => y < 0.1); g.pop();
         tufts(g, 30, 0, 0.22, 0.12, 0.16, 0.12, 0.16, 0.18, 66, (x, y, z) => z > -0.1 && y > -0.2);
         g.pop();
       } else if (part === 'jaw') {
         g.push(A.S(1.25));
         g.ellipsoid(0, -0.03, -0.12, 0.1, 0.045, 0.14, H(KC.skin), MAT.SKIN, 12, 6);
-        for (let i = -3; i <= 3; i++) { if (!i) continue; const fang = Math.abs(i) === 2; g.push(A.T(i * 0.022, -0.005, -0.21 + Math.abs(i) * 0.012)); g.lathe(0, 0, 0, [[0.01, 0], [0.007, fang ? 0.035 : 0.018], [0, fang ? 0.06 : 0.03]], H(KC.teeth), MAT.CERAMIC, 6); g.pop(); }
+        for (let i = -5; i <= 5; i++) { if (!i) continue; const fang = Math.abs(i) === 3, L = fang ? 0.1 : 0.035 + 0.015 * ((i * 5) % 3); g.push(A.chain(A.T(i * 0.019, -0.005, -0.225 + Math.abs(i) * 0.016), A.Rz(-i * 0.04))); g.lathe(0, 0, 0, [[0.01, 0], [0.007, L * 0.5], [0, L]], shade(H(KC.teeth), 0.75 + 0.25 * ((i * 3) % 2)), MAT.CERAMIC, 6); g.pop(); }
         g.ellipsoid(0, -0.0, -0.13, 0.07, 0.02, 0.1, H('#2a0a0c'), 0, 10, 5);
         g.pop();
       } else if (part === 'upper') {
@@ -397,7 +400,7 @@ const ACT = (() => {
           const x = -0.06 + i * 0.04, L = 0.17 - Math.abs(i - 1.5) * 0.02;
           const pts = [[x, -0.14, 0], [x * 1.1, -0.14 - L * 0.5, -0.025], [x * 1.15, -0.14 - L, -0.07]];
           g.tube(pts, [0.019, 0.016, 0.012], H(KC.skin), MAT.SKIN, 6);
-          g.push(A.mul(A.T(...pts[2]), A.alignY([0, -0.6, -0.8]))); g.lathe(0, 0, 0, [[0.012, 0], [0.009, 0.04], [0, 0.09]], H('#1a1410'), MAT.CERAMIC, 6); g.pop();
+          g.push(A.mul(A.T(...pts[2]), A.alignY([0, -0.6, -0.8]))); g.lathe(0, 0, 0, [[0.014, 0], [0.01, 0.07], [0, 0.17]], H('#120d0a'), MAT.CERAMIC, 6); g.pop();
         }
         g.tube([[0.07, -0.08, -0.02], [0.11, -0.13, -0.06], [0.12, -0.18, -0.09]], [0.02, 0.016, 0.012], H(KC.skin), MAT.SKIN, 6);
       } else if (part === 'thigh') {
@@ -463,6 +466,10 @@ const ACT = (() => {
         if (gs.name === 'grab') { set('shX', 1, 1.6); set('el', 1, 0.3); set('lean', null, 0.8); set('jaw', null, 0.4); }
         if (gs.name === 'rise') { const u = smooth(age / (gs.dur || 2.5)); set('hip', null, lerp(0.95, KD.hip, u)); for (const i of [0, 1]) { set('hipX', i, lerp(1.1, 0.35, u)); set('kn', i, lerp(2.1, 1.1, u)); set('an', i, lerp(1.25, 0.75, u)); } set('lean', null, lerp(0.95, 0.2, u)); set('neckX', null, lerp(-1.2, -0.15, u)); }
         if (gs.name === 'tilt') { set('headZ', null, 0.35); }
+        // bent double over a hiding place, hands on the rim, face in the opening
+        if (gs.name === 'peer') { set('hip', null, 0.82); set('lean', null, -1.15 + 0.04 * Math.sin(t * 0.9)); set('neckX', null, -0.2); set('headX', null, -0.5 + 0.06 * Math.sin(t * 0.5)); set('headY', null, 0.25 * Math.sin(t * 0.21)); set('jaw', null, 0.2 + 0.14 * Math.sin(t * 0.7)); set('headZ', null, 0.4 * Math.sin(t * 0.33)); for (const i of [0, 1]) { set('hipX', i, 1.25); set('kn', i, 2.2); set('an', i, 1.25); set('shX', i, 1.0); set('el', i, 0.5); set('shZ', i, 0.4); } }
+        // the catch: hunched to your height, arms wide, jaw unhinged
+        if (gs.name === 'scare') { const sh = Math.sin(t * 47) * 0.04; set('hip', null, 1.25); set('lean', null, 0.75); set('neckX', null, -0.75 + sh); set('headX', null, 0.0); set('headZ', null, sh * 2); set('jaw', null, 0.82 + sh * 2); for (const i of [0, 1]) { set('hipX', i, 0.8); set('kn', i, 1.6); set('an', i, 1.0); set('shX', i, 1.5); set('shZ', i, 1.0); set('el', i, 0.7); } }
       }
     }
     P.jaw += 0.03 * Math.sin(t * 2.3);
@@ -481,7 +488,7 @@ const ACT = (() => {
     // the tongue hangs and sways
     const tg = new Geo(); const pts = [], rad = [];
     for (let i = 0; i <= 8; i++) { const u = i / 8, sw = Math.sin(t * 3 + u * 3) * 0.06 * u; pts.push([sw, -0.01 - u * (0.42 + 0.25 * P.jaw), -0.25 - 0.12 * Math.sin(u * 2.2) - 0.08 * u]); rad.push(0.04 * (1 - u * 0.6)); }
-    tg.tube(pts, rad, hex(KC.tongue), MAT.SKIN, 7); buf.emit(tg.data, jw);
+    tg.tube(pts, rad, hex(KC.tongue), MAT.SKIN, 7); buf.emit(tg.data, A.chain(jw, A.T(0, -0.01, -0.25), A.Rx(-P.jaw * 0.85), A.T(0, 0.01, 0.25))); // hangs with gravity, not with the jaw
     for (const [i, sd] of [[0, -1], [1, 1]]) {
       const S = i ? 'R' : 'L';
       const sh = A.chain(ch, A.T(sd * KD.shW, KD.chest * 0.85, 0), A.Ry(P.shY[i]), A.Rx(P.shX[i]), A.Rz(sd * P.shZ[i]));
