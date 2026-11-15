@@ -10,7 +10,7 @@ with sync_playwright() as p:
     b = p.chromium.launch(executable_path="/usr/bin/google-chrome", args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"])
     pg = b.new_page(viewport={"width": 400, "height": 300})
     errs = []; pg.on("pageerror", lambda e: errs.append(f"{e} {e.stack}"))
-    pg.goto((root / "index.html").as_uri()); pg.wait_for_timeout(1500)
+    pg.goto((root / "index.html").as_uri() + "?debug=1" + __import__("os").environ.get("BOXQ", "&q=low")); pg.wait_for_function("() => !!window.__box", timeout=120000)
     r = pg.evaluate("""([diff, trials]) => {
       const B = __box, L = B.LV, res = [];
       for (let t = 0; t < trials; t++) {
@@ -30,7 +30,7 @@ with sync_playwright() as p:
         let route = B.route(B.P.x, B.P.z, 1, fd.x, fd.z, 0), wi = 1, n = 0, out = 'timeout', gap = 99;
         B.key('ShiftLeft', true); B.key('KeyW', true);
         while (n < 30 * 60) {
-          if (B.mode !== 'play') { out = B.mode === 'intro' ? 'win' : 'caught: ' + B.G.reason; break; }
+          if (B.mode !== 'play') { out = B.mode === 'cine' ? 'win' : 'caught: ' + B.G.reason; break; }
           const P = B.P;
           while (wi < route.length - 1 && Math.hypot(route[wi][0] - P.x, route[wi][1] - P.z) < 0.6) wi++;
           const [tx, tz] = route[Math.min(wi, route.length - 1)];
@@ -48,7 +48,7 @@ with sync_playwright() as p:
     print(f"{diff}: {len(wins)}/{len(r)} escaped; avg run {sum(x['secs'] for x in wins)/max(1,len(wins)):.1f}s")
     from collections import Counter
     print(Counter(x['out'] for x in r))
-    g = sorted(x['gap'] for x in r if x['out'] == 'win'); print("closest he got (m): min", g[0], "median", g[len(g)//2], "max", g[-1], "| under 3m:", sum(1 for v in g if v < 3))
+    g = sorted(x['gap'] for x in r if x['out'] == 'win') or [0]; print("closest he got (m): min", g[0], "median", g[len(g)//2], "max", g[-1], "| under 3m:", sum(1 for v in g if v < 3))
     print("losses:", [(x['kStart'], x['kAt'], x['from'], x['where'], x['secs']) for x in r if x['out'] != 'win'][:12])
     print("errors:", errs[:3])
     b.close()

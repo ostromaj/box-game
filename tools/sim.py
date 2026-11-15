@@ -49,7 +49,7 @@ with sync_playwright() as p:
       r.kDist = Math.hypot(B.K.x - B.P.x, B.K.z - B.P.z).toFixed(1); r.kstate = B.K.state; r.mode = B.mode; return r; }"""))
     pg.evaluate("() => { __box.P.yaw = 3.3; __box.P.pitch = 0.1; }")
     pg.wait_for_timeout(300); pg.screenshot(path=str(out / "c_krampus.png"))
-    print("win", pg.evaluate("""() => { const B = __box; B.K.x = 5; B.K.z = 35; B.setP(32, 0, 2.5, 0, 0, false); B.G.bro.x = 32; B.G.bro.z = 4; B.G.bro.y = 0; B.tick(1/30, 3); return B.mode + ' / ' + document.getElementById('cardWhere').textContent; }"""))
+    print("win", pg.evaluate("""() => { const B = __box; B.K.x = 5; B.K.z = 35; B.setP(32, 0, 2.5, 0, 0, false); B.G.bro.x = 32; B.G.bro.z = 4; B.G.bro.y = 0; B.tick(1/30, 3); return B.mode; }"""))
     pg.wait_for_timeout(300); pg.screenshot(path=str(out / "d_win.png"))
     # mood shots: dark zones, a trap, the door, hiding
     pg.evaluate("""() => { const B = __box; B.start('normal'); B.tick(1/30, 30*30); B.killLights(8); B.tick(1/30, 60);

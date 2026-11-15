@@ -32,8 +32,20 @@ const PAL = {
 };
 
 function buildLevel() {
-  const G = new Geo(true);
+  let G = new Geo(true);
   const obbs = [], lights = [];
+  // Downloaded models (assets/models/*.glb, embedded by tools/build.py as window.BOX_GLB). When one is there, the
+  // hand-built piece is built into a throwaway buffer (so the random layout and colliders stay identical) and
+  // the renderer draws the model in its place.
+  const HAVE = (typeof window !== 'undefined' && window.BOX_GLB) || {}, models = [];
+  let CUR = { x: 0, y: 0, z: 0, yaw: 0 };
+  const lin = (c, k = 1) => [Math.pow(c[0], 2.2) * k, Math.pow(c[1], 2.2) * k, Math.pow(c[2], 2.2) * k];
+  function model(key, o, fn) {
+    if (!HAVE[key]) return fn();
+    const c = Math.cos(CUR.yaw), s = Math.sin(CUR.yaw), lx = o.lx || 0, lz = o.lz || 0;
+    models.push(Object.assign({ key, x: CUR.x + lx * c + lz * s, y: CUR.y + (o.ly || 0), z: CUR.z - lx * s + lz * c, yaw: CUR.yaw }, o));
+    const keep = G; G = new Geo(true); try { fn(); } finally { G = keep; }
+  }
   const rnd = mulberry32(20261114);
   const R = (a, b) => a + (b - a) * rnd();
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
@@ -59,9 +71,10 @@ function buildLevel() {
       hit(lx, lz, sx, sz, y0, y1, opaque = true, collide = true, lyaw = 0) { const [wx, wz] = h.w(lx, lz); obbs.push(makeOBB(wx, wz, sx / 2, sz / 2, yaw + lyaw, y + y0, y + y1, opaque, collide)); },
       light(lx, ly, lz, col, r, i) { const [wx, wz] = h.w(lx, lz); light(wx, y + ly, wz, col, r, i); },
     };
+    const was = CUR; CUR = { x, y, z, yaw };
     G.push(A.mul(A.T(x, y, z), A.Ry(yaw)));
     fn(h);
-    G.pop();
+    G.pop(); CUR = was;
   }
   const rot = (lx, ly, lz, yaw, pitch, roll, fn) => { G.push(A.chain(A.T(lx, ly, lz), A.Ry(yaw || 0), A.Rx(pitch || 0), A.Rz(roll || 0))); fn(); G.pop(); };
 
@@ -200,6 +213,7 @@ function buildLevel() {
   function chair(x, y, z, yaw, col, upholstered) {
     place(x, y, z, yaw, (H) => {
       const wood = upholstered ? COL.woodDark : col;
+      model(upholstered ? 'dining_chair_02' : 'painted_wooden_chair_01', upholstered ? { w: 0.47, h: 0.98, d: 0.6, lz: -0.02, tint: lin(col, 3.2).map((v) => 0.45 + v) } : { w: 0.46, h: 0.94, d: 0.52, tint: lin(col, 1.15) }, () => {
       for (const ex of [-0.19, 0.19]) for (const ez of [-0.19, 0.19]) G.cyl(ex, 0, ez, 0.016, 0.45, wood, MAT.GRAIN, 6, 0.022);
       if (upholstered) {
         G.rbox(0, 0.42, 0.01, 0.48, 0.08, 0.47, 0, col, MAT.FABRIC, 0.035);
@@ -209,21 +223,26 @@ function buildLevel() {
         for (const ex of [-0.19, 0.19]) G.cyl(ex, 0.45, -0.2, 0.016, 0.42, col, MAT.GRAIN, 6);
         for (const yy of [0.62, 0.78]) G.rbox(0, yy, -0.2, 0.42, 0.06, 0.025, 0, col, MAT.GRAIN, 0.01);
       }
+      });
       H.hit(0, 0, 0.46, 0.46, 0, 0.92, false);
     });
   }
   function swivel(x, y, z, yaw, col) {
     place(x, y, z, yaw, (H) => {
+      model(models.length % 2 ? 'modern_arm_chair_01' : 'mid_century_lounge_chair', { h: models.length % 2 ? 0.9 : 0.98 }, () => {
       G.lathe(0, 0, 0, [[0, 0], [0.26, 0, 1], [0.24, 0.08, 1], [0, 0.08]], COL.woodDark, MAT.GRAIN, 14);
       G.lathe(0, 0.08, 0, [[0, 0], [0.36, 0, 1], [0.44, 0.15], [0.44, 0.62], [0.4, 0.7, 1], [0.32, 0.7, 1], [0.32, 0.3], [0, 0.3]], col, MAT.FABRIC, 18);
       G.lathe(0, 0.38, 0.03, [[0, 0], [0.31, 0, 1], [0.32, 0.06], [0.28, 0.12, 1], [0, 0.12]], shade(col, 1.04), MAT.FABRIC, 16);
+      });
       H.hit(0, 0, 0.88, 0.88, 0, 0.8);
     });
   }
   function roundTable(x, y, z, r, h, top, base, style) {
     place(x, y, z, 0, (H) => {
+      model(r < 0.3 ? 'side_table_01' : '-', { w: 0.52, h, d: 0.46 }, () => {
       G.lathe(0, 0, 0, [[0, 0], [r * 0.5, 0, 1], [r * 0.5, 0.04], [r * 0.22, 0.12], [r * 0.18, h * 0.5], [r * 0.24, h - 0.06], [0, h - 0.06]], base, MAT.GRAIN, 16);
       G.lathe(0, h - 0.06, 0, [[0, 0], [r * 0.97, 0, 1], [r, 0.02], [r, 0.04], [r * 0.97, 0.06, 1], [0, 0.06]], top, MAT.GRAIN, 24);
+      });
       if (style) items(-r * 0.6, r * 0.6, h, 0, r * 0.6, style, 0.3);
       H.hit(0, 0, r * 1.6, r * 1.6, 0, h);
     });
@@ -251,11 +270,15 @@ function buildLevel() {
     }
   }
   function plant(x, y, z, h = 1.6) {
+    const was = CUR; CUR = { x, y, z, yaw: (x * 7.3 + z * 3.1) % TAU };
+    model(h > 1.6 ? 'potted_plant_01' : 'potted_plant_02', { h: h > 1.6 ? h : Math.min(h, 1.25) }, () => {
     G.lathe(x, y, z, [[0, 0], [0.2, 0, 1], [0.27, 0.42], [0.29, 0.45, 1], [0.25, 0.45, 1], [0, 0.42]], hex('#d9d2c4'), MAT.CERAMIC, 14);
     if (h > 1.4) {
       G.tube([[x, y + 0.4, z], [x + 0.05, y + h * 0.5, z - 0.03], [x - 0.04, y + h * 0.8, z + 0.03]], [0.04, 0.03, 0.02], hex('#5a4532'), MAT.GRAIN, 6);
       for (let i = 0; i < 6; i++) leafCluster(x + R(-0.25, 0.25), y + h * R(0.55, 0.95), z + R(-0.25, 0.25), 9, 0.32, COL.green);
     } else leafCluster(x, y + 0.42, z, 26, 0.6, COL.green);
+    });
+    CUR = was;
     obbs.push(makeOBB(x, z, 0.3, 0.3, 0, y, y + h, false, true));
   }
   function livingSet(x, y, z, yaw, sofaCol, chairCol, rugCol, sect) {
@@ -266,8 +289,11 @@ function buildLevel() {
     for (const q of [-1, 1]) { const [cx, cz] = w(q * 0.85, 1.3); swivel(cx, y, cz, yaw + Math.PI, chairCol); }
     const [tx, tz] = w(0, 0.1);
     place(tx, y, tz, yaw, (H) => {
-      if (rnd() < 0.5) { G.lathe(0, 0, 0, [[0, 0], [0.5, 0, 1], [0.52, 0.06], [0.5, 0.38], [0.53, 0.4, 1], [0, 0.4]], COL.stone, MAT.CERAMIC, 24); }
+      const drum = rnd() < 0.5;
+      model(drum ? 'coffee_table_round_01' : 'modern_coffee_table_01', drum ? { w: 1.06, h: 0.4, d: 1.06 } : { w: 1.2, h: 0.4, d: 0.62, turn: Math.PI / 2 }, () => {
+      if (drum) { G.lathe(0, 0, 0, [[0, 0], [0.5, 0, 1], [0.52, 0.06], [0.5, 0.38], [0.53, 0.4, 1], [0, 0.4]], COL.stone, MAT.CERAMIC, 24); }
       else { G.rbox(0, 0.32, 0, 1.2, 0.07, 0.65, 0, COL.woodMid, MAT.GRAIN, 0.02); legs(1.2, 0.65, 0.32, COL.woodDark, 0.07, 0.028); }
+      });
       vase(0.15, 0.4, 0.05, 0.28, pc(PAL.vases)); G.box(-0.25, 0.4, -0.05, 0.3, 0.05, 0.22, 0.2, pc(['#5b6b7d', '#a35d45', '#2b2b2b']));
       H.hit(0, 0, 1.0, 0.8, 0, 0.42);
     });
@@ -754,7 +780,7 @@ function buildLevel() {
     l.zone = l.out ? -1 : ((l.x < 24 ? (l.z < 14 ? 0 : 1) : l.x < 40 ? (l.z < 12 ? 2 : l.z < 28 ? 3 : 4) : (l.z < 14 ? 5 : l.z < 28 ? 6 : 7)) + (f ? 8 : 0));
   }
   return {
-    geo: G, obbs, lights, surfaces, ramps, stairs, polys: [rect, rect], zones, F1, width: W, depth: D, containers,
+    geo: G, models, obbs, lights, surfaces, ramps, stairs, polys: [rect, rect], zones, F1, width: W, depth: D, containers,
     doors: { front: frontDoor, side: sideDoor }, skylight: SK,
     crashDisplay: { x: 29.5, z: 21.5, yaw: 0.5 },
     clock: { x: 63.77, y: 2.6, z: 8.8 },

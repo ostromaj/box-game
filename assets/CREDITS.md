@@ -6,7 +6,15 @@ Everything here is free to use. Nothing uses a real store name, logo or brand.
 |---|---|---|
 | `textures/wood_*.jpg` | ambientCG "WoodFloor043" (via github.com/pmndrs/market-assets) | CC0 |
 | `textures/tile_*.jpg` | ambientCG "Tiles036" (via github.com/pmndrs/market-assets) | CC0 |
-| `textures/brick_*.jpg` | three.js examples (`examples/textures/brick_*`), normal map derived from the bump map | MIT repo (swap for a CC0 Poly Haven brick when downloads are allowed) |
+| `textures/brick_*.jpg` | three.js examples (`examples/textures/brick_*`), normal map derived from the bump map | MIT repo |
+| `textures/sky.jpg` | Poly Haven HDRI "Kloppenheim 02 (Pure Sky)", tone-mapped JPG resized to 2048×1024 | CC0 |
+| `models/modern_arm_chair_01.glb`, `mid_century_lounge_chair.glb` | Poly Haven models of the same names | CC0 |
+| `models/dining_chair_02.glb`, `painted_wooden_chair_01.glb` | Poly Haven | CC0 |
+| `models/coffee_table_round_01.glb`, `modern_coffee_table_01.glb`, `side_table_01.glb` | Poly Haven | CC0 |
+| `models/potted_plant_01.glb`, `potted_plant_02.glb` | Poly Haven | CC0 |
+
+Models were downloaded as 1K glTF from polyhaven.com and packed with
+`gltf-transform optimize in.gltf out.glb --texture-size 1024 --texture-compress webp --compress meshopt`.
 
 Code libraries: three.js (MIT), bundled into `index.html` by `tools/build.py`.
-Reflections use three.js's built-in RoomEnvironment (no HDRI file).
+Reflections use three.js's built-in RoomEnvironment.

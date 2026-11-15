@@ -28,6 +28,7 @@
     STATIC = R.upload(LV.geo.array());
     LV.geo = null;
     R.bakeShadows(STATIC, LV.bounds);
+    if (R.addModels && LV.models.length) R.addModels(LV.models).catch(() => {});
     WORLD = new World(LV.obbs, LV.width, LV.depth);
   } catch (e) {
     $('fatal').style.display = 'flex'; $('fatal').textContent = 'Sorry — this browser could not start the 3D view. (' + e.message + ')';
@@ -341,7 +342,7 @@
   function roar() { tone(95, 1.1, 0.5, 'sawtooth', 0, -50); tone(63, 1.3, 0.4, 'square', 0.05, -25); thud(0.6, 0, 400); }
   function shatter(vol = 0.6) { noise(vol, 0, 3500, 'highpass', 4); for (let i = 0; i < 14; i++) tone(2500 + Math.random() * 4000, 0.05 + Math.random() * 0.2, vol * 0.25, 'square', Math.random() * 0.5, -1500); thud(vol, 0, 300); }
   function boxSmash() { for (let i = 0; i < 6; i++) tone(1800 + Math.random() * 2600, 0.08 + Math.random() * 0.12, 0.12, 'square', i * 0.05 + Math.random() * 0.05, -900); thud(0.5, 0, 1800); }
-  function scream(vol = 0.3) { tone(880, 0.6, vol, 'sawtooth', 0, 300); tone(1100, 0.5, vol * 0.6, 'triangle', 0.05, 200); }
+  function yelp(vol = 0.3) { tone(880, 0.6, vol, 'sawtooth', 0, 300); tone(1100, 0.5, vol * 0.6, 'triangle', 0.05, 200); }
   function lockClick() { tone(1300, 0.04, 0.2, 'square'); thud(0.35, 0, 1500); tone(700, 0.06, 0.15, 'square', 0.06); }
   // "Jingle Bells" (public domain, 1857) on soft bells; the warp setting bends it down
   const MEL = [[64, 1], [64, 1], [64, 2], [64, 1], [64, 1], [64, 2], [64, 1], [67, 1], [60, 1.5], [62, 0.5], [64, 4], [65, 1], [65, 1], [65, 1.5], [65, 0.5], [65, 1], [64, 1], [64, 1], [64, 0.5], [64, 0.5], [64, 1], [62, 1], [62, 1], [64, 1], [62, 2], [67, 2],
@@ -1194,7 +1195,7 @@
     cut([23.2, 1.9, 29.4], [27.6, 1.3, 24.6], 1.0);
     KV.look = null; KV.anim = 'run';
     { const sx = KV.x, sz = KV.z, ex = C.leo.x + 0.6, ez = C.leo.z - 0.9; for (let i = 0; i < 10; i++) { const u = (i + 1) / 10; KV.x = lerp(sx, ex, u); KV.z = lerp(sz, ez, u); KV.phase += 0.6; yield 0.04; } }
-    KV.anim = 'idle'; KV.gest = { name: 'grab', t0: NOW, dur: 0.8 }; roar(); scream(0.25);
+    KV.anim = 'idle'; KV.gest = { name: 'grab', t0: NOW, dur: 0.8 }; roar(); yelp(0.25);
     yield 0.35; C.leo.visible = false; C.you.holdHand = null; KV.sackFull = true; cam.shake = 0.6;
     yield 0.6;
     KV.anim = 'crouch'; KV.yaw = Math.atan2(31 - KV.x, -(30 - KV.z)); yield 0.45;
@@ -1497,7 +1498,7 @@
 
   // ---------------- test hooks ----------------
   window.__box = {
-    get P() { return P; }, get G() { return G; }, get K() { return K; }, get mode() { return mode; }, get EX() { return EX; }, get NOW() { return NOW; }, LV, ZL, ZT, cast, KV, CAR, cam,
+    R, get P() { return P; }, get G() { return G; }, get K() { return K; }, get mode() { return mode; }, get EX() { return EX; }, get NOW() { return NOW; }, LV, ZL, ZT, cast, KV, CAR, cam,
     stats: () => ({ walk: walk.reduce((a, b) => a + b, 0), reach: REACH.length, spots: SPOTS.length, links: stairLinks, verts: STATIC.count, obbs: LV.obbs.length, lights: LV.lights.length }),
     start: (d) => { if (d) diffKey = d; showOnly(null); startHunt(); },
     explore: () => { showOnly(null); startExplore(); },

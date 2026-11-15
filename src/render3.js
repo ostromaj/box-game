@@ -15,6 +15,8 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
 const KEY = new THREE.Vector3(0.28, 1.0, 0.36).normalize();
 
@@ -183,6 +185,11 @@ class Renderer {
     r.outputColorSpace = THREE.SRGBColorSpace; r.shadowMap.enabled = false;
     this.gl = r.getContext();
     const scene = this.scene = new THREE.Scene(); scene.background = new THREE.Color(0x020308);
+    if ((window.BOX_TEX || {}).sky) { // Poly Haven night sky behind the parking lot
+      const sky = new THREE.Texture(), img = new Image();
+      img.onload = () => { sky.image = img; sky.mapping = THREE.EquirectangularReflectionMapping; sky.colorSpace = THREE.SRGBColorSpace; sky.needsUpdate = true; scene.background = sky; scene.backgroundIntensity = 0.05; scene.backgroundRotation.y = 2.2; };
+      img.src = window.BOX_TEX.sky;
+    }
     const pm = new THREE.PMREMGenerator(r); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; pm.dispose();
     this.cam = new THREE.PerspectiveCamera(60, 1, 0.04, 170);
     this.lights = [];
@@ -292,6 +299,58 @@ class Renderer {
     if (ng) { glass = new THREE.Mesh(build(true, ng), this.glassMat); glass.frustumCulled = false; glass.renderOrder = 2.5; glass.visible = false; this.scene.add(glass); }
     return { count: n, mesh, glass, packed: true };
   }
+  // ---- downloaded models (GLB, embedded in the page as window.BOX_GLB) ----
+  // slots: [{key, x, y, z, yaw, w, h, d, turn, tint}] from level.js. Each model is fitted to the footprint of the
+  // hand-built piece it replaces and drawn instanced, with the store's own lighting patched into its material.
+  _modelMat(src) {
+    const m = src.clone(); m.defines = Object.assign({}, m.defines, { SH_TAPS: 1, GLOW_K: '2.1' }); m.envMapIntensity = 1;
+    m.onBeforeCompile = (s) => {
+      Object.assign(s.uniforms, this.U);
+      s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nvarying float vM; varying vec3 vWP; varying vec3 vWN;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n{ vec4 bw = vec4(transformed, 1.0);\n#ifdef USE_INSTANCING\nbw = instanceMatrix * bw;\n#endif\nvWP = (modelMatrix * bw).xyz; vM = 0.0; vWN = vec3(0.0, 1.0, 0.0); }');
+      s.fragmentShader = s.fragmentShader.replace('#include <common>', '#include <common>\n' + PARS_F)
+        .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+          bxN = normalize((vec4(normal, 0.0) * viewMatrix).xyz);
+          bxOutside = (vWP.z < -0.14 || vWP.x > 64.14 || vWP.x < -0.14 || vWP.z > 40.14 || vWP.y > 9.31) ? 1.0 : 0.0;
+          bxL = bxOutside > 0.5 ? 1.0 : zl(vWP) * uAmb; bxSh = bxOutside > 0.5 ? 1.0 : shadowAt(vWP, bxN);`)
+        .replace('#include <lights_fragment_end>', LIGHT_F)
+        .replace('#include <opaque_fragment>', FINAL_F);
+    };
+    return m;
+  }
+  async addModels(slots) {
+    const src = window.BOX_GLB || {}, by = {};
+    for (const s of slots || []) if (src[s.key]) (by[s.key] = by[s.key] || []).push(s);
+    const loader = new GLTFLoader(); loader.setMeshoptDecoder(MeshoptDecoder);
+    this.models = this.models || [];
+    await Promise.all(Object.keys(by).map(async (key) => {
+      try {
+        const bin = Uint8Array.from(atob(src[key]), (c) => c.charCodeAt(0)).buffer;
+        const g = await new Promise((res, rej) => loader.parse(bin, '', res, rej));
+        g.scene.updateMatrixWorld(true);
+        const bb = new THREE.Box3().setFromObject(g.scene), size = bb.getSize(new THREE.Vector3()), ctr = bb.getCenter(new THREE.Vector3());
+        const list = by[key];
+        const T = new THREE.Matrix4(), Rm = new THREE.Matrix4(), S = new THREE.Matrix4(), C = new THREE.Matrix4(), M = new THREE.Matrix4(), col = new THREE.Color();
+        g.scene.traverse((o) => {
+          if (!o.isMesh) return;
+          const im = new THREE.InstancedMesh(o.geometry, this._modelMat(o.material), list.length);
+          list.forEach((s, i) => {
+            const turned = Math.abs(Math.sin(s.turn || 0)) > 0.5, bx = turned ? size.z : size.x, bz = turned ? size.x : size.z;
+            let sx, sy, sz;
+            if (s.w && s.d) { sx = s.w / bx; sz = s.d / bz; sy = s.h ? s.h / size.y : (sx + sz) / 2; } else { sx = sy = sz = s.h / size.y; }
+            T.makeTranslation(s.x, s.y, s.z); Rm.makeRotationY(s.yaw || 0); S.makeScale(sx, sy, sz);
+            M.copy(T).multiply(Rm).multiply(S).multiply(C.makeRotationY(s.turn || 0)).multiply(C.makeTranslation(-ctr.x, -bb.min.y, -ctr.z)).multiply(o.matrixWorld);
+            im.setMatrixAt(i, M);
+            const t = s.tint || [1, 1, 1]; im.setColorAt(i, col.setRGB(t[0], t[1], t[2]));
+          });
+          im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true;
+          im.frustumCulled = false; im.visible = false; this.scene.add(im); this.models.push(im);
+        });
+      } catch (e) { console.warn('model failed: ' + key, e); }
+    }));
+    if (this._bake) this.bakeShadows(this._bake[0], this._bake[1]);
+    return this.models.length;
+  }
   resize(scaleCap) {
     const dpr = Math.min(window.devicePixelRatio || 1, scaleCap || 1.5);
     const w = Math.max(2, Math.floor(this.canvas.clientWidth * dpr)), h = Math.max(2, Math.floor(this.canvas.clientHeight * dpr));
@@ -299,6 +358,7 @@ class Renderer {
   }
   // two depth maps along the key light, one per floor (so the upstairs slab doesn't black out downstairs)
   bakeShadows(obj, bounds) {
+    this._bake = [obj, bounds];
     const S = this.shadowRes, c = new THREE.Vector3((bounds[0] + bounds[1]) / 2, (bounds[2] + bounds[3]) / 2, (bounds[4] + bounds[5]) / 2);
     const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 200);
     cam.position.copy(c).addScaledVector(KEY, 40); cam.up.set(0, 0, -1); cam.lookAt(c); cam.updateMatrixWorld();
@@ -312,15 +372,22 @@ class Renderer {
       fragmentShader: 'varying float vY; varying float vM; uniform vec2 uYR; void main(){ float m=floor(vM+0.5); if(vY<uYR.x||vY>uYR.y||m==4.0||m==12.0) discard; gl_FragColor=vec4(1.0); }',
     });
     const sc = new THREE.Scene(); const m = new THREE.Mesh(obj.mesh.geometry, dm); m.frustumCulled = false; sc.add(m);
+    const dmI = new THREE.ShaderMaterial({
+      uniforms: dm.uniforms, side: THREE.DoubleSide,
+      vertexShader: 'varying float vY; void main(){ vec4 w=vec4(position,1.0);\n#ifdef USE_INSTANCING\nw=instanceMatrix*w;\n#endif\nw=modelMatrix*w; vY=w.y; gl_Position=projectionMatrix*viewMatrix*w; }',
+      fragmentShader: 'varying float vY; uniform vec2 uYR; void main(){ if(vY<uYR.x||vY>uYR.y) discard; gl_FragColor=vec4(1.0); }',
+    });
+    for (const im of this.models || []) { if (im.material.alphaTest > 0 || im.material.transparent) continue; const c = new THREE.InstancedMesh(im.geometry, dmI, im.count); c.instanceMatrix = im.instanceMatrix; c.frustumCulled = false; sc.add(c); }
     const names = ['uSh0', 'uSh1'], ranges = [[0.005, 4.0], [4.52, 8.9]];
     for (let i = 0; i < 2; i++) {
+      if (this.U[names[i]].value) this.U[names[i]].value.dispose();
       const rt = new THREE.WebGLRenderTarget(S, S, { depthBuffer: true });
       rt.depthTexture = new THREE.DepthTexture(S, S, THREE.UnsignedIntType); rt.depthTexture.minFilter = rt.depthTexture.magFilter = THREE.NearestFilter;
       dm.uniforms.uYR.value.set(ranges[i][0], ranges[i][1]);
       this.r.setRenderTarget(rt); this.r.clear(); this.r.render(sc, cam);
       this.U[names[i]].value = rt.depthTexture;
     }
-    this.r.setRenderTarget(null); this.U.uShOn.value = 1; dm.dispose();
+    this.r.setRenderTarget(null); this.U.uShOn.value = 1; dm.dispose(); dmI.dispose();
     return true;
   }
   // o: {proj?, view, fov, eye, zones(16), k[4], alarm, time, lights[{x,y,z,r,c,i}], fade, amb, expo, outAmb, focus, fear}
@@ -340,8 +407,9 @@ class Renderer {
     if (this.dof) { this.dof.enabled = o.focus > 0; if (o.focus > 0) { this.dof.uniforms.focus.value = o.focus; this.dof.uniforms.aspect.value = cam.aspect; } }
     for (const k in this.dyn) this.dyn[k].mesh.visible = false;
     if (this._static) { this._static.mesh.visible = false; if (this._static.glass) this._static.glass.visible = false; }
+    for (const im of this.models || []) im.visible = false;
   }
-  draw(obj) { this._static = obj; obj.mesh.visible = true; if (obj.glass) obj.glass.visible = true; }
+  draw(obj) { this._static = obj; obj.mesh.visible = true; if (obj.glass) obj.glass.visible = true; for (const im of this.models || []) im.visible = true; }
   drawDynamic(arr, mode = 'opaque') {
     const d = this.dyn[mode]; if (!arr || !arr.length) { d.mesh.visible = false; return; }
     if (arr.length > d.cap) { let c = d.cap; while (c < arr.length) c *= 2; this._dynAlloc(d, c); }
