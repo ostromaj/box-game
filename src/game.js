@@ -571,7 +571,7 @@
     // the staff wait outside, at the glass. More of them come to watch with every clue you find.
     placeA(cast.marcus, fd.x + 0.7, -0.62, Math.PI); placeA(cast.dana, 64.62, sd.z + 0.25, -Math.PI / 2);
     placeA(cast.priya, fd.x - 0.9, -0.62, Math.PI); placeA(cast.manager, fd.x - 0.1, -1.7, Math.PI); cast.priya.visible = cast.manager.visible = false;
-    for (const k of STAFF) { const a = cast[k]; setCreep(a, 3); a.face = { mouth: 'grin', eyes: 'stare' }; a.gest = { name: k === 'manager' ? 'fold' : 'glass', t0: NOW }; }
+    for (const k of STAFF) { const a = cast[k]; setCreep(a, 3); maw(a, 1); a.mawMax = 0.3; a.gest = { name: k === 'manager' ? 'fold' : 'glass', t0: NOW }; }   // at the glass: teeth showing. They open wider the closer you come.
     DOORS.front = DOORS.side = 0; SKY.broken = true; DISPLAY.smashed = true; CAR.visible = true; CAR.lights = false; CAR.inside = false; CAR.x = 36.5; CAR.z = -7.5; CAR.yaw = Math.PI + 0.25;
     for (const l of LV.lights) l.off = false;
     for (let i = 0; i < 16; i++) ZT[i] = Math.min(ZT[i], 0.8);
@@ -881,6 +881,8 @@
   // 0 tired retail · 1 the smile comes back · 2 it stays, and they stop blinking · 3 heads follow you further than heads should
   const STAFF = ['dana', 'marcus', 'priya', 'manager'];
   const CREEP = [{ face: {} }, { face: { mouth: 'smile' } }, { face: { mouth: 'smile', eyes: 'wide' }, noBlink: true, still: true }, { face: { mouth: 'wide', eyes: 'stare' }, noBlink: true, still: true, owl: true }];
+  // the smile that opens: starts closed and takes `secs` to gape (drawWorld works out how far open it is)
+  function maw(a, secs = 4, hold = 0) { a.face = { mouth: 'maw', eyes: 'stare', open: 0 }; a.noBlink = true; a.mawT0 = NOW + hold; a.mawDur = secs; }
   function setCreep(a, n) { const c = CREEP[n]; a.creep = n; a.face = Object.assign({}, c.face); a.noBlink = !!c.noBlink; a.still = !!c.still; a.owl = !!c.owl; }
   // can the player see this point right now? (in front of them, and nothing in the way)
   function inView(x, y, z, half = 1.0) {
@@ -1052,7 +1054,11 @@
   function leoUpdate(dt) {
     const L = cast.leo, s = EX.leo;
     if (s.mode === 'counting' || s.mode === 'hidden') {
-      if (s.mode === 'hidden') { s.gigT -= dt; s.hideT += dt; if (s.gigT <= 0) { s.gigT = 2.6 + Math.random() * 1.5; const c = LV.containers[s.hideIdx], [v, pan] = hear(c.x, c.z, c.y, 22); giggle(0.05 + v * 0.35, pan); } if (s.hideT > 60) popLeo(false); }
+      if (s.mode === 'hidden') { s.gigT -= dt; s.hideT += dt; if (s.gigT <= 0) { s.gigT = 2.6 + Math.random() * 1.5; const c = LV.containers[s.hideIdx], [v, pan] = hear(c.x, c.z, c.y, 22); giggle(0.05 + v * 0.35, pan); }
+        const c = LV.containers[s.hideIdx];
+        if (s.hideT > 18 && !s.hint1) { s.hint1 = true; showMsg('The giggling is coming from ' + placeName(c.x, c.z, c.y) + (c.f !== floorOf(P.y) ? (c.f ? ' — upstairs.' : ' — downstairs.') : '.'), 4, 'tip'); }
+        if (s.hideT > 36 && !s.hint2) { s.hint2 = true; say('LEO', 'Psst! I’m in the ' + c.type + '! Over here!', 3); }   // and his hiding place shows on the map
+        if (s.hideT > 75) popLeo(false); }
       return;
     }
     const sy = Math.sin(P.yaw), cy = Math.cos(P.yaw);
@@ -1098,14 +1104,14 @@
     const s = EX.leo, c = LV.containers[s.hideIdx], L = cast.leo;
     if (!c) { s.mode = 'follow'; return; }
     placeA(L, c.x + 0.7, c.z, 0, { y: c.y, face: { mouth: 'smile' } }); L.yaw = Math.atan2(P.x - L.x, -(P.z - L.z));
-    s.mode = 'follow'; s.hideIdx = -1; giggle(0.3, 0); $('peek').style.opacity = 0; if (found) EX.found++;
+    s.mode = 'follow'; s.hideIdx = -1; giggle(0.3, 0); $('peek').style.opacity = 0; EX.found++; s.hint1 = s.hint2 = false;   // a finished round always counts, whoever won
     if (found && s.pointed) { say('LEO', 'How did you find me so fast?!', 2.4); const e = EX; later(2.6, () => { if (EX === e) say('', 'She was pointing at it. She is still pointing at it.', 3.4); }); }
     else say('LEO', found ? (EX.hs === 1 ? 'You found me! Again! Again!' : 'Okay okay, you’re good at this.') : 'I win! You didn’t even look in the pots!', 2.8);
     s.pointed = false;
   }
   function exploreInteract() {
     const s = EX.leo;
-    if (s.mode === 'hidden') { const i = nearContainer(); if (i === s.hideIdx) return popLeo(true); if (i >= 0) showMsg('Not in here.', 1.2); }
+    if (s.mode === 'hidden') { const c = LV.containers[s.hideIdx]; if (c && c.f === floorOf(P.y) && Math.hypot(c.x - P.x, c.z - P.z) < 2.3) return popLeo(true); if (nearContainer() >= 0) showMsg('Not in here.', 1.2); }
   }
   function updateExplore(dt) {
     // once Leo has seen everything on his list and played a round, the evening moves along faster
@@ -1158,7 +1164,7 @@
     $('btnCrouch').classList.toggle('on', P.crouch);
     let prompt = '';
     if (mode === 'play') { if (G.hiding != null) prompt = 'Climb out'; else { const c = nearContainer(); if (c >= 0) prompt = LV.containers[c].type === 'pot' ? 'Look in / hide in the pot' : 'Look in / hide in the hamper'; } }
-    else if (mode === 'explore' && EX.leo.mode === 'hidden') { const c = nearContainer(); if (c >= 0) prompt = 'Look inside'; }
+    else if (mode === 'explore' && EX.leo.mode === 'hidden') { const c = nearContainer(), h = LV.containers[EX.leo.hideIdx]; if (c >= 0 || (h && h.f === floorOf(P.y) && Math.hypot(h.x - P.x, h.z - P.z) < 2.3)) prompt = 'Look inside'; }
     $('prompt').style.display = prompt ? 'block' : 'none'; $('promptText').textContent = prompt;
     $('btnUse').style.display = prompt && isTouch ? 'block' : 'none'; $('btnUse').textContent = mode === 'play' && G.hiding != null ? 'Out' : mode === 'play' ? 'Hide' : 'Look';
     mm.style.display = mapOn ? 'block' : 'none';
@@ -1172,6 +1178,7 @@
       if (mode === 'play' && (G.D.map || debug) && KV.visible && floorOf(K.y) === f) { mg.fillStyle = '#7a1010'; mg.beginPath(); mg.arc(sx(K.x), sz(K.z), 4, 0, TAU); mg.fill(); }
       if (mode === 'explore' && EX.stage === 'return' && f === 1) { mg.fillStyle = '#e0a03a'; mg.beginPath(); mg.arc(sx(40.9), sz(16.4), 5, 0, TAU); mg.fill(); }
       if (mode === 'explore' && EX.stage === 'explore') for (const [, i] of LIST) { const [lf, lx, lz, , line] = LV.leoSpots[i]; if (lf === f && !EX.leo.said.has(line)) { mg.strokeStyle = '#e0a03a'; mg.lineWidth = 2; mg.beginPath(); mg.arc(sx(lx), sz(lz), 5, 0, TAU); mg.stroke(); } }
+      if (mode === 'explore' && EX.leo.mode === 'hidden' && EX.leo.hint2) { const c = LV.containers[EX.leo.hideIdx]; if (c && c.f === f) { mg.strokeStyle = '#e0a03a'; mg.lineWidth = 2.5; mg.beginPath(); mg.arc(sx(c.x), sz(c.z), 6, 0, TAU); mg.stroke(); } }
       if (mode === 'explore') for (const k of ['mom', 'dad']) { const a = cast[k]; if (a.visible && floorOf(a.y) === f) { mg.fillStyle = '#2f6fd0'; mg.beginPath(); mg.arc(sx(a.x), sz(a.z), 3, 0, TAU); mg.fill(); } }
       if (debug && mode === 'play') { const c = LV.containers[G.broC]; mg.fillStyle = '#18a0ff'; mg.beginPath(); mg.arc(sx(c.x), sz(c.z), 3, 0, TAU); mg.fill(); }
       mg.translate(sx(P.x), sz(P.z)); mg.rotate(Math.PI - P.yaw);
@@ -1421,16 +1428,16 @@
     cut([62.3, 1.55, 30.42], [64.75, 1.55, 30.52], 0.6);
     gest(C.dana, 'shake', 1.8); yield 2.0;
     move([62.6, 1.6, 30.45], [64.75, 1.55, 30.52], [63.25, 1.6, 30.5], [64.75, 1.57, 30.52], 3.0, 0.45, 0.33);
-    C.dana.face = { mouth: 'wide', eyes: 'stare' }; C.dana.noBlink = true; yield 1.2; C.dana.face = { mouth: 'grin', eyes: 'stare' }; C.dana.gest = { name: 'tiltHead', t0: NOW }; tone(180, 1.6, 0.12, 'sine', 0, -60);
-    yield 2.4;
+    maw(C.dana, 4.2, 1.0); C.dana.mawMax = 1; yield 1.6; C.dana.gest = { name: 'tiltHead', t0: NOW }; tone(180, 3.6, 0.12, 'sine', 0, -70); tone(92, 3.6, 0.1, 'sine', 0.4, -20);
+    yield 4.2;
     placeA(C.you, 32.75, 1.5, 0, { face: { eyes: 'wide', mouth: 'open' } });
     placeA(C.marcus, 33.0, -0.7, Math.PI, { holdR: 'keys' }); C.marcus.look = head(C.you); DOORS.front = 0;
     cut([31.2, 1.7, 4.4], [32.3, 1.4, -0.6], 0.8);
     gest(C.marcus, 'lock', 1.0); lockClick(); yield 1.2;
     gest(C.marcus, 'shake', 1.6); yield 1.4;
     cut([33.05, 1.72, 0.75], [33.0, 1.74, -0.7], 0.5);
-    C.marcus.face = { mouth: 'grin', eyes: 'stare' }; C.marcus.noBlink = true; C.marcus.gest = { name: 'tiltHead', t0: NOW }; tone(160, 1.6, 0.12, 'sine', 0, -60);
-    yield 2.6;
+    maw(C.marcus, 3.8, 0.5); C.marcus.mawMax = 1; yield 1.0; C.marcus.gest = { name: 'tiltHead', t0: NOW }; tone(160, 3.4, 0.12, 'sine', 0, -65); tone(86, 3.4, 0.1, 'sine', 0.4, -18);
+    yield 4.0;
     goA(C.marcus, [[30.5, -6], [27, -16]], 1.1); C.marcus.look = null;
     placeA(C.dana, 40, -2.5, -Math.PI / 2); goA(C.dana, [[33.5, -7], [29, -17]], 1.1);
     cut([32.0, 1.6, 2.2], [32.2, 1.2, -6], 0.9);
@@ -1457,7 +1464,7 @@
     CAR.x = 36.5; CAR.z = -7.5; CAR.yaw = Math.PI + 0.25; CAR.lights = true; CAR.visible = true;
     placeA(C.mom, 35.0, -5.6, Math.PI * 0.85, { face: { mouth: 'open', eyes: 'wide' } }); placeA(C.dad, 37.9, -7.4, Math.PI * 0.9, { face: { mouth: 'open', eyes: 'wide' } });
     gest(C.mom, 'wave', 3); gest(C.dad, 'wave', 3);
-    placeA(C.dana, 30.6, -1.5, Math.PI + 0.2, { face: { mouth: 'grin', eyes: 'narrow', brows: 'angry' } }); C.dana.look = head(C.you);
+    placeA(C.dana, 30.6, -1.5, Math.PI + 0.2, ); maw(C.dana, 0.1); C.dana.mawMax = 1; C.dana.look = head(C.you);
     KV.x = 32; KV.z = 0.6; KV.yaw = Math.PI; KV.anim = 'idle'; KV.gest = null; KV.look = head(C.dana);
     cut([35.8, 1.4, -11.5], [33.5, 1.2, -3], 0.95);
     yield say('MOM', 'OVER HERE! RUN!', 1.8);
@@ -1474,7 +1481,7 @@
     yield 1.0;
     // the rest of the staff, lined up in the snow, watching the car
     { const row = [['marcus', 27.4], ['manager', 28.6], ['priya', 29.8]];
-      for (const [k, x] of row) { placeA(C[k], x, -2.3, 0); setCreep(C[k], 3); C[k].face = { mouth: 'grin', eyes: 'stare' }; C[k].gest = { name: 'fold', t0: NOW }; C[k].look = [CAR.x, 1.3, CAR.z]; }
+      for (const [k, x] of row) { placeA(C[k], x, -2.3, 0); setCreep(C[k], 3); maw(C[k], 3.5, 0.6); C[k].mawMax = 0.8; C[k].gest = { name: 'fold', t0: NOW }; C[k].look = [CAR.x, 1.3, CAR.z]; }
       C.manager.gest = { name: 'wave', t0: NOW };
       move([32.6, 1.5, -6.6], [28.6, 1.45, -2.3], [31.6, 1.5, -5.6], [28.6, 1.5, -2.3], 4, 0.7, 0.55); }
     yield say('', 'The others haven’t moved. They’re still smiling. One of them waves.', 3.6);
@@ -1573,6 +1580,7 @@
     for (const k in cast) {
       const a = cast[k]; if (!a.visible) continue;
       const talking = a.talkUntil && a.talkUntil > NOW && (!a.face.mouth || a.face.mouth === 'neutral' || a.face.mouth === 'smile');
+      if (a.face.mouth === 'maw') a.face.open = smooth(clamp((NOW - a.mawT0) / a.mawDur, 0, 1)) * (a.mawMax || 1);
       const keep = a.face; if (talking) a.face = Object.assign({}, a.face, { mouth: Math.sin(NOW * 16 + a.seed) > 0 ? 'o' : 'neutral' });
       ACT.drawPerson(BUF, a, t); a.face = keep;
       if (a.anim !== 'sit') blob(a.x, a.y || 0, a.z, ACT.dims(a.id).H * 0.17);
@@ -1707,7 +1715,7 @@
   function staffOutside(dt) {
     const fd = LV.doors.front, sd = LV.doors.side;
     cast.priya.visible = cast.priya.visible || G.clues >= 1; cast.manager.visible = cast.manager.visible || G.clues >= 2;
-    for (const k of STAFF) { const a = cast[k]; if (!a.visible) continue; a.look = [P.x, P.y + 1.2, P.z]; const g = a.gest; if (!g || (g.dur && NOW - g.t0 > g.dur)) a.gest = { name: k === 'manager' ? 'fold' : 'glass', t0: NOW }; }
+    for (const k of STAFF) { const a = cast[k]; if (!a.visible) continue; a.look = [P.x, P.y + 1.2, P.z]; a.mawMax = lerp(a.mawMax || 0.3, floorOf(P.y) === 0 ? clamp(1.15 - Math.hypot(a.x - P.x, a.z - P.z) / 9, 0.3, 1) : 0.3, Math.min(1, dt * 0.5)); const g = a.gest; if (!g || (g.dur && NOW - g.t0 > g.dur)) a.gest = { name: k === 'manager' ? 'fold' : 'glass', t0: NOW }; }
     // stand around near a door and they rap on the glass to tell him where you are
     G.knockCool -= dt;
     const nearF = Math.hypot(P.x - fd.x, P.z - fd.z) < 7.5, nearS = Math.hypot(P.x - sd.x, P.z - sd.z) < 6.5;

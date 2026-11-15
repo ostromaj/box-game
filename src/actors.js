@@ -113,6 +113,29 @@ const ACT = (() => {
           // a closed smile that goes a little too far up the cheeks
           for (let i = -6; i <= 6; i++) { const u = i / 6; g.rbox(u * rx * 0.5, my + u * u * ry * 0.2, mz - (1 - u * u) * 0.006 + Math.abs(u) * 0.004, rx * 0.095, d.H * 0.0065, d.H * 0.006, 0, lip, 0, 0.002); }
           for (const sd of [-1, 1]) g.ellipsoid(sd * rx * 0.5, my + ry * 0.17, mz + 0.008, rx * 0.15, ry * 0.11, rz * 0.08, shade(skin, 1.02), MAT.SKIN, 8, 5);
+        } else if (mouth.startsWith('maw')) {
+          // The smile that opens. Closed: lips stretched too far up the cheeks. Then the lips part, slowly, on two rows of
+          // needle teeth, and keep going further than a jaw should.
+          const o = (+mouth.slice(3) || 0) / 12, gap = ry * (0.03 + 0.44 * o), W = rx * (0.46 + 0.07 * o), lipD = shade(lip, 0.8);
+          const curve = (u) => u * u * ry * 0.22;                       // corners pulled up
+          const zc = (u) => mz - 0.012 + u * u * rz * 0.2;              // and wrapped back round the face
+          if (o > 0.02) for (let i = -6; i <= 6; i++) {                  // the dark inside
+            const u = i / 6, hgt = gap * (1 - u * u * 0.75);
+            g.rbox(u * W, my + curve(u) - hgt * 0.5 + ry * 0.02, zc(u) + 0.006, W / 5.4, hgt + 0.003, 0.012, 0, H('#1a0506'), 0, 0.002);
+          }
+          for (let i = -6; i <= 6; i++) {                                // lips: upper stays, lower drops
+            const u = i / 6, hgt = gap * (1 - u * u * 0.75);
+            g.rbox(u * W, my + curve(u) + ry * 0.03, zc(u), W / 4.3, d.H * 0.0055, d.H * 0.007, 0, lipD, 0, 0.002);
+            g.rbox(u * W, my + curve(u) - hgt + ry * 0.01, zc(u), W / 4.3, d.H * 0.0055, d.H * 0.007, 0, lipD, 0, 0.002);
+          }
+          if (o > 0.08) for (let i = -5; i <= 5; i++) {                  // needle teeth, top and bottom, uneven
+            const u = i / 5.6, hgt = gap * (1 - u * u * 0.75), L = Math.min(hgt * 0.62, ry * (0.16 + 0.07 * ((i * 7 + 14) % 3))), r0 = W / 13;
+            g.push(A.chain(A.T(u * W, my + curve(u) + ry * 0.02, zc(u) - 0.003), A.Rx(Math.PI))); g.lathe(0, 0, 0, [[r0, 0], [r0 * 0.55, L * 0.55], [0, L]], H('#f1ecdf'), MAT.CERAMIC, 5); g.pop();
+            const u2 = (i + 0.5) / 5.6; if (Math.abs(u2) > 0.95) continue; const h2 = gap * (1 - u2 * u2 * 0.75), L2 = Math.min(h2 * 0.5, ry * (0.13 + 0.06 * ((i * 5 + 11) % 3)));
+            g.push(A.T(u2 * W, my + curve(u2) - h2 + ry * 0.02, zc(u2) - 0.003)); g.lathe(0, 0, 0, [[r0, 0], [r0 * 0.55, L2 * 0.55], [0, L2]], H('#e6dfcf'), MAT.CERAMIC, 5); g.pop();
+          }
+          if (o > 0.5) g.ellipsoid(0, my - gap * 0.55, mz + 0.004, W * 0.45, gap * 0.22, rz * 0.03, H('#5e1218'), 0, 8, 5);   // tongue, deep in
+          for (const sd of [-1, 1]) g.ellipsoid(sd * W * 1.0, my + ry * 0.2, zc(1) + 0.02, rx * 0.13, ry * 0.1, rz * 0.07, shade(skin, 1.02), MAT.SKIN, 8, 5);
         } else if (mouth === 'grin') {
           // wide, wrong smile: dark mouth, teeth, corners pulled up
           for (let i = -5; i <= 5; i++) {
@@ -303,7 +326,9 @@ const ACT = (() => {
     buf.emit(personPart(id, 'pelvis'), B.pelvis);
     buf.emit(personPart(id, 'chest'), B.chest);
     buf.emit(personPart(id, 'neck'), B.neck);
-    buf.emit(personPart(id, 'head', `${eyes},${f.brows || 'flat'},${f.mouth || 'neutral'}`), B.head);
+    // 'maw': the mouth opens slowly from a closed smile (f.open goes 0..1; twelve steps, each cached)
+    const mouth = f.mouth === 'maw' ? 'maw' + Math.round(clamp(f.open == null ? 1 : f.open, 0, 1) * 12) : (f.mouth || 'neutral');
+    buf.emit(personPart(id, 'head', `${eyes},${f.brows || 'flat'},${mouth}`), B.head);
     for (const i of [0, 1]) {
       const sd = i ? 'R' : 'L';
       buf.emit(personPart(id, 'upper'), B['sh' + i]);
