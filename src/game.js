@@ -326,6 +326,18 @@
       try { const bin = atob(uri.split(',')[1]), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); AC.decodeAudioData(u8.buffer, (b) => { SND[k] = b; }, () => {}); } catch (e) { /* falls back to the device voice */ }
     }
   }
+  // spoken lines: assets/sounds/v_<hash of "WHO|text">.mp3, made by tools/voices.py
+  const vhash = (str) => { let v = 5381; for (let i = 0; i < str.length; i++) v = ((v * 33) ^ str.charCodeAt(i)) >>> 0; return ('0000000' + v.toString(16)).slice(-8); };
+  const VOX = new Set();
+  function speak(who, text) {
+    const buf = SND['v_' + vhash(who + '|' + text)]; if (!AC || muted || !buf) return 0;
+    const a = cast[who.toLowerCase()]; let vol = 1, pan = 0;
+    if (a && a.visible && mode !== 'cine') { const [v, p] = hear(a.x, a.z, a.y || 0, 16); vol = clamp(0.25 + v * 1.6, 0.25, 1); pan = p; }   // in the store, voices come from where the person is
+    const src = AC.createBufferSource(), g = AC.createGain(); src.buffer = buf; g.gain.value = vol * 1.25; src.connect(g); out(g, pan); src.start();
+    VOX.add(src); src.onended = () => VOX.delete(src);
+    return buf.duration;
+  }
+  function hush() { for (const s of VOX) { try { s.stop(); } catch (e) {} } VOX.clear(); }
   function playSnd(k, vol) { if (!AC || muted || !SND[k]) return false; const s = AC.createBufferSource(), g = AC.createGain(); s.buffer = SND[k]; g.gain.value = vol; s.connect(g); g.connect(master); s.start(); return true; }
   function out(node, pan) {
     if (pan && AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); node.connect(p); p.connect(master); } else node.connect(master);
@@ -394,6 +406,7 @@
     dur = dur || Math.max(2.2, text.length * 0.065);
     if (FF) return dur;
     if (text) ev('say', (who || '—') + ': ' + text);
+    if (who && text) { const vd = speak(who, text); if (vd) dur = Math.max(dur, vd + 0.35); }
     $('sub').innerHTML = (who ? `<b>${who}</b>` : '') + `<span class="${who ? '' : 'nar'}">${text}</span>`; $('sub').style.opacity = text ? 1 : 0; subT = dur;
     const a = who && cast[who.toLowerCase()]; if (a) a.talkUntil = NOW + dur * 0.85;
     return dur;
@@ -545,7 +558,7 @@
   }
   function skipScene() {
     if (!SC || FF) return;
-    FF = true; muted = true; const sc = SC;
+    FF = true; muted = true; hush(); const sc = SC;
     for (let i = 0; i < 6000 && SC === sc; i++) { NOW += 0.1; sceneTick(0.1); for (const k in cast) stepActor(cast[k], 0.1); }
     FF = false; muted = false; $('fade').style.transition = 'none'; $('fade').style.opacity = 0; timeScale = 1;
   }
@@ -1524,7 +1537,7 @@
   function startJump() { audioInit(); showOnly(null); runScene(sceneQuickIntro, startHunt); }
   function pause() { if (!playing()) return; pausedFrom = mode; mode = 'pause'; showOnly('pause'); $('skipAhead').style.display = pausedFrom === 'explore' && EX && EX.stage === 'explore' ? 'inline-block' : 'none'; if (document.pointerLockElement) document.exitPointerLock(); }
   function resume() { mode = pausedFrom || 'play'; showOnly(null); lastTime = performance.now(); lock(); }
-  function toTitle() { $('ears').style.display = 'none'; mode = 'title'; SC = null; timers.length = 0; document.body.classList.remove('cine', 'explore', 'stare'); $('fade').style.opacity = 0; showOnly('title'); $('hud').style.display = 'none'; $('skipBtn').style.display = 'none'; refreshBest(); if (document.pointerLockElement) document.exitPointerLock(); music.on = false; hideAll(); timeScale = 1; }
+  function toTitle() { hush(); $('ears').style.display = 'none'; mode = 'title'; SC = null; timers.length = 0; document.body.classList.remove('cine', 'explore', 'stare'); $('fade').style.opacity = 0; showOnly('title'); $('hud').style.display = 'none'; $('skipBtn').style.display = 'none'; refreshBest(); if (document.pointerLockElement) document.exitPointerLock(); music.on = false; hideAll(); timeScale = 1; }
   function caught(reason) {
     if (mode !== 'play') return;
     // jumpscare first: he is suddenly right there, and the camera is dragged up to his face

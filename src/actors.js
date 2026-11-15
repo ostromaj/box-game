@@ -59,10 +59,18 @@ const ACT = (() => {
       const sleeve = puff ? 1.45 : coat ? 1.25 : 1.12;
       if (part === 'pelvis') {
         loft(g, [[-d.spine * 0.5, d.hipW * 1.2, d.rz * 0.6], [-d.spine * 0.2, d.hipW * 2.2, d.rz * 0.95, d.rz * 0.06], [d.spine * 0.25, d.hipW * (c.fem ? 2.3 : 2.2), d.rz * 0.98, d.rz * 0.05], [d.spine * 0.7, d.hipW * (c.fem ? 1.9 : 2.05), d.rz * 0.8], [d.spine * 0.92, d.hipW * 1.5, d.rz * 0.55]], pants, fab);
-        if (!puff && !coat) g.push(A.S(1, 1, d.rz * 0.84 / (d.hipW * 2.0))); g.torus(0, d.spine * 0.62, 0, d.hipW * (c.fem ? 1.96 : 2.1), d.H * 0.008, H('#1c1a19'), MAT.LEATHER, 18, 5); g.pop();   // belt
+        if (!puff && !coat && !c.apron) { g.push(A.S(1, 1, d.rz * 0.82 / (d.hipW * 2.0))); g.torus(0, d.spine * 0.62, 0, d.hipW * (c.fem ? 1.94 : 2.04), d.H * 0.011, H('#1c1a19'), MAT.LEATHER, 18, 5); g.pop(); g.rbox(0, d.spine * 0.62 - d.H * 0.011, -d.rz * 0.86, d.H * 0.026, d.H * 0.022, 0.008, 0, H('#b9bcc0'), MAT.METAL, 0.003); }   // belt and buckle
         if (puff) g.ellipsoid(0, d.spine * 0.55, 0, d.shW * 1.0, d.spine * 0.32, d.rz * 1.25, shade(top, 0.95), fab, 14, 6);
         if (coat) g.lathe(0, -d.thigh * 0.85, 0, [[d.hipW * 3.0, 0, 1], [d.hipW * 2.6, d.thigh * 0.6], [d.hipW * 2.35, d.thigh * 0.85 + d.spine * 0.5], [d.hipW * 2.2, d.thigh * 0.85 + d.spine * 0.95, 1]], top, fab, 16);
-        if (c.apron) { g.rbox(0, -d.thigh * 0.65, -d.rz * 0.92, d.hipW * 3.6, d.thigh * 0.65 + d.spine * 0.6, 0.02, 0, H(c.apron), fab, 0.01); g.rbox(-d.hipW * 1.1, -d.thigh * 0.15, -d.rz * 0.95 - 0.012, d.hipW * 1.2, d.thigh * 0.25, 0.012, 0, shade(H(c.apron), 1.2), fab, 0.005); }
+        if (c.apron) {
+          const ap = H(c.apron), W = d.hipW * 2.2, D = d.rz * 1.02, hgt = d.thigh * 0.7 + d.spine * 0.75, y0 = -d.thigh * 0.7;
+          for (let i = -4; i <= 4; i++) { const a = i * 0.27, x = Math.sin(a) * W, z = -Math.cos(a) * D; g.rbox(x, y0, z, W * 0.31, hgt, 0.01, a * 0.75, shade(ap, 1 - 0.03 * Math.abs(i)), fab, 0.004); }
+          g.push(A.S(1, 1, d.rz * 0.84 / (d.hipW * 2.0))); g.torus(0, d.spine * 0.7, 0, d.hipW * 2.03, d.H * 0.006, shade(ap, 0.8), fab, 18, 4); g.pop();                                  // waist tie, all the way round
+          for (const sd of [-1, 1]) g.tube([[sd * 0.01, d.spine * 0.7, D * 1.0], [sd * d.hipW * 0.9, d.spine * 0.45, D * 1.08], [sd * d.hipW * 0.7, d.spine * 0.05, D * 1.1]], 0.006, shade(ap, 0.8), fab, 4, false);   // the bow's tails
+          g.rbox(-d.hipW * 0.9, -d.thigh * 0.2, -D - 0.008, d.hipW * 1.5, d.thigh * 0.3, 0.008, 0, shade(ap, 1.25), fab, 0.004);
+          g.cyl(-d.hipW * 1.3, -d.thigh * 0.2 + d.thigh * 0.24, -D - 0.014, 0.004, d.thigh * 0.12, H('#d9d5cc'), MAT.CERAMIC, 5);
+        }
+        if (!c.apron && !coat && !puff) for (const sd of [-1, 1]) g.tube([[sd * d.hipW * 1.2, d.spine * 0.5, -d.rz * 0.88], [sd * d.hipW * 1.9, d.spine * 0.3, -d.rz * 0.72], [sd * d.hipW * 2.2, d.spine * 0.0, -d.rz * 0.4]], 0.003, shade(pants, 0.6), fab, 4, false);
         if (c.purse) { g.rbox(-d.shW * 1.25, -d.spine * 0.25, 0.02, 0.07, d.H * 0.13, d.H * 0.16, 0, H(c.purse), MAT.LEATHER, 0.02); }
       } else if (part === 'chest') {
         const cw = d.shW * 0.95, ch = d.chest;
@@ -81,16 +89,23 @@ const ACT = (() => {
             for (const s of [-1, 1]) { g.push(A.chain(A.T(s * d.H * 0.022, ch * 0.985, -d.H * 0.04), A.Rz(s * 0.5), A.Rx(-0.5))); g.rbox(0, 0, 0, d.H * 0.035, d.H * 0.02, 0.006, 0, shade(top, 1.1), fab, 0.003); g.pop(); } }   // collar points
         }
         if (puff) for (let i = 0; i < 4; i++) g.ellipsoid(0, ch * (0.12 + i * 0.22), 0, cw * (1.05 + (i === 1 || i === 2 ? 0.1 : 0)), ch * 0.08, d.rz * 1.3, shade(top, 1.06), fab, 16, 6);
+        if (puff) { g.rbox(0, ch * 0.02, -d.rz * 1.3, d.H * 0.008, ch * 0.96, 0.008, 0, shade(top, 0.55), MAT.METAL, 0.003); g.rbox(0, ch * 0.78, -d.rz * 1.3 - 0.006, d.H * 0.012, d.H * 0.02, 0.006, 0, H('#c9ccd0'), MAT.METAL, 0.003); }
         if (puff) g.lathe(0, ch * 0.95, 0, [[d.H * 0.055, 0, 1], [d.H * 0.06, ch * 0.12], [d.H * 0.052, ch * 0.16, 1]], shade(top, 0.9), fab, 14);
-        if (coat) { g.ellipsoid(0, ch * 0.96, 0.0, d.H * 0.07, ch * 0.08, d.H * 0.06, shade(top, 0.92), fab, 12, 6); for (let i = 0; i < 3; i++) g.sphere(d.shW * 0.25, ch * (0.2 + i * 0.22), -d.rz * 1.0, d.H * 0.008, H('#3a2a20'), 0, 6); }
+        if (coat) { for (const sd of [-1, 1]) { g.push(A.chain(A.T(sd * d.shW * 0.34, ch * 0.62, -d.rz * 1.2), A.Rz(sd * 0.32))); g.rbox(0, 0, 0, d.shW * 0.42, ch * 0.42, 0.012, 0, shade(top, 0.86), fab, 0.006); g.pop(); }
+          g.push(A.S(1, 1, d.rz * 1.0 / (d.hipW * 2.2))); g.torus(0, ch * 0.02, 0, d.hipW * 2.32, d.H * 0.011, shade(top, 0.7), fab, 18, 5); g.pop(); g.rbox(0, ch * 0.02 - d.H * 0.012, -d.rz * 1.06, d.H * 0.03, d.H * 0.024, 0.008, 0, H('#c9a24b'), MAT.METAL, 0.003);
+          g.ellipsoid(0, ch * 0.96, 0.0, d.H * 0.07, ch * 0.08, d.H * 0.06, shade(top, 0.92), fab, 12, 6); for (let i = 0; i < 3; i++) g.sphere(d.shW * 0.25, ch * (0.2 + i * 0.22), -d.rz * 1.0, d.H * 0.008, H('#3a2a20'), 0, 6); }
         if (c.top[0] === 'shirt' || c.top[0] === 'sweater') { g.ellipsoid(0, ch * 0.95, -0.005, d.H * 0.045, ch * 0.07, d.H * 0.045, c.top[0] === 'sweater' ? H('#f2f0ea') : shade(top, 1.08), fab, 10, 5); }
+        if (c.top[0] === 'sweater') { g.push(A.S(1, 1, d.rz * 0.9 / (d.hipW * 2.1))); for (let i = 0; i < 3; i++) g.torus(0, -ch * 0.2 + i * d.H * 0.009, 0, d.hipW * 2.13, d.H * 0.006, shade(top, 0.82), fab, 18, 4); g.pop(); }
         if (c.tie) { g.rbox(0, ch * 0.25, -d.rz * 1.0, d.H * 0.025, ch * 0.65, 0.01, 0, H(c.tie), fab, 0.004); }
         if (c.lanyard) { g.tube([[-d.H * 0.04, ch * 0.98, -d.rz * 0.6], [-d.H * 0.05, ch * 0.6, -d.rz * 1.05], [0, ch * 0.42, -d.rz * 1.08], [d.H * 0.05, ch * 0.6, -d.rz * 1.05], [d.H * 0.04, ch * 0.98, -d.rz * 0.6]], 0.006, H('#7a1f2b'), fab, 4, false); g.rbox(0, ch * 0.3, -d.rz * 1.1, 0.06, 0.09, 0.008, 0, H('#f2f0ea'), 0, 0.004); }
         if (c.apron) {
           const ap = H(c.apron);
-          g.rbox(0, ch * 0.05, -d.rz * 1.0, d.shW * 1.15, ch * 0.75, 0.018, 0, ap, fab, 0.008);
-          for (const s of [-1, 1]) g.tube([[s * d.shW * 0.5, ch * 0.78, -d.rz * 1.02], [s * d.shW * 0.42, ch * 1.02, -d.rz * 0.3], [s * d.shW * 0.4, ch * 0.9, d.rz * 0.7]], 0.008, ap, fab, 4, false);
-          if (c.tag) { g.rbox(-d.shW * 0.4, ch * 0.62, -d.rz * 1.04, 0.07, 0.025, 0.006, 0, H('#f6f5f1'), MAT.CERAMIC, 0.003); g.box(-d.shW * 0.4, ch * 0.628, -d.rz * 1.044, 0.05, 0.006, 0.002, 0, H('#2b2b2b')); }
+          // the bib: tapers from the waist to the chest and lies on the body, with a strap round the neck
+          const fz = (t) => -d.rz * (c.fem ? lerp(0.98, 1.2, Math.sin(clamp(t, 0, 1) * Math.PI) ** 1.5) * (t > 0.75 ? lerp(1, 0.86, (t - 0.75) * 4) : 1) : lerp(1.02, 1.1, Math.sin(clamp(t, 0, 1) * Math.PI))) - 0.006;
+          for (let i = 0; i < 26; i++) { const t = i / 26, w = lerp(d.hipW * 3.3, d.shW * 1.0, smooth(Math.min(1, t * 1.25))); g.box(0, ch * (-0.2 + t * 1.0), fz(t), w, ch * 0.05, 0.01, 0, ap, fab); }
+          g.rbox(0, ch * 0.79, fz(0.99) - 0.002, d.shW * 1.02, ch * 0.03, 0.012, 0, shade(ap, 1.2), fab, 0.004);
+          for (const s of [-1, 1]) g.tube([[s * d.shW * 0.46, ch * 0.78, fz(0.95)], [s * d.shW * 0.36, ch * 0.98, -d.rz * 0.5], [s * d.H * 0.03, ch * 1.03, d.rz * 0.35], [0, ch * 1.02, d.rz * 0.5]], 0.007, ap, fab, 4, false);
+          if (c.tag) { g.rbox(-d.shW * 0.36, ch * 0.56, fz(0.75) - 0.01, 0.07, 0.025, 0.006, 0, H('#f6f5f1'), MAT.CERAMIC, 0.003); g.box(-d.shW * 0.36, ch * 0.568, fz(0.75) - 0.014, 0.05, 0.006, 0.002, 0, H('#2b2b2b')); }
         }
         if (c.purse) g.tube([[-d.shW * 0.9, ch * 0.95, 0], [-d.shW * 0.2, ch * 0.5, -d.rz * 1.05], [d.shW * 0.6, ch * 0.05, -d.rz * 0.6]], 0.008, H(c.purse), MAT.LEATHER, 4, false);
       } else if (part === 'neck') {
@@ -224,6 +239,9 @@ const ACT = (() => {
       } else if (part === 'fore') {
         g.capsule(d.fore, d.armR * 1.05 * sleeve, d.armR * 0.9 * (puff ? 1.3 : sleeve), top, fab, 10);
         if (puff) g.torus(0, -d.fore * 0.92, 0, d.armR * 1.05, d.armR * 0.35, shade(top, 0.85), fab, 12, 5);
+        else if (c.top[0] === 'shirt') { g.cyl(0, -d.fore * 1.0, 0, d.armR * 1.08, d.fore * 0.13, shade(top, 1.12), fab, 10); g.sphere(d.armR * 1.08, -d.fore * 0.94, 0, d.H * 0.003, H('#d9d5cc'), MAT.CERAMIC, 4); }
+        else if (c.top[0] === 'sweater') for (let i = 0; i < 3; i++) g.torus(0, -d.fore * (0.9 + i * 0.035), 0, d.armR * 1.0, d.armR * 0.2, shade(top, 0.82), fab, 10, 4);
+        else g.torus(0, -d.fore * 0.95, 0, d.armR * 1.12, d.armR * 0.22, shade(top, 0.85), fab, 10, 4);
         if (c.watch && extra === 'L') { g.torus(0, -d.fore * 0.88, 0, d.armR * 0.95, d.H * 0.006, H('#2a2a2c'), MAT.LEATHER, 12, 4); g.push(A.chain(A.T(d.armR * 0.95, -d.fore * 0.88, 0), A.Rz(-Math.PI / 2))); g.cyl(0, -0.004, 0, d.H * 0.011, 0.008, H('#d7d9db'), MAT.METAL, 12); g.pop(); }
       } else if (part === 'hand') {
         const hc = c.mittens ? H(c.mittens) : skin, m = c.mittens ? fab : MAT.SKIN;
@@ -242,16 +260,18 @@ const ACT = (() => {
           g.tube([[sd * pw * 0.85, -HL * 0.16, -HL * 0.02], [sd * pw * 1.35, -HL * 0.33, -HL * 0.07], [sd * pw * 1.4, -HL * 0.5, -HL * 0.12]], [HL * 0.055, HL * 0.048, HL * 0.036], hc, m, 6);
         }
       } else if (part === 'thigh') {
-        g.capsule(d.thigh, d.legR * (c.fem ? 1.42 : 1.4), d.legR * 1.0, pants, fab, 12);
-        g.ellipsoid(0, -d.thigh * 0.98, -d.legR * 0.25, d.legR * 0.8, d.legR * 0.9, d.legR * 0.75, pants, fab, 8, 5);   // knee
+        g.capsule(d.thigh, d.legR * (c.fem ? 1.5 : 1.52), d.legR * 1.22, pants, fab, 12);
+        g.rbox(0, -d.thigh * 0.95, -d.legR * 1.3, 0.004, d.thigh * 0.8, 0.004, 0, shade(pants, 1.25), fab, 0.002);   // crease
+        g.ellipsoid(0, -d.thigh * 0.99, -d.legR * 0.12, d.legR * 1.17, d.legR * 0.9, d.legR * 1.14, pants, fab, 10, 6);   // knee
       } else if (part === 'shin') {
         const sc = c.boots ? shoes : pants;
         if (c.boots) { g.capsule(d.shin * 0.55, d.legR * 0.85, d.legR * 0.7, pants, fab, 10); g.push(A.T(0, -d.shin * 0.45, 0)); g.capsule(d.shin * 0.55, d.legR * 0.95, d.legR * 0.75, sc, MAT.LEATHER, 10); g.pop(); }
-        else { g.capsule(d.shin, d.legR * 0.96, d.legR * 0.7, sc, fab, 10); g.ellipsoid(0, -d.shin * 0.3, d.legR * 0.28, d.legR * 0.82, d.shin * 0.3, d.legR * 0.8, sc, fab, 8, 6); }   // calf
+        else { g.capsule(d.shin, d.legR * 1.2, d.legR * 1.08, sc, fab, 10); g.torus(0, -d.shin * 0.97, 0, d.legR * 1.1, d.legR * 0.13, shade(sc, 0.8), fab, 12, 4); g.rbox(0, -d.shin * 0.95, -d.legR * 1.16, 0.004, d.shin * 0.9, 0.004, 0, shade(sc, 1.25), fab, 0.002); }   // straight leg, hem, crease
       } else if (part === 'foot') {
         const L = d.H * 0.15;
         g.rbox(0, -d.footH, -L * 0.25, d.legR * 1.6, d.footH * 1.15, L, 0, shoes, MAT.LEATHER, d.footH * 0.45);
         g.ellipsoid(0, -d.footH * 0.35, -L * 0.52, d.legR * 0.8, d.footH * 0.6, L * 0.24, shoes, MAT.LEATHER, 8, 5);   // toe cap
+        if (!c.boots) for (let i = 0; i < 3; i++) g.rbox(0, d.footH * 0.12, -L * (0.22 + i * 0.1), d.legR * 0.9, 0.003, 0.004, 0, shade(shoes, id === 'you' ? 0.7 : 1.8), 0, 0.001);
         g.box(0, -d.footH, -L * 0.25, d.legR * 1.62, d.footH * 0.25, L * 1.01, 0, shade(shoes, id === 'you' ? 0.9 : 0.7), MAT.LEATHER);
       }
     });

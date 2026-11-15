@@ -144,8 +144,8 @@ const LIGHT_F = /* glsl */`
 {
   vec3 wn = bxN; float ny = wn.y*0.5+0.5;
   vec3 hemi;
-  if(bxOutside>0.5) hemi = mix(vec3(0.012,0.016,0.03), vec3(0.05,0.07,0.13), ny)*uOutAmb;
-  else hemi = mix(vec3(0.004,0.005,0.009)+vec3(0.006,0.008,0.014)*ny, mix(vec3(0.05,0.045,0.04), vec3(0.2,0.185,0.16), ny), bxL);
+  if(bxOutside>0.5) hemi = mix(vec3(0.018,0.024,0.045), vec3(0.07,0.095,0.17), ny)*uOutAmb;
+  else hemi = mix(vec3(0.009,0.011,0.018)+vec3(0.012,0.015,0.026)*ny, mix(vec3(0.075,0.068,0.06), vec3(0.26,0.24,0.21), ny), bxL);   // brighter all round; dark zones stay dark but readable
   irradiance += hemi*PI;
   float envK = bxOutside>0.5 ? 0.1*uOutAmb : mix(0.03, 0.55, bxL);
   iblIrradiance *= envK*0.35; radiance *= envK;
@@ -181,7 +181,7 @@ class Renderer {
   constructor(canvas, opt = {}) {
     this.canvas = canvas; this.NL = opt.lights || 8; this.q = opt.quality || 'high';
     const r = this.r = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'high-performance' });
-    r.setPixelRatio(1); r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.0;
+    r.setPixelRatio(1); r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.22;
     r.outputColorSpace = THREE.SRGBColorSpace; r.shadowMap.enabled = false;
     this.gl = r.getContext();
     const scene = this.scene = new THREE.Scene(); scene.background = new THREE.Color(0x020308);
