@@ -9,7 +9,7 @@ Store hours: closes at 9:00 PM. Box is a made-up store. No real names, logos or 
 - **DANA**: employee at the front doors, closing shift, out of patience
 - **MARCUS** and **PRIYA**: employees
 - **THE MANAGER**: calm, too calm
-- **KRAMPUS**: never speaks. Bells, chains, breathing.
+- **KRAMPUS**: bells, chains, breathing. He says one thing, and only when you are hiding.
 
 ---
 
@@ -77,61 +77,86 @@ Store hours: closes at 9:00 PM. Box is a made-up store. No real names, logos or 
 
 ### 6. EXPLORATION (PLAYABLE)
 
-*Caption: "Mom and Dad will be a while." YOU hold LEO's hand. Ten minutes to wander both floors: the big tree in the atrium, the beds upstairs, the bath corner with its giant planters and laundry hampers, the clearance pile behind the elevator. LEO laughs the whole time. He wants to hide in everything.*
+*Caption: "Mom and Dad will be a while." YOU hold LEO's hand. About ten minutes to wander both floors. LEO has a list of things he wants to see (the big tree, the beds, the giant pots, the rug wall, the lamps) and wants to play hide-and-seek. Once he has seen it all, the evening moves along faster.*
 
 **LEO** *(inside a hamper, muffled)*: You can't find me!
 
 **LEO** *(at the beds)*: This one's mine. I live here now.
 
-*The holiday music is cheerful and slightly too loud. The tree lights twinkle. Nothing is wrong yet.*
+**LEO** *(by a register)*: There's keys behind the counter. A whole ring of them.
+
+*Mom and Dad never notice anything. Dad tries every sofa. Mom moves every plate. The staff change, a little at a time, and always while you are looking somewhere else:*
+
+- **9:03 — tired retail.** They sigh, fix what your parents move, turn a lamp off next to Dad. "We're closed. Just so you know."
+- **9:05 — the smiles come back.** They stop tidying. They stand with their hands folded and watch the two of you. "Take your time." "No rush. None at all."
+  **LEO**: Why is everybody smiling now? They were grumpy before.
+- **9:07 — they stop blinking.** PRIYA is always somewhere you can see her, and a little closer every time you look away. MARCUS is waiting wherever the stairs bring you out. In the second game of hide-and-seek, PRIYA stands next to LEO's hiding place and points at it.
+  **PRIYA**: Can I help you find something?
+  **LEO**: He hasn't blinked. I've been counting.
+- **9:10 — wrong.** Wide closed smiles. Eyes too round. Their heads follow you further than a neck should turn while their bodies stay put. All of them hum the same slow carol. The music sags. The lights dip.
+  **MANAGER**: He likes it when they stay late.
+  **PRIYA**: You can stay as long as you like.
+  **LEO**: I don't like it here anymore.
+
+*Far away, too faint to be sure: bells.*
+
+**LEO**: I want Mom. Can we go find Mom?
 
 ### 7. INT. UPSTAIRS — BALCONY — 9:14 PM
 
-*Walking back toward the stairs, YOU hear voices below. Through the cable rail you can see MOM and DAD at the front of the store, surrounded. Every employee is there. THE MANAGER stands in front of them.*
+*Through the cable rail you can see MOM and DAD at the front of the store, surrounded. Every employee is there, hands folded, smiling. THE MANAGER stands in front of them.*
 
-**DAD** *(off-screen, below)*: We're just browsing, we'll be out of your hair in—
+**DAD** *(below)*: We're just browsing, we'll be out of your hair in—
 
 **THE MANAGER**: We told you not to stay too late.
 
 **MOM**: It's been, what, ten minutes?
 
-**THE MANAGER** *(not looking at them, looking up at the ceiling)*: You don't want to be here after it's too late.
+**THE MANAGER** *(looking up at the skylight)*: You don't want to be here after it's too late.
 
-*THE MANAGER looks at the clock. The music slows and warps, dropping a full octave. The lights flicker. Far away, too faint to be sure: bells.*
+*The music slows and warps. The lights flicker. Bells.*
+
+**LEO**: …What was that?
+
+*Every one of them looks up at the same moment. Straight at you.*
+
+**LEO** *(whisper)*: They can see us.
 
 ### 8. INT. DOWNSTAIRS — ATRIUM — CONTINUOUS
 
 *YOU and LEO come down the big staircase. MOM sees you and starts toward you.*
 
-**MOM**: There you are, come on, we're—
+**MOM**: There you are! Come on, we're—
 
-*The round skylight above the atrium explodes. Glass rains down, glittering in the tree lights. Something huge drops through it and lands on the ornament display. Glass balls burst in every direction like fireworks.*
+**THE MANAGER** *(calm, to the ceiling)*: Here he is.
 
-*It rises slowly between YOU and your parents. It's twice as tall as Dad, with horns, chains, and a long red tongue. A sack hangs over one shoulder. Bells on its belt chime once, softly.*
+*The round skylight explodes. Something huge drops through it and lands on the ornament display. Glass balls burst in every direction.*
 
-*It looks at YOU. Then it looks at LEO.*
+*MOM screams. The staff fold their hands and bow their heads.*
 
-*LEO's hand tightens around yours.*
+*It rises between YOU and your parents: twice as tall as Dad, horns, chains, a long red tongue, a sack over one shoulder. It looks at YOU. Then it looks at LEO.*
 
 **LEO** *(whisper)*: …Is he part of the store?
 
-*It moves faster than anything that big should. One swipe and LEO's hand is gone from yours, and LEO is in the sack. KRAMPUS crouches, then leaps straight up onto the balcony without touching the stairs. The bells fade away upstairs.*
+*One swipe and LEO is in the sack. KRAMPUS crouches and leaps straight up onto the balcony. The bells fade away upstairs.*
 
 ### 9. INT. DOWNSTAIRS — THE DOORS — CONTINUOUS
 
-**DAD**: GO! GO!
+**DAD**: THE KIDS! Somebody—
 
-*In the panic, MOM and DAD are swept toward the side door with the employees. MOM screams your name and tries to turn back. Too late: the crowd pushes them outside into the snow.*
+*Nobody panics. MARCUS and PRIYA each take a parent by the arm and walk them, quickly and politely, to the side door.*
 
-*YOU run for the side door. DANA is already on the other side of the glass. The lock clicks. You pull at the door. Through the glass, DANA slowly shakes her head.*
+**MARCUS**: This way, sir. We're closed.
 
-*Then she smiles. It's not a customer-service smile. It's slow, wide and wrong.*
+**MOM**: NO— LEO! Let GO of me!
 
-*YOU run to the front doors. MARCUS is outside them, keys in hand. He turns the lock. He shakes his head too, and smiles the same smile. Then both of them turn and walk off into the snow.*
+**PRIYA**: Thank you for shopping with us.
 
-*Upstairs: bells. Then a sound like crying, muffled, as if through wicker.*
+*YOU run for the side door. DANA is already on the other side of the glass. The lock clicks. Through the glass, DANA slowly shakes her head. Then she smiles: wide, unblinking, wrong.*
 
-*The lights die one bank at a time, until only the tree is lit.*
+*YOU run to the front doors. MARCUS is outside them, keys in hand. He turns the lock, shakes his head, and smiles the same smile.*
+
+*Upstairs: bells. Then crying, muffled, as if through wicker. The lights die one bank at a time, until only the tree is lit.*
 
 **TITLE CARD: BOX**
 
@@ -141,8 +166,9 @@ Store hours: closes at 9:00 PM. Box is a made-up store. No real names, logos or 
 
 ## IN-GAME LINES
 
-- **Locked front doors, before the rescue**: "Locked. Outside, an employee shakes their head. Then smiles."
-- **Side door**: "This door is chained. The employee outside just smiles."
+- **During the hunt** the staff stand at the glass with their hands pressed to it, watching. One more comes to watch with each of Leo's things you find. Stand around near a door and they knock: "They're knocking on the glass. They're telling him where you are."
+- **Locked front doors, before the rescue**: "Locked. Outside, he shakes his head. Then smiles."
+- **Side door**: "This door is locked too. She just smiles."
 - **Front doors with keys but no LEO**: "You are not leaving without your brother."
 - **Keys**: "The store keys. These open the front doors."
 - **Clue 1, his mitten**: "His mitten. The crying is easier to hear now."
@@ -150,7 +176,10 @@ Store hours: closes at 9:00 PM. Box is a made-up store. No real names, logos or 
 - **Clue 3, his scarf**: "His scarf. The crying is coming from the [area]."
 - **Opening an empty pot or hamper**: "Empty. You climb in."
 - **Bell trap**: "A bell trap! He heard that."
+- **Krampus, while you hide**: "I can hear you." *(the one thing he says)*
+- **He grabs you, once**: "He got your coat. You tore free! RUN!"
 - **Rescue**: LEO, from inside the hamper: "…I knew you'd find me." Then: "RUN."
+- **Bottom of the stairs**: "Leo fell! Go back for him!"
 - **A note on the upstairs register** (optional find): *Sorry, we're closed.*
 
 ---
@@ -176,6 +205,8 @@ Store hours: closes at 9:00 PM. Box is a made-up store. No real names, logos or 
 **DANA** *(as she disappears)*: We're CLOSED—
 
 *The doors swing shut. The bells start up again inside, happily.*
+
+*The rest of the staff haven't moved. They stand in a row in the snow, still smiling. One of them waves.*
 
 ### 13. INT. FAMILY CAR — MOVING
 

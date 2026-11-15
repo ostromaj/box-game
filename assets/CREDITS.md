@@ -16,5 +16,7 @@ Everything here is free to use. Nothing uses a real store name, logo or brand.
 Models were downloaded as 1K glTF from polyhaven.com and packed with
 `gltf-transform optimize in.gltf out.glb --texture-size 1024 --texture-compress webp --compress meshopt`.
 
+| `sounds/hear.mp3` | Generated with Piper text-to-speech (voice `en_US-ljspeech-medium`, trained on the public-domain LJ Speech recordings), then pitched down with gravel and reverb | free to use |
+
 Code libraries: three.js (MIT), bundled into `index.html` by `tools/build.py`.
 Reflections use three.js's built-in RoomEnvironment.

@@ -16,7 +16,7 @@
   button { font: inherit; font-weight: 700; border: 2px solid var(--paper); background: transparent; color: var(--paper); padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 15px; }
   button.sel { background: var(--paper); color: var(--ink); }
   button.big { background: var(--accent); border-color: var(--accent); color: #fff; font-size: 20px; padding: 14px 44px; }
-  .how { max-width: 520px; font-size: 13.5px; line-height: 1.5; opacity: 0.85; }
+  .how { max-width: 560px; font-size: 13.5px; line-height: 1.5; opacity: 0.85; }
   .how b { color: #fff; }
   .touchonly { display: none; } body.touch .touchonly { display: inline; } body.touch .keyonly { display: none; }
   #best { font-size: 12px; opacity: 0.6; }
@@ -31,7 +31,7 @@
   #where { position: absolute; left: max(12px, env(safe-area-inset-left)); top: max(12px, env(safe-area-inset-top)); background: rgba(20,18,16,0.6); padding: 6px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; max-width: 40vw; }
   #stance { position: absolute; left: max(12px, env(safe-area-inset-left)); top: calc(max(12px, env(safe-area-inset-top)) + 34px); font-size: 12px; opacity: 0.8; background: rgba(20,18,16,0.5); padding: 3px 10px; border-radius: 8px; }
   #minimap { position: absolute; right: max(12px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top)); width: 170px; height: 120px; border-radius: 12px; background: rgba(30,28,26,0.55); border: 2px solid rgba(255,255,255,0.5); pointer-events: auto; cursor: pointer; }
-  #msg { position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); font-size: clamp(22px, 5vw, 40px); font-weight: 900; text-shadow: 0 2px 12px rgba(0,0,0,0.7); transition: opacity .4s; text-align: center; width: 90vw; }
+  #msg { position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); font-size: clamp(18px, min(5vw, 8.5vh), 40px); font-weight: 900; text-shadow: 0 2px 12px rgba(0,0,0,0.7); transition: opacity .4s; text-align: center; width: 90vw; }
   #vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(200,20,10,0.75)); opacity: 0; }
   #dot { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 2px; background: rgba(255,255,255,0.7); }
   #hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 12px; opacity: 0.7; background: rgba(20,18,16,0.5); padding: 4px 12px; border-radius: 8px; white-space: nowrap; }
@@ -86,6 +86,7 @@
   #ears span { position: absolute; transform: translate(-50%, -50%); font-size: 12px; font-weight: 700; letter-spacing: .08em; white-space: nowrap; opacity: 0; transition: opacity .3s; text-shadow: 0 1px 5px #000; background: rgba(20,18,16,.45); padding: 2px 8px; border-radius: 999px; }
   .tipline { display: inline-block; margin-top: 8px; font-size: 14px; opacity: .8; font-style: italic; }
   body.stare #top, body.stare #hint, body.stare #where, body.stare #stance, body.stare #minimap, body.stare #btnPause { opacity: 0; transition: opacity .6s; }
+  body.touch #sub { width: min(60vw, 760px); }
   #fatal { display: none; position: fixed; inset: 0; align-items: center; justify-content: center; padding: 30px; text-align: center; z-index: 50; background: #141210; }
 </style>
 </head>
@@ -135,7 +136,9 @@
   </div>
   <button class="big" id="play">Play the story</button>
   <button id="jump">Jump to the hunt</button>
-  <div class="how">A Krampus story. Best with sound on.<br>The story has cutscenes, about ten minutes in the store with Leo, then the hunt. <span class="keyonly">Esc skips a cutscene.</span></div>
+  <div class="how">A Krampus story. <b>Play with sound on</b> — headphones if you have them.<br>
+    The story: a few cutscenes, a walk around the store with your little brother Leo, then the hunt. <span class="keyonly">Esc skips a cutscene.</span><br>
+    <b>The hunt:</b> find Leo’s three things and follow his crying · hide in the big pots and hampers, or crouch behind furniture, when you hear bells · take the keys from a register · get Leo out the front doors.</div>
   <div id="best"></div>
 </div>
 

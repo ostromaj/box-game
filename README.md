@@ -13,12 +13,13 @@ Open `index.html` in a browser. It's one self-contained file (Three.js and the t
 ## How a round goes
 1. **Grace period.** Krampus is upstairs hiding your brother in a random hamper or big planter.
 2. **The hunt.** He patrols both floors. His bells jingle as he walks, louder the closer he is, so you track him by ear. He sees in a cone with real line of sight and hears you run.
-3. **Find your brother** by following the muffled crying. Three clues (mitten, toy train, scarf) each make the crying carry farther, and the third names the area he's in.
+3. **Find your brother** by following the muffled crying. Three of his things (mitten, toy train, scarf) each make the crying carry farther, and the third names the area he's in. A small marker at the edge of the screen shows which way the crying is.
 4. **Escalation.** Every clue makes Krampus faster and sharper-eyed, kills the lights in three sections of the store, and adds two bell traps. Lights also die on a timer. Dark sections make you harder to see.
 5. **Bell traps** are strings of bells across walkways. Walk into one and he comes running. Crouch to duck under.
-6. **Hide** by crouching behind furniture or climbing into a pot or hamper. If he's chasing and watches you climb in, he pulls you out.
+6. **Hide** by crouching behind furniture or climbing into a pot or hamper. If he's chasing and watches you climb in, he pulls you out. Get about 13 m ahead of him and he loses you. The first time he grabs you, you tear free (twice on Easy, never on Hard).
+   **The staff** watch from outside the glass. Stand around near a door and they knock to tell him where you are.
 7. **Get the store keys** from one of the registers.
-8. **The escape.** Opening the right hamper starts the finale: alarm lights, the bells go silent, and he charges straight at you. Your brother follows you. Run down the stairs to the front doors. They only open if you have the keys.
+8. **The escape.** Opening the right hamper starts the finale: alarm lights, the bells go silent, and he charges straight at you. Your brother follows you. Run down the stairs to the front doors. They only open if you have the keys. Leo falls at the bottom of the stairs: go back for him.
 
 ## Code
 - `src/render3.js`: the Three.js drawing layer (PBR materials, textures, shadows, AO, bloom, depth of field, grain)
@@ -28,16 +29,19 @@ Open `index.html` in a browser. It's one self-contained file (Three.js and the t
 - `src/game.js`: player, Krampus (A* across both floors), brother, clues, traps, lights, cutscenes, HUD, audio, touch controls
 - `tools/build.py`: bundles Three.js + `render3.js` (esbuild), embeds `assets/textures`, inlines `src/` into `index.html`.
   Run `npm install` once, then `python3 tools/build.py` after editing anything in `src/`.
-- `tools/shots.py`, `tools/scenes.py`, `tools/scares.py`, `tools/sim.py`, `tools/escape_sim.py`: headless checks (Playwright + Chrome)
-- `assets/CREDITS.md`: where the textures came from
+- `tools/playthrough.py`: plays the whole story on autopilot and writes a transcript; `tools/hunt_sim.py` and `tools/escape_sim.py` play the hunt and the finale many times
+- `tools/shots.py`, `tools/scenes.py`, `tools/scares.py`, `tools/sim.py`: older headless checks (Playwright + Chrome)
+- `assets/models/*.glb`, `assets/sounds/*.mp3`, `assets/textures/*.jpg` are all embedded in `index.html` by the build
+- `assets/CREDITS.md`: where the models, textures and the voice line came from
 
 ## Krampus
+- While you get your bearings he walks across the upstairs with the sack. Watch where he goes.
 - He says **"I can hear you"** when you're hiding and he's close.
 - Sometimes he then walks over, bends down and **stares into your hiding place** for about half a minute. Don't climb out.
 - If he catches you there's a **jumpscare** before the end screen.
 
 ## Story
-The full script is in `docs/script.md`. In the game it plays as story cards: eight before the round (you can skip them) and three after you escape. The animated cutscenes and the playable 10-minute exploration with Leo aren't built yet.
+The full script is in `docs/script.md`. "Play the story" runs all of it: the opening cutscenes, about ten minutes walking the store with Leo while the staff slowly stop acting like people, the balcony, the crash, the doors, then the hunt and the ending. "Jump to the hunt" skips to the hunt. During the walk-around, Pause has a button to skip to closing time.
 
 ## Tuning
-`tools/escape_sim.py [easy|normal|hard] [trials]` autopilots the finale: it rescues Leo from a random spot and sprints the shortest route to the doors. With perfect steering, about every run escapes on Easy and Normal and about 9 in 10 on Hard, with Krampus closing to about 2.5 m on Normal. Real players will lose more.
+Difficulty numbers are in `DIFF` at the top of `src/game.js`. `tools/hunt_sim.py [easy|normal|hard] [trials]` plays whole hunts with an autopilot that walks, hides and runs when chased; it wins about 7 in 10 on Easy, 3 in 10 on Normal and rarely on Hard. It knows where everything is and panics in corners, so treat it as a rough guide. `tools/escape_sim.py` autopilots the finale alone; with clean steering every run escapes, with Krampus closing to about 3 m.

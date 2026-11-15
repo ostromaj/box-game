@@ -10,7 +10,8 @@ subprocess.run(["npx", "esbuild", str(src / "render3.js"), "--bundle", "--minify
                 "--outfile=" + str(root / "build" / "render3.bundle.js"), "--log-level=warning"], check=True, cwd=root)
 tex = {f.stem: "data:image/jpeg;base64," + base64.b64encode(f.read_bytes()).decode() for f in sorted((root / "assets" / "textures").glob("*.jpg"))}
 glb = {f.stem: base64.b64encode(f.read_bytes()).decode() for f in sorted((root / "assets" / "models").glob("*.glb"))}
-three = "window.BOX_GLB={" + ",".join(f'"{k}":"{v}"' for k, v in glb.items()) + "};\nwindow.BOX_TEX={" + ",".join(f'"{k}":"{v}"' for k, v in tex.items()) + "};\n" + (root / "build" / "render3.bundle.js").read_text()
+snd = {f.stem: "data:audio/mpeg;base64," + base64.b64encode(f.read_bytes()).decode() for f in sorted((root / "assets" / "sounds").glob("*.mp3"))}
+three = "window.BOX_SND={" + ",".join(f'"{k}":"{v}"' for k, v in snd.items()) + "};\nwindow.BOX_GLB={" + ",".join(f'"{k}":"{v}"' for k, v in glb.items()) + "};\nwindow.BOX_TEX={" + ",".join(f'"{k}":"{v}"' for k, v in tex.items()) + "};\n" + (root / "build" / "render3.bundle.js").read_text()
 html = (src / "index.src.html").read_text()
 for tag, text in (("THREE", three), ("ENGINE", (src / "engine.js").read_text()), ("LEVEL", (src / "level.js").read_text()),
                   ("ACTORS", (src / "actors.js").read_text()), ("GAME", (src / "game.js").read_text())):

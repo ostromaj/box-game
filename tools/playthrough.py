@@ -197,7 +197,7 @@ with sync_playwright() as p:
           const fd = B.LV.doors.front, P = B.P; let t = 0, gap = 99, back = 0;
           while (B.mode === 'play' && t < 90) {
             const b = B.G.bro, lag = Math.hypot(b.x - P.x, b.z - P.z) + (Math.abs(b.y - P.y) > 1 ? 6 : 0);
-            if (b.down) { AP.walk(b.x, b.z, b.y > 2.25 ? 1 : 0, { run: true, near: 1.2, maxT: 6 }); back++; t += 1; continue; }
+            if (b.down) { AP.walk(b.x, b.z, b.y > 2.25 ? 1 : 0, { run: true, near: 1.2, maxT: 6 }); AP.wait(0.25); back++; t += 0.5; continue; }
             AP.walk(fd.x, fd.z - 0.4, 0, { run: true, near: 0.5, maxT: 0.5 }); t += 0.5;
             if (B.K.stun <= 0) gap = Math.min(gap, Math.hypot(B.K.x - P.x, B.K.z - P.z), Math.hypot(B.K.x - b.x, B.K.z - b.z));
           }

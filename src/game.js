@@ -316,8 +316,16 @@
   let AC = null, master = null, noiseBuf = null, muted = false, musicGain = null;
   function audioInit() {
     if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
-    try { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = 0.75; master.connect(AC.destination); musicGain = AC.createGain(); musicGain.gain.value = 0; musicGain.connect(master); } catch (e) { AC = null; }
+    try { AC = new (window.AudioContext || window.webkitAudioContext)(); master = AC.createGain(); master.gain.value = 0.75; master.connect(AC.destination); musicGain = AC.createGain(); musicGain.gain.value = 0; musicGain.connect(master); loadSounds(); } catch (e) { AC = null; }
   }
+  // recorded lines (assets/sounds/*.mp3, embedded by the build): the same voice on every device
+  const SND = {};
+  function loadSounds() {
+    for (const [k, uri] of Object.entries(window.BOX_SND || {})) {
+      try { const bin = atob(uri.split(',')[1]), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); AC.decodeAudioData(u8.buffer, (b) => { SND[k] = b; }, () => {}); } catch (e) { /* falls back to the device voice */ }
+    }
+  }
+  function playSnd(k, vol) { if (!AC || muted || !SND[k]) return false; const s = AC.createBufferSource(), g = AC.createGain(); s.buffer = SND[k]; g.gain.value = vol; s.connect(g); g.connect(master); s.start(); return true; }
   function out(node, pan) {
     if (pan && AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); node.connect(p); p.connect(master); } else node.connect(master);
   }
@@ -344,7 +352,8 @@
   function growl(vol, len = 1.8) { tone(52, len, vol * 0.5, 'sawtooth', 0, -14); tone(79, len * 0.9, vol * 0.28, 'square', 0.04, -22); noise(vol * 0.45, 0, 240, 'lowpass', len * 7); }
   function breath(vol, pan) { noise(vol, pan, 520, 'bandpass', 9); tone(70, 0.9, vol * 0.25, 'sawtooth', 0, -18, pan); }
   function krampusSay(text, vol = 1) {
-    showMsg('\u201c' + text + '\u201d', 3.8, 'krampus'); growl(0.55 * vol, 2.4);
+    showMsg('\u201c' + text + '\u201d', 3.8, 'krampus'); growl(0.4 * vol, 2.4);
+    if (/hear you/i.test(text) && playSnd('hear', clamp(vol, 0.3, 1) * 1.5)) return;
     try { if (window.speechSynthesis && !muted) { const u = new SpeechSynthesisUtterance(text); u.pitch = 0.01; u.rate = 0.5; u.volume = clamp(vol, 0.25, 1); speechSynthesis.cancel(); speechSynthesis.speak(u); } } catch (e) { /* no voice on this device: growl + subtitle only */ }
   }
   function scream() { roar(); for (const f of [622, 880, 933, 1244, 1760]) tone(f, 1.3, 0.2, 'sawtooth', 0, -f * 0.45); noise(0.9, 0, 2400, 'highpass', 11); tone(41, 1.6, 0.6, 'sine'); shatter(0.35); }
@@ -570,7 +579,7 @@
   const level = () => Math.min(5, G.clues + Math.floor(G.huntT / 100));
   function startHunt() {
     newRound(); mode = 'play'; $('hud').style.display = 'block'; document.body.classList.remove('explore'); lastTime = performance.now(); lock();
-    showMsg('It took Leo upstairs. Find him.', 4); jingle(0.3, 0, 8);
+    showMsg('It took Leo upstairs. Find him.', 4); jingle(0.3, 0, 8); $('sub').style.opacity = 0; subT = 0;
     $('ears').style.display = 'block';
   }
 
@@ -1364,7 +1373,7 @@
     C.leo.look = [29.5, 2.8, 21.5];
     { const L = C.leo, fx = Math.sin(L.yaw), fz = -Math.cos(L.yaw); cut([L.x + fx * 0.95, 1.0, L.z + fz * 0.95], [L.x, 0.95, L.z], 0.6); }
     yield say('LEO', '(whisper) …Is he part of the store?', 2.4);
-    cut([23.2, 1.9, 29.4], [27.6, 1.3, 24.6], 1.0);
+    cut([29.9, 1.6, 29.7], [26.7, 1.2, 26.1], 1.0);
     KV.look = null; KV.anim = 'run';
     { const sx = KV.x, sz = KV.z, ex = C.leo.x + 0.6, ez = C.leo.z - 0.9; for (let i = 0; i < 10; i++) { const u = (i + 1) / 10; KV.x = lerp(sx, ex, u); KV.z = lerp(sz, ez, u); KV.phase += 0.6; yield 0.04; } }
     KV.anim = 'idle'; KV.gest = { name: 'grab', t0: NOW, dur: 0.8 }; roar(); yelp(0.25);
@@ -1372,7 +1381,7 @@
     yield 0.6;
     KV.anim = 'crouch'; KV.yaw = Math.atan2(31 - KV.x, -(30 - KV.z)); yield 0.45;
     KV.anim = 'leap'; jingle(0.3, 0, 6);
-    follow(() => [[24.2, 1.5, 25.2], [KV.x, KV.y + 2.0, KV.z]], 1.05);
+    follow(() => [[33.2, 1.3, 23.9], [KV.x, KV.y + 2.0, KV.z]], 1.05);
     { const sx = KV.x, sz = KV.z; for (let i = 0; i < 20; i++) { const u = (i + 1) / 20; KV.x = lerp(sx, 31, u); KV.z = lerp(sz, 30.5, u); KV.y = F1 * u + 4.2 * Math.sin(u * Math.PI); yield 0.04; } }
     KV.y = F1; KV.anim = 'land'; thud(0.6, 0.3, 300); yield 0.5;
     KV.anim = 'walk'; KV.yaw = -Math.PI / 2 - 0.4;
@@ -1460,7 +1469,14 @@
     C.dana.visible = false; KV.visible = false;
     par(function* () { for (let i = 0; i < 20; i++) { DOORS.front = Math.max(0, DOORS.front - 0.06); yield 0.02; } });
     yield 0.8; jingle(0.2, 0, 8); yield 0.4; jingle(0.15, 0, 6);
-    yield 1.4;
+    yield 1.0;
+    // the rest of the staff, lined up in the snow, watching the car
+    { const row = [['marcus', 27.4], ['manager', 28.6], ['priya', 29.8]];
+      for (const [k, x] of row) { placeA(C[k], x, -2.3, 0); setCreep(C[k], 3); C[k].face = { mouth: 'grin', eyes: 'stare' }; C[k].gest = { name: 'fold', t0: NOW }; C[k].look = [CAR.x, 1.3, CAR.z]; }
+      C.manager.gest = { name: 'wave', t0: NOW };
+      move([32.6, 1.5, -6.6], [28.6, 1.45, -2.3], [31.6, 1.5, -5.6], [28.6, 1.5, -2.3], 4, 0.7, 0.55); }
+    yield say('', 'The others haven’t moved. They’re still smiling. One of them waves.', 3.6);
+    yield 0.4;
     yield fadeTo(1, 0.8);
     for (const k in C) C[k].visible = false;
     CAR.visible = false; CAR.inside = true; CAR.lights = false;

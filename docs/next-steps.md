@@ -1,35 +1,45 @@
 # Next steps
 
-## Done on `cutscenes-wip` (Three.js port + scares)
-- **Renderer is now Three.js** (`src/render3.js`, bundled into the single offline `index.html` by `tools/build.py` with esbuild).
-  Game logic, level builders, actors, A*, cutscenes and the script are unchanged; only the drawing layer was swapped.
-  - PBR materials (roughness/metalness per surface), photo textures for wood floor, tile and brick, procedural bump for
-    fabric, carpet, concrete, fur, leather, snow and asphalt, room reflections on ceramic/metal/glass.
-  - Baked soft shadow maps per floor, ambient occlusion (GTAO), bloom on lamps / tree lights / Krampus's eyes,
-    depth of field in cutscenes, film grain, vignette, chromatic aberration, ACES tone mapping.
-  - Phone preset (touch devices, or add `?q=low` to the URL): no AO/DoF, smaller shadow maps.
-- **Krampus is scarier**: ember eyes that glow in the dark, more and longer teeth, longer claws, taller in the hunt.
-  - **Jumpscare** when he catches you (camera is dragged to his face, scream, shake) before the "Into the sack" screen.
-  - **"I can hear you"** while you hide near him: growl + the device's speech voice pitched all the way down + red subtitle.
-  - **The stare**: about 70% of the time after that line he walks to your pot/hamper, bends over and looks straight into
-    the opening for 27–33 seconds, breathing. Hold still and he leaves. Climb out while he's staring and he has you.
-  - Dread effect: the picture desaturates and closes in and a heartbeat speeds up as he gets near.
-- Test tools: `tools/scares.py` (stare + jumpscare), plus the existing `scenes.py`, `shots.py`, `sim.py`, `escape_sim.py`.
-  All accept `BOXQ='&q=low'` to run the phone preset (much faster headless).
+## Where things stand (`cutscenes-wip`)
+The whole story plays start to finish: opening → walk-around with Leo → balcony → crash → doors → hunt → rescue →
+escape → ending. `tools/playthrough.py` runs all of it on autopilot and writes a transcript.
+
+### Done in the overnight pass (three run-throughs, five rounds each)
+**Bugs that would have stopped a real play-through**
+- The game froze when the balcony or crash cutscene started from the walk-around.
+- Krampus and Leo got stuck at the foot of the stairs whenever they re-pathed (he could never chase you upstairs).
+- Heads turned the wrong way when a character looked at something.
+- The jumpscare scream was being replaced by a quiet yelp.
+
+**The staff** go from tired retail to wrong over four acts in the walk-around (see `docs/script.md`), look up at
+you from the balcony scene, bow when Krampus lands, walk your parents out, and watch from the glass in the hunt.
+
+**The hunt**
+- Fair chases: get about 13 m ahead and he loses you; he grabs your coat once before a catch counts (twice on Easy, never on Hard).
+- He is slow to notice you far away and quick up close. He carries the sack across the upstairs while you get your bearings.
+- One-time hints, a goal line, a "crying" direction marker (and a "bells" marker on Easy and on phones).
+- Staff knock on the glass if you loiter by a door.
+- Leo falls at the bottom of the stairs in the finale; Krampus is slow on the staircase.
+- "I can hear you" is now a recorded line (`assets/sounds/hear.mp3`), the same on every device.
+
+**Models**: Poly Haven chairs, armchairs, coffee and side tables, potted plants and a night sky (`assets/CREDITS.md`).
 
 ## Still to do
-1. **Real downloaded 3D models.** This session could only reach npm and GitHub, so Poly Haven, Quaternius, Kenney and
-   ambientCG downloads were blocked. Allow those domains (claude.ai → Settings → Capabilities → allowed domains:
-   `polyhaven.com`, `dl.polyhaven.org`, `api.polyhaven.com`, `quaternius.com`, `kenney.nl`, `ambientcg.com`) and then:
-   - sofas / tables / lamps / shelves / plants from Poly Haven + Kenney furniture kit, loaded as GLB next to the built geometry
-     (render3.js needs a small GLTF path: load, place by the same transforms level.js uses, keep the existing colliders);
-   - rigged CC0 people with walk/run/idle/sit (Quaternius) to replace the hand-built family and staff;
-   - a rigged goat/creature base for Krampus, keeping the horns, chains, bells and sack;
-   - a Poly Haven night HDRI for the parking lot.
-   Models have to be embedded in `index.html` (it is opened from disk), so keep them small (Draco/meshopt, 1K textures).
-2. Re-test the full hunt (`tools/sim.py`, `tools/escape_sim.py`) and the 10-minute walk-around after the renderer swap.
-3. Unfinished from before: balcony moved to the east rail (x≈40.6, z≈15.5 upstairs), better framing for the crash close-ups,
-   brick base band breaking at the two doorways.
-4. Tune: Krampus's voice differs by device (it uses whatever speech voice the phone/computer has). A recorded growl line
-   would be scarier and consistent.
+1. **People and Krampus are still hand-built.** Rigged CC0 packs (Quaternius) would need their faces and gestures rebuilt
+   for the cutscenes: the stare, the wide smile, the owl head-turn and the bow all live in `src/actors.js`. Worth doing only
+   if the result keeps those.
+2. **Sofas, beds and shelves are still hand-built.** Poly Haven's sofas are antique styles that don't suit this store.
+   A modern CC0 sofa and bed would slot straight in: add the `.glb` to `assets/models/` and wrap the builder in `model(...)`
+   in `src/level.js` the way `chair()` does.
+3. **Listen to the Krampus line** on a real device. It was generated and processed blind (text-to-speech pitched down, with
+   gravel and reverb). If it is mush, re-run with less processing or record one.
+4. **Balance with real players.** The autopilot (`tools/hunt_sim.py`) wins about 7 in 10 on Easy, 3 in 10 on Normal and
+   rarely on Hard, but it knows where everything is and panics in corners. Tune `DIFF` at the top of `src/game.js`.
 5. Keep the "Box" name and the shuffled layout; no real store name or private store details.
+
+## Tools
+- `python3 tools/build.py` after any change in `src/` (needs `npm install` once).
+- `tools/playthrough.py OUT [easy|normal|hard] [--fast] [--noshots]`: the whole story, with a transcript.
+- `tools/hunt_sim.py [difficulty] [trials]`: many hunts; `TRACE=1` prints the last seconds of each loss.
+- `tools/escape_sim.py [difficulty] [trials] [reaction secs]`: the finale only.
+- `tools/sim.py`, `tools/scenes.py`, `tools/scares.py`, `tools/shots.py`: older single-purpose checks.

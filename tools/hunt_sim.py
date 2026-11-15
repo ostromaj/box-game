@@ -21,7 +21,7 @@ RUN = """(diff) => {
     const fd = B.LV.doors.front, P = B.P; let t = 0;
     while (B.mode === 'play' && t < 90) {
       const b = B.G.bro;
-      if (b.down && b.down > 0.8) { AP.walk(b.x, b.z, 0, { run: true, near: 1.2, maxT: 4 }); t += 1; continue; }
+      if (b.down && b.down > 0.8) { AP.walk(b.x, b.z, 0, { run: true, near: 1.2, maxT: 4 }); AP.wait(0.25); t += 0.5; continue; }
       AP.walk(fd.x, fd.z - 0.4, 0, { run: true, near: 0.5, maxT: 0.4 }); t += 0.4;
     }
     out = B.mode === 'cine' ? 'win' : B.mode === 'play' ? 'timeout' : 'caught in escape';
