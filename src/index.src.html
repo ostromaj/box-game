@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>BOX — Hide &amp; Seek</title>
+<style>
+  :root { --ink:#1d1b19; --paper:#f4f1ea; --accent:#d4402c; --gold:#e0a03a; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #141210; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--paper); user-select: none; -webkit-user-select: none; }
+  #view { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; cursor: crosshair; }
+  .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; text-align: center; background: radial-gradient(ellipse at center, rgba(20,18,16,0.55), rgba(20,18,16,0.88)); z-index: 20; }
+  .logo { font-size: clamp(64px, 16vw, 132px); font-weight: 900; letter-spacing: 0.08em; line-height: 0.9; color: var(--paper); border: 6px solid var(--paper); padding: 4px 22px 10px; }
+  .sub { font-size: 15px; letter-spacing: 0.25em; text-transform: uppercase; opacity: 0.85; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  button { font: inherit; font-weight: 700; border: 2px solid var(--paper); background: transparent; color: var(--paper); padding: 10px 18px; border-radius: 999px; cursor: pointer; font-size: 15px; }
+  button.sel { background: var(--paper); color: var(--ink); }
+  button.big { background: var(--accent); border-color: var(--accent); color: #fff; font-size: 20px; padding: 14px 44px; }
+  .how { max-width: 520px; font-size: 13.5px; line-height: 1.5; opacity: 0.85; }
+  .how b { color: #fff; }
+  .touchonly { display: none; } body.touch .touchonly { display: inline; } body.touch .keyonly { display: none; }
+  #best { font-size: 12px; opacity: 0.6; }
+  #hud { display: none; position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+  #top { position: absolute; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  #clock { display: flex; align-items: baseline; gap: 10px; background: rgba(20,18,16,0.6); padding: 6px 16px; border-radius: 999px; }
+  #phase { font-size: 12px; font-weight: 800; letter-spacing: 0.2em; }
+  #phase.hide { color: var(--gold); } #phase.seek { color: #8fd18f; }
+  #timer { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  #alert { width: 180px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.2); overflow: hidden; transition: opacity .3s; }
+  #alertFill { height: 100%; width: 0; background: linear-gradient(90deg, #ffd23a, #ff4a2e); }
+  #where { position: absolute; left: max(12px, env(safe-area-inset-left)); top: max(12px, env(safe-area-inset-top)); background: rgba(20,18,16,0.6); padding: 6px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; max-width: 40vw; }
+  #stance { position: absolute; left: max(12px, env(safe-area-inset-left)); top: calc(max(12px, env(safe-area-inset-top)) + 34px); font-size: 12px; opacity: 0.8; background: rgba(20,18,16,0.5); padding: 3px 10px; border-radius: 8px; }
+  #minimap { position: absolute; right: max(12px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top)); width: 170px; height: 120px; border-radius: 12px; background: rgba(30,28,26,0.55); border: 2px solid rgba(255,255,255,0.5); pointer-events: auto; cursor: pointer; }
+  #msg { position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); font-size: clamp(22px, 5vw, 40px); font-weight: 900; text-shadow: 0 2px 12px rgba(0,0,0,0.7); transition: opacity .4s; text-align: center; width: 90vw; }
+  #vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(200,20,10,0.75)); opacity: 0; }
+  #dot { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 2px; background: rgba(255,255,255,0.7); }
+  #hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 12px; opacity: 0.7; background: rgba(20,18,16,0.5); padding: 4px 12px; border-radius: 8px; white-space: nowrap; }
+  body.touch #hint { display: none; }
+  #btnPause { position: absolute; right: max(12px, env(safe-area-inset-right)); top: calc(max(12px, env(safe-area-inset-top)) + 128px); pointer-events: auto; padding: 6px 12px; font-size: 13px; background: rgba(20,18,16,0.6); }
+  .tbtn { display: none; position: absolute; pointer-events: auto; width: 78px; height: 78px; border-radius: 50%; background: rgba(20,18,16,0.55); border: 2px solid rgba(255,255,255,0.7); font-size: 13px; padding: 0; }
+  body.touch .tbtn { display: block; }
+  .tbtn.on { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+  #btnCrouch { right: max(24px, env(safe-area-inset-right)); bottom: calc(max(24px, env(safe-area-inset-bottom)) + 92px); }
+  #btnRun { right: calc(max(24px, env(safe-area-inset-right)) + 92px); bottom: max(24px, env(safe-area-inset-bottom)); }
+  #stick { display: none; position: fixed; width: 110px; height: 110px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.08); z-index: 11; pointer-events: none; }
+  #knob { position: absolute; left: 30px; top: 30px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,0.55); }
+  #end h1, #pause h1 { margin: 0; font-size: clamp(32px, 8vw, 60px); font-weight: 900; }
+  h1.win { color: #8fd18f; } h1.lose { color: var(--accent); }
+  #endText { font-size: 16px; line-height: 1.6; max-width: 480px; }
+  .screen { overflow-y: auto; justify-content: safe center; }
+  @media (max-height: 560px) { .logo { font-size: 54px; border-width: 4px; padding: 2px 14px 6px; } .screen { gap: 8px; padding: 12px; } .how { font-size: 12px; line-height: 1.4; } .how br { display: none; } button.big { padding: 10px 36px; font-size: 18px; } }
+  #fatal { display: none; position: fixed; inset: 0; align-items: center; justify-content: center; padding: 30px; text-align: center; z-index: 50; background: #141210; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="fatal"></div>
+
+<div id="hud">
+  <div id="vignette"></div>
+  <div id="dot"></div>
+  <div id="top">
+    <div id="clock"><span id="phase" class="hide">HIDE</span><span id="timer">0:30</span></div>
+    <div id="alert"><div id="alertFill"></div></div>
+  </div>
+  <div id="where">Downstairs</div>
+  <div id="stance">Standing</div>
+  <canvas id="minimap" width="340" height="240"></canvas>
+  <button id="btnPause">Pause</button>
+  <div id="msg"></div>
+  <div id="hint">WASD move · Mouse look · Shift run (loud) · C crouch · M map · Esc pause</div>
+  <button class="tbtn" id="btnCrouch">Crouch</button>
+  <button class="tbtn" id="btnRun">Run</button>
+</div>
+<div id="stick"><div id="knob"></div></div>
+
+<div class="screen" id="title">
+  <div class="logo">BOX</div>
+  <div class="sub">Hide &amp; seek after closing</div>
+  <div class="row">
+    <button data-diff="easy">Easy</button>
+    <button data-diff="normal" class="sel">Normal</button>
+    <button data-diff="hard">Hard</button>
+  </div>
+  <button class="big" id="play">Play</button>
+  <div class="how">
+    The store just closed and the staff are playing hide &amp; seek. You get <b>30 seconds</b> to hide while they count at the front doors. Then stay hidden until the clock runs out.<br><br>
+    <b>Crouch</b> behind sofas, shelves and beds. <b>Running is loud</b> and draws seekers. A <b>?</b> means they heard something; a <b>!</b> means they see you. If the red bar fills, you're found.<br><br>
+    <span class="keyonly">WASD / arrows to move · mouse to look (click the view) · Shift run · C crouch · M map · Esc pause</span>
+    <span class="touchonly">Left thumb: move · Right thumb: look · Crouch and Run buttons on the right</span>
+  </div>
+  <div id="best"></div>
+</div>
+
+<div class="screen" id="pause" style="display:none">
+  <h1>Paused</h1>
+  <div class="row"><button class="big" id="resume">Resume</button></div>
+  <button id="quit">Quit to menu</button>
+</div>
+
+<div class="screen" id="end" style="display:none">
+  <h1 id="endTitle">FOUND!</h1>
+  <div id="endText"></div>
+  <div class="row"><button class="big" id="again">Play again</button></div>
+  <button id="menu">Menu</button>
+</div>
+
+<script>
+/*@ENGINE@*/
+</script>
+<script>
+/*@LEVEL@*/
+</script>
+<script>
+/*@GAME@*/
+</script>
+</body>
+</html>
