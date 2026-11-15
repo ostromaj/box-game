@@ -74,6 +74,17 @@
   #peekN { font-size: 90px; font-weight: 900; }
   body.explore #alert { display: none; }
   #fps { position: fixed; left: 6px; bottom: 6px; font-size: 11px; opacity: .6; z-index: 30; }
+  #list { display: none; position: absolute; left: max(12px, env(safe-area-inset-left)); top: calc(max(12px, env(safe-area-inset-top)) + 66px); background: rgba(20,18,16,0.55); padding: 7px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.55; }
+  #list b { display: block; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); margin-bottom: 2px; }
+  #list span { display: block; opacity: .95; } #list span::before { content: '○  '; opacity: .7; }
+  #list span.ok { opacity: .5; text-decoration: line-through; } #list span.ok::before { content: '●  '; }
+  @media (max-height: 560px) { #list { font-size: 11px; line-height: 1.35; padding: 5px 9px; } }
+  #goal { font-size: 12px; opacity: .8; text-shadow: 0 1px 4px #000; max-width: 80vw; text-align: center; }
+  body.explore #goal { display: none; }
+  #msg.tip { font-size: clamp(15px, 3vw, 22px); font-weight: 700; top: 72%; }
+  #ears { display: none; position: absolute; inset: 0; }
+  #ears span { position: absolute; transform: translate(-50%, -50%); font-size: 12px; font-weight: 700; letter-spacing: .08em; white-space: nowrap; opacity: 0; transition: opacity .3s; text-shadow: 0 1px 5px #000; background: rgba(20,18,16,.45); padding: 2px 8px; border-radius: 999px; }
+  .tipline { display: inline-block; margin-top: 8px; font-size: 14px; opacity: .8; font-style: italic; }
   #fatal { display: none; position: fixed; inset: 0; align-items: center; justify-content: center; padding: 30px; text-align: center; z-index: 50; background: #141210; }
 </style>
 </head>
@@ -96,12 +107,15 @@
     <div id="clock"><span id="phase" class="hide">FIND LEO</span><span id="timer">0:00</span></div>
     <div id="alert"><div id="alertFill"></div></div>
     <div id="obj"></div>
+    <div id="goal"></div>
   </div>
   <div id="where">Downstairs</div>
   <div id="stance">Standing</div>
+  <div id="list"></div>
   <canvas id="minimap" width="340" height="240"></canvas>
   <button id="btnPause">Pause</button>
   <div id="msg"></div>
+  <div id="ears"><span id="earCry"></span><span id="earBell"></span></div>
   <div id="prompt"><span class="keyonly"><b>E</b> · </span><span id="promptText"></span></div>
   <div id="hint">WASD move · Mouse look · Shift run (loud) · C crouch · E hide / look inside · M map · Esc pause</div>
   <button class="tbtn" id="btnUse">Hide</button>

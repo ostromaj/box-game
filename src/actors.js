@@ -93,11 +93,11 @@ const ACT = (() => {
         for (const s of [-1, 1]) {
           if (eyes === 'closed') { g.rbox(s * ex, ey - 0.004, ez - 0.012, rx * 0.34, 0.006, 0.006, 0, dark, 0, 0.002); }
           else {
-            const sy = eyes === 'narrow' ? 0.45 : eyes === 'wide' ? 1.35 : 1;
-            g.ellipsoid(s * ex, ey, ez, rx * 0.2, ry * 0.11 * sy, rz * 0.1, white, MAT.CERAMIC, 10, 6);
-            g.ellipsoid(s * ex, ey, ez - rz * 0.07, rx * 0.1, ry * 0.085 * Math.min(1, sy * 1.1), rz * 0.05, H(id === 'leo' || id === 'you' ? '#5a3a22' : '#3a2a1e'), MAT.CERAMIC, 8, 5);
-            g.ellipsoid(s * ex, ey, ez - rz * 0.1, rx * 0.05, ry * 0.045 * Math.min(1, sy), rz * 0.03, dark, MAT.CERAMIC, 6, 4);
-            g.sphere(s * ex + rx * 0.03, ey + ry * 0.03, ez - rz * 0.125, d.H * 0.0025, white, MAT.GLOW, 4);
+            const stare = eyes === 'stare', sy = eyes === 'narrow' ? 0.45 : eyes === 'wide' ? 1.35 : stare ? 1.6 : 1, ik = stare ? 0.62 : 1;
+            g.ellipsoid(s * ex, ey, ez, rx * (stare ? 0.23 : 0.2), ry * 0.11 * sy, rz * 0.1, white, MAT.CERAMIC, 10, 6);
+            g.ellipsoid(s * ex, ey, ez - rz * 0.07, rx * 0.1 * ik, ry * 0.085 * Math.min(1, sy * 1.1) * ik, rz * 0.05, H(id === 'leo' || id === 'you' ? '#5a3a22' : '#3a2a1e'), MAT.CERAMIC, 8, 5);
+            g.ellipsoid(s * ex, ey, ez - rz * 0.1, rx * 0.05 * ik, ry * 0.045 * Math.min(1, sy) * ik, rz * 0.03, dark, MAT.CERAMIC, 6, 4);
+            if (!stare) g.sphere(s * ex + rx * 0.03, ey + ry * 0.03, ez - rz * 0.125, d.H * 0.0025, white, MAT.GLOW, 4);
             if (eyes === 'narrow') g.ellipsoid(s * ex, ey + ry * 0.06, ez - 0.002, rx * 0.22, ry * 0.07, rz * 0.11, skin, MAT.SKIN, 8, 4);
           }
           const by = ey + ry * (brows === 'up' ? 0.28 : 0.2), tilt = brows === 'angry' ? 0.38 : brows === 'sad' ? -0.32 : 0;
@@ -109,6 +109,10 @@ const ACT = (() => {
         if (mouth === 'smile' || mouth === 'frown') {
           const sg = mouth === 'smile' ? 1 : -1;
           for (let i = -3; i <= 3; i++) { const u = i / 3; g.rbox(u * rx * 0.24, my + sg * u * u * ry * 0.07, mz - (1 - u * u) * 0.004, rx * 0.1, d.H * 0.006, d.H * 0.006, 0, lip, 0, 0.002); }
+        } else if (mouth === 'wide') {
+          // a closed smile that goes a little too far up the cheeks
+          for (let i = -6; i <= 6; i++) { const u = i / 6; g.rbox(u * rx * 0.5, my + u * u * ry * 0.2, mz - (1 - u * u) * 0.006 + Math.abs(u) * 0.004, rx * 0.095, d.H * 0.0065, d.H * 0.006, 0, lip, 0, 0.002); }
+          for (const sd of [-1, 1]) g.ellipsoid(sd * rx * 0.5, my + ry * 0.17, mz + 0.008, rx * 0.15, ry * 0.11, rz * 0.08, shade(skin, 1.02), MAT.SKIN, 8, 5);
         } else if (mouth === 'grin') {
           // wide, wrong smile: dark mouth, teeth, corners pulled up
           for (let i = -5; i <= 5; i++) {
@@ -206,7 +210,7 @@ const ACT = (() => {
     } else if (a.anim === 'crouch') {
       P.hipX = [1.3, 1.1]; P.kn = [2.1, 2.0]; P.an = [0.7, 0.8]; P.lean = 0.45; P.bob = -dims(a.id).legs * 0.42; P.shX = [0.9, 0.9]; P.el = [1.0, 1.0];
     } else {
-      const br = Math.sin(t * 1.7 + (a.seed || 0));
+      const br = a.still ? 0 : Math.sin(t * 1.7 + (a.seed || 0));
       P.lean = 0.015 * br; P.shZ = [0.08, 0.08]; P.el = [0.14, 0.16]; P.headX = 0.02 * br;
       P.hipX = [0.02, -0.02]; P.hipZ = [0.02, 0.02];
     }
@@ -214,9 +218,10 @@ const ACT = (() => {
     if (a.look) {
       const dx = a.look[0] - a.x, dz = a.look[2] - a.z, want = Math.atan2(dx, -dz);
       let d = want - a.yaw; while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU;
-      d = clamp(d, -1.6, 1.6);
+      const owl = a.owl ? 2.7 : 1.1;   // owl: the head turns much further than a neck should, and the body does not follow
+      d = clamp(d, a.owl ? -2.7 : -1.6, a.owl ? 2.7 : 1.6);
       const hd = Math.hypot(dx, dz), dy = a.look[1] - ((a.y || 0) + dims(a.id).H * 0.93);
-      P.headY = clamp(d, -1.1, 1.1); P.twist += clamp(d - P.headY, -0.6, 0.6);
+      const hy = clamp(d, -owl, owl); P.headY = -hy; if (!a.owl) P.twist -= clamp(d - hy, -0.6, 0.6);   // the rig turns with Ry(-yaw), so a turn toward +yaw is a negative head angle
       P.headX = clamp(-Math.atan2(dy, hd) * 0.8, -0.6, 0.6);
     }
     // gestures (blended)
@@ -256,6 +261,14 @@ const ACT = (() => {
       case 'lookUp': set('headX', null, -0.75); set('neckX', null, -0.2); break;
       case 'fluff': set('lean', null, 0.5); for (const i of [0, 1]) { set('shX', i, 1.0 + 0.2 * Math.sin(t * 9 + i)); set('el', i, 0.4); } break;
       case 'hand': set('shX', 1, 0.25); set('shZ', 1, 0.35); set('el', 1, 0.2); break;
+      case 'fold': for (const i of [0, 1]) { set('shX', i, 0.38); set('shY', i, i ? 0.5 : -0.5); set('shZ', i, 0.04); set('el', i, 0.75); } break;
+      case 'tiltHead': set('headZ', null, 0.42); break;
+      case 'bow': set('headX', null, 0.75); set('lean', null, 0.1); for (const i of [0, 1]) { set('shX', i, 0.38); set('shY', i, i ? 0.5 : -0.5); set('el', i, 0.75); } break;
+      case 'glass': for (const i of [0, 1]) { set('shX', i, 1.75); set('shZ', i, 0.5); set('el', i, 0.55); } set('lean', null, 0.16); set('headZ', null, 0.22); break;
+      case 'knock': set('shX', 1, 1.55); set('shZ', 1, 0.15); set('el', 1, 1.0 + 0.5 * Math.max(0, Math.sin(age * 14))); break;
+      case 'clap': for (const i of [0, 1]) { set('shX', i, 0.95); set('shY', i, i ? 0.62 + 0.14 * Math.sin(age * 5) : -0.62 - 0.14 * Math.sin(age * 5)); set('el', i, 1.25); } break;
+      case 'usher': set('shX', 1, 1.2); set('shZ', 1, 0.7); set('el', 1, 0.15); break;
+      case 'finger': set('shX', 1, 0.85); set('shY', 1, -0.75); set('el', 1, 2.35); set('headZ', null, 0.12); break;
     }
   }
   // world matrices for all bones
@@ -286,7 +299,7 @@ const ACT = (() => {
     if (a.visible === false) return;
     const P = pose(a, t), B = rig(a, P), id = a.id;
     const f = a.face || {};
-    const eyes = (f.eyes === 'closed' || (f.eyes !== 'narrow' && blink(a, t))) ? 'closed' : (f.eyes || 'open');
+    const eyes = (f.eyes === 'closed' || (f.eyes !== 'narrow' && f.eyes !== 'stare' && !a.noBlink && blink(a, t))) ? 'closed' : (f.eyes || 'open');
     buf.emit(personPart(id, 'pelvis'), B.pelvis);
     buf.emit(personPart(id, 'chest'), B.chest);
     buf.emit(personPart(id, 'neck'), B.neck);

@@ -74,6 +74,17 @@
   #peekN { font-size: 90px; font-weight: 900; }
   body.explore #alert { display: none; }
   #fps { position: fixed; left: 6px; bottom: 6px; font-size: 11px; opacity: .6; z-index: 30; }
+  #list { display: none; position: absolute; left: max(12px, env(safe-area-inset-left)); top: calc(max(12px, env(safe-area-inset-top)) + 66px); background: rgba(20,18,16,0.55); padding: 7px 12px; border-radius: 10px; font-size: 12.5px; line-height: 1.55; }
+  #list b { display: block; font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); margin-bottom: 2px; }
+  #list span { display: block; opacity: .95; } #list span::before { content: '○  '; opacity: .7; }
+  #list span.ok { opacity: .5; text-decoration: line-through; } #list span.ok::before { content: '●  '; }
+  @media (max-height: 560px) { #list { font-size: 11px; line-height: 1.35; padding: 5px 9px; } }
+  #goal { font-size: 12px; opacity: .8; text-shadow: 0 1px 4px #000; max-width: 80vw; text-align: center; }
+  body.explore #goal { display: none; }
+  #msg.tip { font-size: clamp(15px, 3vw, 22px); font-weight: 700; top: 72%; }
+  #ears { display: none; position: absolute; inset: 0; }
+  #ears span { position: absolute; transform: translate(-50%, -50%); font-size: 12px; font-weight: 700; letter-spacing: .08em; white-space: nowrap; opacity: 0; transition: opacity .3s; text-shadow: 0 1px 5px #000; background: rgba(20,18,16,.45); padding: 2px 8px; border-radius: 999px; }
+  .tipline { display: inline-block; margin-top: 8px; font-size: 14px; opacity: .8; font-style: italic; }
   #fatal { display: none; position: fixed; inset: 0; align-items: center; justify-content: center; padding: 30px; text-align: center; z-index: 50; background: #141210; }
 </style>
 </head>
@@ -96,12 +107,15 @@
     <div id="clock"><span id="phase" class="hide">FIND LEO</span><span id="timer">0:00</span></div>
     <div id="alert"><div id="alertFill"></div></div>
     <div id="obj"></div>
+    <div id="goal"></div>
   </div>
   <div id="where">Downstairs</div>
   <div id="stance">Standing</div>
+  <div id="list"></div>
   <canvas id="minimap" width="340" height="240"></canvas>
   <button id="btnPause">Pause</button>
   <div id="msg"></div>
+  <div id="ears"><span id="earCry"></span><span id="earBell"></span></div>
   <div id="prompt"><span class="keyonly"><b>E</b> · </span><span id="promptText"></span></div>
   <div id="hint">WASD move · Mouse look · Shift run (loud) · C crouch · E hide / look inside · M map · Esc pause</div>
   <button class="tbtn" id="btnUse">Hide</button>
@@ -6471,6 +6485,8 @@ function buildLevel() {
       [1, 56, 34, 5, 'Everything here has a red tag. Is it broken?'],
       [1, 41.4, 18, 3, 'Spin the stools! Spin them!'],
       [0, 52, 6, 5, 'This couch is squishy. Dad’s gonna sit on all of them.'],
+      [0, 23, 6.6, 3.2, 'There’s keys behind the counter. A whole ring of them.'],
+      [1, 44.5, 8, 3.2, 'More keys! Every register has keys.'],
     ],
   };
 }
@@ -6572,11 +6588,11 @@ const ACT = (() => {
         for (const s of [-1, 1]) {
           if (eyes === 'closed') { g.rbox(s * ex, ey - 0.004, ez - 0.012, rx * 0.34, 0.006, 0.006, 0, dark, 0, 0.002); }
           else {
-            const sy = eyes === 'narrow' ? 0.45 : eyes === 'wide' ? 1.35 : 1;
-            g.ellipsoid(s * ex, ey, ez, rx * 0.2, ry * 0.11 * sy, rz * 0.1, white, MAT.CERAMIC, 10, 6);
-            g.ellipsoid(s * ex, ey, ez - rz * 0.07, rx * 0.1, ry * 0.085 * Math.min(1, sy * 1.1), rz * 0.05, H(id === 'leo' || id === 'you' ? '#5a3a22' : '#3a2a1e'), MAT.CERAMIC, 8, 5);
-            g.ellipsoid(s * ex, ey, ez - rz * 0.1, rx * 0.05, ry * 0.045 * Math.min(1, sy), rz * 0.03, dark, MAT.CERAMIC, 6, 4);
-            g.sphere(s * ex + rx * 0.03, ey + ry * 0.03, ez - rz * 0.125, d.H * 0.0025, white, MAT.GLOW, 4);
+            const stare = eyes === 'stare', sy = eyes === 'narrow' ? 0.45 : eyes === 'wide' ? 1.35 : stare ? 1.6 : 1, ik = stare ? 0.62 : 1;
+            g.ellipsoid(s * ex, ey, ez, rx * (stare ? 0.23 : 0.2), ry * 0.11 * sy, rz * 0.1, white, MAT.CERAMIC, 10, 6);
+            g.ellipsoid(s * ex, ey, ez - rz * 0.07, rx * 0.1 * ik, ry * 0.085 * Math.min(1, sy * 1.1) * ik, rz * 0.05, H(id === 'leo' || id === 'you' ? '#5a3a22' : '#3a2a1e'), MAT.CERAMIC, 8, 5);
+            g.ellipsoid(s * ex, ey, ez - rz * 0.1, rx * 0.05 * ik, ry * 0.045 * Math.min(1, sy) * ik, rz * 0.03, dark, MAT.CERAMIC, 6, 4);
+            if (!stare) g.sphere(s * ex + rx * 0.03, ey + ry * 0.03, ez - rz * 0.125, d.H * 0.0025, white, MAT.GLOW, 4);
             if (eyes === 'narrow') g.ellipsoid(s * ex, ey + ry * 0.06, ez - 0.002, rx * 0.22, ry * 0.07, rz * 0.11, skin, MAT.SKIN, 8, 4);
           }
           const by = ey + ry * (brows === 'up' ? 0.28 : 0.2), tilt = brows === 'angry' ? 0.38 : brows === 'sad' ? -0.32 : 0;
@@ -6588,6 +6604,10 @@ const ACT = (() => {
         if (mouth === 'smile' || mouth === 'frown') {
           const sg = mouth === 'smile' ? 1 : -1;
           for (let i = -3; i <= 3; i++) { const u = i / 3; g.rbox(u * rx * 0.24, my + sg * u * u * ry * 0.07, mz - (1 - u * u) * 0.004, rx * 0.1, d.H * 0.006, d.H * 0.006, 0, lip, 0, 0.002); }
+        } else if (mouth === 'wide') {
+          // a closed smile that goes a little too far up the cheeks
+          for (let i = -6; i <= 6; i++) { const u = i / 6; g.rbox(u * rx * 0.5, my + u * u * ry * 0.2, mz - (1 - u * u) * 0.006 + Math.abs(u) * 0.004, rx * 0.095, d.H * 0.0065, d.H * 0.006, 0, lip, 0, 0.002); }
+          for (const sd of [-1, 1]) g.ellipsoid(sd * rx * 0.5, my + ry * 0.17, mz + 0.008, rx * 0.15, ry * 0.11, rz * 0.08, shade(skin, 1.02), MAT.SKIN, 8, 5);
         } else if (mouth === 'grin') {
           // wide, wrong smile: dark mouth, teeth, corners pulled up
           for (let i = -5; i <= 5; i++) {
@@ -6685,7 +6705,7 @@ const ACT = (() => {
     } else if (a.anim === 'crouch') {
       P.hipX = [1.3, 1.1]; P.kn = [2.1, 2.0]; P.an = [0.7, 0.8]; P.lean = 0.45; P.bob = -dims(a.id).legs * 0.42; P.shX = [0.9, 0.9]; P.el = [1.0, 1.0];
     } else {
-      const br = Math.sin(t * 1.7 + (a.seed || 0));
+      const br = a.still ? 0 : Math.sin(t * 1.7 + (a.seed || 0));
       P.lean = 0.015 * br; P.shZ = [0.08, 0.08]; P.el = [0.14, 0.16]; P.headX = 0.02 * br;
       P.hipX = [0.02, -0.02]; P.hipZ = [0.02, 0.02];
     }
@@ -6693,9 +6713,10 @@ const ACT = (() => {
     if (a.look) {
       const dx = a.look[0] - a.x, dz = a.look[2] - a.z, want = Math.atan2(dx, -dz);
       let d = want - a.yaw; while (d > Math.PI) d -= TAU; while (d < -Math.PI) d += TAU;
-      d = clamp(d, -1.6, 1.6);
+      const owl = a.owl ? 2.7 : 1.1;   // owl: the head turns much further than a neck should, and the body does not follow
+      d = clamp(d, a.owl ? -2.7 : -1.6, a.owl ? 2.7 : 1.6);
       const hd = Math.hypot(dx, dz), dy = a.look[1] - ((a.y || 0) + dims(a.id).H * 0.93);
-      P.headY = clamp(d, -1.1, 1.1); P.twist += clamp(d - P.headY, -0.6, 0.6);
+      const hy = clamp(d, -owl, owl); P.headY = -hy; if (!a.owl) P.twist -= clamp(d - hy, -0.6, 0.6);   // the rig turns with Ry(-yaw), so a turn toward +yaw is a negative head angle
       P.headX = clamp(-Math.atan2(dy, hd) * 0.8, -0.6, 0.6);
     }
     // gestures (blended)
@@ -6735,6 +6756,14 @@ const ACT = (() => {
       case 'lookUp': set('headX', null, -0.75); set('neckX', null, -0.2); break;
       case 'fluff': set('lean', null, 0.5); for (const i of [0, 1]) { set('shX', i, 1.0 + 0.2 * Math.sin(t * 9 + i)); set('el', i, 0.4); } break;
       case 'hand': set('shX', 1, 0.25); set('shZ', 1, 0.35); set('el', 1, 0.2); break;
+      case 'fold': for (const i of [0, 1]) { set('shX', i, 0.38); set('shY', i, i ? 0.5 : -0.5); set('shZ', i, 0.04); set('el', i, 0.75); } break;
+      case 'tiltHead': set('headZ', null, 0.42); break;
+      case 'bow': set('headX', null, 0.75); set('lean', null, 0.1); for (const i of [0, 1]) { set('shX', i, 0.38); set('shY', i, i ? 0.5 : -0.5); set('el', i, 0.75); } break;
+      case 'glass': for (const i of [0, 1]) { set('shX', i, 1.75); set('shZ', i, 0.5); set('el', i, 0.55); } set('lean', null, 0.16); set('headZ', null, 0.22); break;
+      case 'knock': set('shX', 1, 1.55); set('shZ', 1, 0.15); set('el', 1, 1.0 + 0.5 * Math.max(0, Math.sin(age * 14))); break;
+      case 'clap': for (const i of [0, 1]) { set('shX', i, 0.95); set('shY', i, i ? 0.62 + 0.14 * Math.sin(age * 5) : -0.62 - 0.14 * Math.sin(age * 5)); set('el', i, 1.25); } break;
+      case 'usher': set('shX', 1, 1.2); set('shZ', 1, 0.7); set('el', 1, 0.15); break;
+      case 'finger': set('shX', 1, 0.85); set('shY', 1, -0.75); set('el', 1, 2.35); set('headZ', null, 0.12); break;
     }
   }
   // world matrices for all bones
@@ -6765,7 +6794,7 @@ const ACT = (() => {
     if (a.visible === false) return;
     const P = pose(a, t), B = rig(a, P), id = a.id;
     const f = a.face || {};
-    const eyes = (f.eyes === 'closed' || (f.eyes !== 'narrow' && blink(a, t))) ? 'closed' : (f.eyes || 'open');
+    const eyes = (f.eyes === 'closed' || (f.eyes !== 'narrow' && f.eyes !== 'stare' && !a.noBlink && blink(a, t))) ? 'closed' : (f.eyes || 'open');
     buf.emit(personPart(id, 'pelvis'), B.pelvis);
     buf.emit(personPart(id, 'chest'), B.chest);
     buf.emit(personPart(id, 'neck'), B.neck);
@@ -7031,9 +7060,9 @@ const ACT = (() => {
   if (isTouch) document.body.classList.add('touch');
   const debug = /debug/.test(location.search);
   const DIFF = {
-    easy:   { label: 'Easy',   rage: 3.85, behind: 15, spd: 0.88, range: 13, rate: 0.7, grace: 35, map: true },
-    normal: { label: 'Normal', rage: 4.2,  behind: 14, spd: 1.0,  range: 16, rate: 1.0, grace: 28, map: false },
-    hard:   { label: 'Hard',   rage: 4.5,  behind: 12, spd: 1.08, range: 19, rate: 1.3, grace: 20, map: false },
+    easy:   { label: 'Easy',   rage: 3.85, behind: 15, spd: 0.88, range: 13, rate: 0.7, grace: 35, map: true, lose: 11 },
+    normal: { label: 'Normal', rage: 4.2,  behind: 14, spd: 1.0,  range: 16, rate: 1.0, grace: 28, map: false, lose: 13 },
+    hard:   { label: 'Hard',   rage: 4.5,  behind: 12, spd: 1.08, range: 19, rate: 1.3, grace: 20, map: false, lose: 15 },
   };
   const CLUES = [
     { name: 'mitten', col: '#d0342c', text: 'Leo’s mitten. The crying is easier to hear now.' },
@@ -7193,6 +7222,13 @@ const ACT = (() => {
     return out;
   }
   const route = (x0, z0, f0, x1, z1, f1) => makePath(astar(rNode(f0, x0, z0), rNode(f1, x1, z1)));
+  // same, for someone who may be standing part-way up the staircase: they finish the stairs first instead of turning back
+  const onStairs = (y) => y > 0.12 && y < F1 - 0.12;
+  function routeY(x0, z0, y0, x1, z1, f1) {
+    if (!onStairs(y0)) return route(x0, z0, floorOf(y0), x1, z1, f1);
+    const st = LV.stairs[0], end = f1 === 1 ? st.top : st.bottom, p = route(end[0], end[1], f1, x1, z1, f1);
+    return p ? [[x0, z0, floorOf(y0)]].concat(p) : null;
+  }
   function upstairsDist() {
     const dist = new Float64Array(GN * 2).fill(1e9), top = LV.stairs[0].top, s0 = rNode(1, top[0], top[1]);
     const heap = [[0, s0]]; dist[s0] = 0;
@@ -7281,7 +7317,7 @@ const ACT = (() => {
   window.addEventListener('mouseup', () => { dragLook = false; });
   window.addEventListener('mousemove', (e) => { if (playing() && (document.pointerLockElement === canvas || dragLook)) look(e.movementX || 0, e.movementY || 0, 0.0024); });
   document.addEventListener('pointerlockchange', () => {
-    if (document.pointerLockElement !== canvas && playing() && !isTouch && hadLock) pause();
+    if (document.pointerLockElement !== canvas && playing() && !isTouch && hadLock && !(debug && window.__hold)) pause();
     hadLock = document.pointerLockElement === canvas;
   });
   function look(dx, dy, k) { P.yaw += dx * k; P.pitch = clamp(P.pitch - dy * k, -1.35, 1.35); }
@@ -7391,10 +7427,12 @@ const ACT = (() => {
 
   // ---------------- text on screen ----------------
   let msgT = 0, subT = 0, FF = false;
-  function showMsg(t, secs, cls) { $('msg').className = cls || ''; msgT = secs; $('msg').textContent = t; $('msg').style.opacity = 1; }
+  const EV = []; const ev = (k, t) => { if (debug) { EV.push([+NOW.toFixed(1), mode, k, t]); if (EV.length > 5000) EV.shift(); } };
+  function showMsg(t, secs, cls) { ev(cls === 'krampus' ? 'KRAMPUS' : 'msg', t); $('msg').className = cls || ''; msgT = secs; $('msg').textContent = t; $('msg').style.opacity = 1; }
   function say(who, text, dur) {
     dur = dur || Math.max(2.2, text.length * 0.065);
     if (FF) return dur;
+    if (text) ev('say', (who || '—') + ': ' + text);
     $('sub').innerHTML = (who ? `<b>${who}</b>` : '') + `<span class="${who ? '' : 'nar'}">${text}</span>`; $('sub').style.opacity = text ? 1 : 0; subT = dur;
     const a = who && cast[who.toLowerCase()]; if (a) a.talkUntil = NOW + dur * 0.85;
     return dur;
@@ -7486,7 +7524,7 @@ const ACT = (() => {
 
   // ---------------- actors moving ----------------
   function goA(a, pts, speed = 1.3) { a.path = pts.map((p) => [p[0], p[1]]); a.pi = 0; a.speed = speed; a.arrived = false; a.anim = speed > 2.5 ? 'run' : 'walk'; return () => a.arrived; }
-  function goRoute(a, x, z, f, speed = 1.3) { const p = route(a.x, a.z, floorOf(a.y), x, z, f); if (p) return goA(a, p.slice(1).map((q) => [q[0], q[1]]).concat([[x, z]]), speed); return goA(a, [[x, z]], speed); }
+  function goRoute(a, x, z, f, speed = 1.3) { const p = routeY(a.x, a.z, a.y || 0, x, z, f); if (p) return goA(a, p.slice(1).map((q) => [q[0], q[1]]).concat([[x, z]]), speed); return goA(a, [[x, z]], speed); }
   function stepActor(a, dt) {
     if (a.path && a.pi < a.path.length) {
       const [tx, tz] = a.path[a.pi], dx = tx - a.x, dz = tz - a.z, d = Math.hypot(dx, dz);
@@ -7500,7 +7538,7 @@ const ACT = (() => {
   }
   const gest = (a, name, dur) => { a.gest = { name, t0: NOW, dur }; };
   function placeA(a, x, z, yaw, extra) {
-    Object.assign(a, { x, z, yaw, path: null, anim: 'idle', visible: true, gest: null, look: null, faceYaw: null, holdR: null, holdL: null, holdHand: null, face: {}, sitH: null, after: null, arrived: false }, extra || {});
+    Object.assign(a, { x, z, yaw, path: null, anim: 'idle', visible: true, gest: null, look: null, faceYaw: null, holdR: null, holdL: null, holdHand: null, face: {}, sitH: null, after: null, arrived: false, noBlink: false, still: false, owl: false, creep: 0, post: null }, extra || {});
     a.y = extra && extra.y != null ? extra.y : surfaceY(x, z, 0);
   }
   function hideAll() { for (const k in cast) cast[k].visible = false; KV.visible = false; }
@@ -7555,7 +7593,7 @@ const ACT = (() => {
   // ---------------- round setup (hunt) ----------------
   function newRound() {
     const D = DIFF[diffKey];
-    Object.assign(P, { x: 32, y: 0, z: 1.8, yaw: Math.PI, pitch: 0.05, vx: 0, vz: 0, crouch: false, ct: 0, run: false });
+    Object.assign(P, { x: 32, y: 0, z: 3.6, yaw: Math.PI, pitch: 0.05, vx: 0, vz: 0, crouch: false, ct: 0, run: false });
     const up = LV.containers.map((c, i) => i).filter((i) => LV.containers[i].f === 1);
     const broC = up[(Math.random() * up.length) | 0], bc = LV.containers[broC];
     const items = [];
@@ -7566,11 +7604,13 @@ const ACT = (() => {
     for (let i = 0; i < 4; i++) traps[i].on = true;
     K = { x: -50, z: -50, y: -50, yaw: 0, state: 'wait', path: null, pi: 0, t: 0, look: 0, step: 0, stuck: 0, lastP: [0, 0], seeing: false, lastSeen: null, searchLeft: 0, repath: 0, spd: 0, sawT: 99, stun: 0 };
     G = { hearCool: 8, peerCool: 25, peerAt: 0, D, phase: 'grace', t: D.grace, time: 0, huntT: 0, clues: 0, keys: false, items, traps, broC, bro: { state: 'hidden', x: bc.x, z: bc.z, y: bc.y }, trail: [], hiding: null, back: null,
-      alert: 0, noiseT: 0, hunchT: 30, lightT: 70, cryT: 2, doorT: 0, dead: shuffle([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]), reason: '', extraStun: 0 };
+      alert: 0, noiseT: 0, hunchT: 30, lightT: 70, cryT: 2, doorT: 7, lingerT: 0, knockCool: 0, tipT: 5, tips: {}, breathT: 0, sightings: 0, hides: 0, dead: shuffle([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]), reason: '', extraStun: 0 };
     hideAll();
     const fd = LV.doors.front, sd = LV.doors.side;
-    placeA(cast.marcus, fd.ex, fd.ez, 0, { face: { mouth: 'grin', eyes: 'narrow', brows: 'angry' } });
-    placeA(cast.dana, sd.ex, sd.ez, 0, { face: { mouth: 'grin', eyes: 'narrow', brows: 'angry' } });
+    // the staff wait outside, at the glass. More of them come to watch with every clue you find.
+    placeA(cast.marcus, fd.x + 0.7, -0.62, Math.PI); placeA(cast.dana, 64.62, sd.z + 0.25, -Math.PI / 2);
+    placeA(cast.priya, fd.x - 0.9, -0.62, Math.PI); placeA(cast.manager, fd.x - 0.1, -1.7, Math.PI); cast.priya.visible = cast.manager.visible = false;
+    for (const k of STAFF) { const a = cast[k]; setCreep(a, 3); a.face = { mouth: 'grin', eyes: 'stare' }; a.gest = { name: k === 'manager' ? 'fold' : 'glass', t0: NOW }; }
     DOORS.front = DOORS.side = 0; SKY.broken = true; DISPLAY.smashed = true; CAR.visible = true; CAR.lights = false; CAR.inside = false; CAR.x = 36.5; CAR.z = -7.5; CAR.yaw = Math.PI + 0.25;
     for (const l of LV.lights) l.off = false;
     for (let i = 0; i < 16; i++) ZT[i] = Math.min(ZT[i], 0.8);
@@ -7580,6 +7620,7 @@ const ACT = (() => {
   function startHunt() {
     newRound(); mode = 'play'; $('hud').style.display = 'block'; document.body.classList.remove('explore'); lastTime = performance.now(); lock();
     showMsg('It took Leo upstairs. Find him.', 4); jingle(0.3, 0, 8);
+    $('ears').style.display = 'block';
   }
 
   // ---------------- interact ----------------
@@ -7596,7 +7637,7 @@ const ACT = (() => {
     if (G.bro.state === 'hidden' && i === G.broC) return rescue();
     if (G.phase === 'escape') { showMsg('No time to hide. RUN!', 1.5); return; }
     if (K.state === 'chase' && (K.seeing || K.sawT < 1.5)) return caught('He watched you climb into the ' + LV.containers[i].type + '.');
-    G.hiding = i; G.back = [P.x, P.z];
+    G.hiding = i; G.back = [P.x, P.z]; G.hides++;
     P.x = LV.containers[i].x; P.z = LV.containers[i].z; P.vx = P.vz = 0;
     if (G.bro.state === 'hidden') showMsg('Empty. You climb in.', 1.6);
   }
@@ -7626,7 +7667,7 @@ const ACT = (() => {
   }
 
   // ---------------- Krampus (hunt AI) ----------------
-  function goTo(x, z, f) { const p = makePath(astar(rNode(floorOf(K.y), K.x, K.z), rNode(f, x, z))); if (p && p.length) { K.path = p; K.pi = 1; return true; } K.path = null; return false; }
+  function goTo(x, z, f) { const p = routeY(K.x, K.z, K.y, x, z, f); if (p && p.length) { K.path = p; K.pi = 1; return true; } K.path = null; return false; }
   function pickPatrol() {
     const n = (Math.random() < 0.7 && SPOTS.length) ? SPOTS[(Math.random() * SPOTS.length) | 0] : REACH[(Math.random() * REACH.length) | 0];
     const [x, z, f] = nodePos(n); K.state = 'patrol';
@@ -7644,7 +7685,8 @@ const ACT = (() => {
   }
   function canSee() {
     if (G.hiding != null) return 0;
-    const range = (G.D.range + 2 * level()) * (ZL[lightZone(P.x, P.z, floorOf(P.y))] < 0.5 ? 0.7 : 1);
+    let range = (G.D.range + 2 * level()) * (ZL[lightZone(P.x, P.z, floorOf(P.y))] < 0.5 ? 0.7 : 1);
+    if (K.state === 'chase') range = Math.min(range, G.D.lose);   // outrun him by this much and he loses you
     const ex = K.x, ey = K.y + 2.4, ez = K.z, eye = P.y + EYE(), body = P.y + lerp(0.7, 0.3, P.ct);
     const dx = P.x - ex, dz = P.z - ez, dy = eye - ey, d = Math.hypot(dx, dz, dy * 0.6);
     if (d > range) return 0;
@@ -7657,7 +7699,7 @@ const ACT = (() => {
     K.state = fast ? 'rush' : 'investigate';
     if (!goTo(x + (Math.random() - 0.5) * 2, z + (Math.random() - 0.5) * 2, f)) goTo(x, z, f);
   }
-  function hearNoise(x, z, f, radius) { const r = floorOf(K.y) === f ? radius : radius * 0.45; if (Math.hypot(K.x - x, K.z - z) < r) investigate(x, z, f, false); }
+  function hearNoise(x, z, f, radius) { let r = floorOf(K.y) === f ? radius : radius * 0.45; if (K.state === 'look' && K.listen) r *= 1.7; /* standing dead still, bells silent, listening */ if (Math.hypot(K.x - x, K.z - z) < r) investigate(x, z, f, false); }
   // While you hide: he says "I can hear you", and sometimes walks over, bends down and stares into the
   // opening for about half a minute. Hold still and he leaves. Climb out and he has you.
   function startPeer(c) { K.state = 'peer'; K.path = null; K.peerT = 0; K.peerDur = 27 + Math.random() * 6; K.breathT = 0.5; KV.gest = { name: 'peer', t0: NOW }; G.peerLook = 2.4; G.peerCool = 80; showMsg('Don\u2019t move.', 2.6); }
@@ -7694,8 +7736,24 @@ const ACT = (() => {
   }
   let smashT = 0;
   function updateKrampus(dt) {
-    const D = G.D, mult = D.spd * (1 + 0.05 * Math.min(4, level()));
-    if (K.state === 'wait') { KV.visible = false; return; }
+    const D = G.D, mult = D.spd * (1 + 0.04 * Math.min(4, level()));
+    if (K.state === 'wait') {
+      // while you get your bearings he crosses the upstairs with the sack, heading for wherever he will hide Leo
+      const el = D.grace - G.t;
+      if (el > 2 && G.t > 5) {
+        if (!K.carry) { const bc = LV.containers[G.broC]; K.carry = route(31, 30.5, 1, bc.x, bc.z, 1) || [[31, 30.5, 1]]; K.ci = 1; K.x = 31; K.z = 30.5; K.y = F1; K.step = 0; }
+        const bc = LV.containers[G.broC], left = Math.hypot(bc.x - K.x, bc.z - K.z);
+        if (left > 3.2 && K.ci < K.carry.length) {
+          const [tx, tz] = K.carry[K.ci], dx = tx - K.x, dz = tz - K.z, d = Math.hypot(dx, dz), m = Math.min(d, 2.5 * dt);
+          if (d < 0.1) K.ci++; else { K.x += dx / d * m; K.z += dz / d * m; K.yaw = turnTo(K.yaw, Math.atan2(dx, -dz), dt * 6); }
+          const before = K.step; K.step += 2.5 * dt * 0.62;
+          if (Math.floor(before) !== Math.floor(K.step)) { const [v, pan] = hear(K.x, K.z, F1, 34); jingle(v * 0.45, pan, 4); thud(v * 0.45, pan, 300); if (Math.random() < 0.5) sob(v * 0.35, pan); }
+          Object.assign(KV, { x: K.x, y: F1, z: K.z, yaw: K.yaw, visible: true, scale: 1.1, anim: 'walk', phase: K.step * Math.PI * 1.6, sackFull: true, look: null, gest: null });
+          return;
+        }
+      }
+      KV.visible = false; return;
+    }
     if (K.stun > 0) { K.stun -= dt; K.spd = 0; Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle' }); if (!KV.gest) KV.gest = { name: 'roar', t0: NOW, dur: 1.4 }; return; }
     const sameFloor = Math.abs(K.y - P.y) < 1, dP = Math.hypot(P.x - K.x, P.z - K.z);
     if (K.state === 'rage') {
@@ -7710,12 +7768,12 @@ const ACT = (() => {
       K.seeing = !!s; K.sawT = K.seeing ? 0 : K.sawT + dt;
       if (s) {
         const [d, range] = s;
-        let r = d < 2.4 ? 5 : 0.6 + 2.4 * (1 - d / range);
+        let r = d < 2.4 ? 5 : 0.2 + 2.2 * Math.pow(1 - d / range, 1.8);   // slow to notice you far away, quick up close
         if (P.ct > 0.5 && d > 3) r *= 0.5;
         if (Math.hypot(P.vx, P.vz) > 0.5) r *= 1.25;
         G.alert = Math.min(1, G.alert + r * D.rate * dt);
         K.lastSeen = [P.x, P.z, floorOf(P.y)];
-        if (G.alert >= 1 && K.state !== 'chase') { K.state = 'chase'; K.repath = 0; roar(); showMsg('HE SEES YOU!', 1.5); KV.gest = { name: 'roar', t0: NOW, dur: 1.0 }; }
+        if (G.alert >= 1 && K.state !== 'chase') { K.state = 'chase'; K.repath = 0; G.sightings++; roar(); showMsg('HE SEES YOU!', 1.5); KV.gest = { name: 'roar', t0: NOW, dur: 1.0 }; }
         else if (K.state !== 'chase' && G.alert > 0.45 && K.state !== 'rush') investigate(P.x, P.z, floorOf(P.y), true);
       } else if (K.state !== 'chase') G.alert = Math.max(0, G.alert - 0.14 * dt);
       if (K.state === 'chase') {
@@ -7732,6 +7790,9 @@ const ACT = (() => {
           } else pickPatrol();
         }
       }
+      // close behind you and unseen: you hear him breathe
+      G.breathT -= dt;
+      if (G.breathT <= 0 && sameFloor && dP < 6.5 && K.state !== 'chase' && G.hiding == null && !inView(K.x, K.y, K.z, 1.1)) { G.breathT = 3.2 + Math.random() * 2; const [v, pan] = hear(K.x, K.z, K.y, 9); breath(0.12 + v * 0.3, pan); }
       G.hunchT -= dt;
       if (G.hunchT <= 0) {
         G.hunchT = 42 - 6 * level();
@@ -7740,8 +7801,8 @@ const ACT = (() => {
     }
     const moving = K.path && K.pi < K.path.length && K.state !== 'look' && K.state !== 'search';
     if (moving) {
-      const base = { peerwalk: 1.35, chase: 4.1, rush: 3.3, investigate: 2.7, searchwalk: 2.4, patrol: 1.75 }[K.state] || 1.75;
-      const spd = K.state === 'rage' ? D.rage : base * mult;
+      const base = { peerwalk: 1.35, chase: 3.9, rush: 3.2, investigate: 2.7, searchwalk: 2.4, patrol: 1.75 }[K.state] || 1.75;
+      const spd = K.state === 'rage' ? D.rage * (K.y > 0.15 && K.y < F1 - 0.15 ? 0.5 : 1) : base * mult;   // he is too big for the staircase
       let left = spd * dt;
       while (left > 0 && K.pi < K.path.length) {
         const [tx, tz] = K.path[K.pi], ddx = tx - K.x, ddz = tz - K.z, dist = Math.hypot(ddx, ddz);
@@ -7759,7 +7820,7 @@ const ACT = (() => {
       K.stuck += dt;
       if (K.stuck > 2.5) { if (Math.hypot(K.x - K.lastP[0], K.z - K.lastP[1]) < 0.6) { if (K.state === 'chase' || K.state === 'rage') K.repath = 0; else pickPatrol(); } K.stuck = 0; K.lastP = [K.x, K.z]; }
       if (K.pi >= K.path.length) {
-        if (K.state === 'patrol') { K.state = 'look'; K.t = 1.2 + Math.random() * 1.6; K.look = K.yaw; }
+        if (K.state === 'patrol') { K.state = 'look'; K.listen = Math.random() < 0.28; K.t = K.listen ? 5 + Math.random() * 3 : 1.2 + Math.random() * 1.6; K.look = K.yaw; }
         else if (K.state === 'investigate' || K.state === 'rush') { K.state = 'search'; K.t = 2.2; K.look = K.yaw; K.searchLeft = 1; K.lastSeen = [K.x, K.z, floorOf(K.y)]; }
         else if (K.state === 'searchwalk') { K.state = 'search'; K.t = 2; K.look = K.yaw; }
       }
@@ -7821,6 +7882,18 @@ const ACT = (() => {
   function updateBrother(dt) {
     const b = G.bro, L = cast.leo;
     if (b.state !== 'follow') { G.cryT -= dt; if (G.cryT <= 0 && G.phase !== 'grace') { G.cryT = 2.3 + Math.random() * 1.2; const [v, pan] = hear(b.x, b.z, b.y, 14 + 6 * G.clues); sob(v * 0.6, pan); } return; }
+    // once, at the bottom of the stairs, he goes down. He gets up when you come back for him.
+    b.maxY = Math.max(b.maxY || 0, b.y);
+    if (!b.tripped && b.maxY > 2 && b.y < 0.02 && G.phase === 'escape') {
+      b.tripped = true; b.down = 0.001; yelp(0.2); thud(0.4, 0, 500); L.anim = 'crouch'; L.face = { eyes: 'closed', mouth: 'open', brows: 'sad' };
+      showMsg('Leo fell! Go back for him!', 2.6); later(0.5, () => sob(0.5, 0));
+    }
+    if (b.down) {
+      b.down += dt; Object.assign(L, { x: b.x, y: b.y, z: b.z, visible: true, anim: 'crouch' });
+      const dl = Math.hypot(P.x - b.x, P.z - b.z);
+      if ((b.down > 0.9 && dl < 1.7) || b.down > 3.6) { const helped = dl < 1.7; b.down = null; G.trail = [[P.x, P.z, P.y]]; L.face = { eyes: 'wide', mouth: 'o', brows: 'sad' }; showMsg(helped ? 'You’ve got him. RUN!' : 'He’s up. RUN!', 1.6); tone(660, 0.12, 0.15, 'triangle'); }
+      return;
+    }
     const tr = G.trail, last = tr[tr.length - 1];
     if (!last || Math.hypot(P.x - last[0], P.z - last[1]) > 0.4) tr.push([P.x, P.z, P.y]);
     let left = 5.8 * dt, moved = 0;
@@ -7835,6 +7908,36 @@ const ACT = (() => {
   }
   function killLights(n) { let did = false; for (let i = 0; i < n && G.dead.length; i++) { ZT[G.dead.pop()] = 0.12; did = true; } if (did) { thud(0.5, 0, 300); tone(140, 0.25, 0.2, 'square', 0, -80); } }
 
+  // ---------------- the staff get stranger ----------------
+  // 0 tired retail · 1 the smile comes back · 2 it stays, and they stop blinking · 3 heads follow you further than heads should
+  const STAFF = ['dana', 'marcus', 'priya', 'manager'];
+  const CREEP = [{ face: {} }, { face: { mouth: 'smile' } }, { face: { mouth: 'smile', eyes: 'wide' }, noBlink: true, still: true }, { face: { mouth: 'wide', eyes: 'stare' }, noBlink: true, still: true, owl: true }];
+  function setCreep(a, n) { const c = CREEP[n]; a.creep = n; a.face = Object.assign({}, c.face); a.noBlink = !!c.noBlink; a.still = !!c.still; a.owl = !!c.owl; }
+  // can the player see this point right now? (in front of them, and nothing in the way)
+  function inView(x, y, z, half = 1.0) {
+    const dx = x - P.x, dz = z - P.z, d = Math.hypot(dx, dz); if (d < 0.6) return true;
+    if (d > 45 || (dx * Math.sin(P.yaw) - dz * Math.cos(P.yaw)) / d < Math.cos(half)) return false;
+    return WORLD.clear(P.x, P.y + 1.25, P.z, x, y + 1.5, z);
+  }
+  const eyeOfP = () => [P.x, P.y + 1.25, P.z];
+  // a spot on the player's floor, a little way off, with a clear line to them — out of view if we can manage it
+  function watchSpot(minD, maxD, wantHidden) {
+    const f = floorOf(P.y); let best = null, bs = -1e9;
+    for (let i = 0; i < 90; i++) {
+      const n = REACH[(Math.random() * REACH.length) | 0], [x, z, nf] = nodePos(n); if (nf !== f) continue;
+      const d = Math.hypot(x - P.x, z - P.z); if (d < minD || d > maxD) continue;
+      if (cover[n] > 22 || LV.ramps.some((r) => x > r.x0 - 1 && x < r.x1 + 1 && z > r.z0 - 1 && z < r.z1 + 1)) continue;
+      if (!WORLD.clear(P.x, P.y + 1.25, P.z, x, (f ? F1 : 0) + 1.5, z)) continue;
+      const seen = inView(x, f ? F1 : 0, z); if (wantHidden && seen) continue;
+      const sc = -Math.abs(d - (minD + maxD) / 2) + Math.random() * 2; if (sc > bs) { bs = sc; best = [x, z, f]; }
+    }
+    return best;
+  }
+  function hum(a, vol) { // a slow, low Jingle Bells, one note at a time
+    a.humI = (a.humI || 0) + 1; const [n] = MEL[a.humI % MEL.length], [v, pan] = hear(a.x, a.z, a.y || 0, 11);
+    if (v > 0.02) { tone(440 * Math.pow(2, (n - 69 - 12) / 12) * 0.985, 0.75, v * vol, 'sine', 0, -3, pan); tone(440 * Math.pow(2, (n - 69 - 12) / 12) * 1.5, 0.5, v * vol * 0.12, 'sine', 0, 0, pan); }
+  }
+
   // ---------------- the walk-around with Leo ----------------
   let EX = null;
   const timers = [];
@@ -7845,7 +7948,7 @@ const ACT = (() => {
     Object.assign(P, { x: 30.8, y: 0, z: 9.2, yaw: Math.PI * 0.95, pitch: 0, vx: 0, vz: 0, crouch: false, ct: 0 });
     for (let i = 0; i < 16; i++) ZL[i] = ZT[i] = 1;
     G = null; K = null;
-    EX = { t: 0, leo: { mode: 'follow', repath: 0, path: null, pi: 0, said: new Set(), hideIdx: -1, gigT: 0, hideT: 0, count: 0 }, events: new Set(), stage: 'explore', barkT: 8, hs: 0 };
+    EX = { t: 0, leo: { mode: 'follow', repath: 0, path: null, pi: 0, said: new Set(), hideIdx: -1, gigT: 0, hideT: 0, count: 0 }, events: new Set(), stage: 'explore', barkT: 8, hs: 0, found: 0, act: 0, stalkT: 0, humT: 0, seenT: 0, fast: false };
     const L = cast.leo; placeA(L, P.x + 0.6, P.z + 0.3, P.yaw, { holdHand: 0, face: { mouth: 'smile' } });
     placeA(cast.dad, 46, 3.85, Math.PI, { anim: 'sit', sitH: 0.5 });
     placeA(cast.marcus, 48.6, 7.4, -0.6, { gest: { name: 'cross', t0: 0 } });
@@ -7855,66 +7958,123 @@ const ACT = (() => {
     placeA(cast.manager, 27.2, 9.2, Math.PI * 0.85, {});
     storeClock = 9 * 60 + 3; DOORS.front = 0; DOORS.side = 0; SKY.broken = false; DISPLAY.smashed = false; CAR.x = 36.5; CAR.z = -7.5; CAR.yaw = Math.PI + 0.25; CAR.lights = false; CAR.visible = true; CAR.inside = false;
     for (const l of LV.lights) l.off = false;
-    mode = 'explore'; document.body.classList.add('explore'); $('hud').style.display = 'block'; lastTime = performance.now(); lock();
+    mode = 'explore'; document.body.classList.add('explore'); $('hud').style.display = 'block'; $('ears').style.display = 'none'; lastTime = performance.now(); lock();
     music.on = true; music.vol = 0.05; music.warp = 1; ambDim = 1;
-    showMsg('Explore the store with Leo', 3.5);
-    say('LEO', 'Hold my hand! Don’t let go!', 2.5);
+    showMsg('Show Leo around the store', 3.5);
+    say('LEO', 'Hold my hand! Don’t let go! I want to see EVERYTHING.', 3);
   }
+  const LIST = [['the big tree', 0], ['the beds', 1], ['the giant pots', 2], ['the rug wall', 3], ['the lamps', 4]];   // index into LV.leoSpots
+  const listDone = () => LIST.filter(([, i]) => EX.leo.said.has(LV.leoSpots[i][4])).length;
   const SOFAS = [[46, 3.85, Math.PI], [53.2, 3.85, Math.PI], [49.5, 11.85, 0], [58, 11.85, 0], [60, 3.85, Math.PI]];
   const MOMSPOTS = [[34.3, 33.3, -Math.PI / 2], [36.9, 35.2, Math.PI / 2], [29.1, 33.4, -Math.PI / 2], [56, 38.5, 0], [42, 31.4, 0], [34.3, 35.5, -Math.PI / 2]];
+  const POSTS = { dana: [30.8, 2.2, Math.PI], manager: [27.2, 9.2, Math.PI * 0.85], marcus: [41.4, 9.4, -0.6], priya: [36.4, 31.2, -1.2] };
+  const ACT_AT = [0, 150, 285, 410];   // seconds into the walk-around when each act starts
   function npcSchedule(dt) {
     const e = EX, t = e.t;
     const once = (k, cond, fn) => { if (!e.events.has(k) && cond) { e.events.add(k); fn(); } };
     const near = (a, r) => a.visible && Math.hypot(a.x - P.x, a.z - P.z) < r && floorOf(a.y) === floorOf(P.y);
-    const dad = cast.dad, mar = cast.marcus, mom = cast.mom, pri = cast.priya;
+    const dad = cast.dad, mar = cast.marcus, mom = cast.mom, pri = cast.priya, man = cast.manager, dan = cast.dana;
+    const live = () => EX === e && e.stage === 'explore';
     if (e.stage === 'explore') {
+      const act = t >= ACT_AT[3] ? 3 : t >= ACT_AT[2] ? 2 : t >= ACT_AT[1] ? 1 : 0;
+      if (act !== e.act) { e.act = act; e.stalkT = 4; }
+      // each of them changes while you are not looking at them
+      for (const k of STAFF) { const a = cast[k]; if ((a.creep || 0) < act && (Math.hypot(a.x - P.x, a.z - P.z) > 14 || !inView(a.x, a.y || 0, a.z))) { setCreep(a, act); if (act >= 1 && !a.path) { a.gest = { name: 'fold', t0: NOW }; a.holdR = k === 'dana' ? 'keys' : null; } } }
+      // Dad tries every sofa and Mom moves every plate, start to finish. They never notice a thing.
       if (!dad.path && t > (e.dadNext || 50)) {
         e.dadI = ((e.dadI || 0) + 1) % SOFAS.length; const [sx, sz, sy] = SOFAS[e.dadI];
         dad.anim = 'idle'; dad.sitH = null; goRoute(dad, sx, sz + (sy ? 1.0 : -1.0), 0); dad.path.push([sx, sz]); dad.after = 'sit'; dad.faceYaw = sy; dad.sitH = 0.5;
         e.dadNext = t + 55 + Math.random() * 30;
         const prev = SOFAS[(e.dadI + SOFAS.length - 1) % SOFAS.length];
-        later(2.5, () => { if (EX === e && e.stage === 'explore') { goRoute(mar, prev[0] + 0.2, prev[1] + (prev[2] ? 1.2 : -1.2), 0, 1.1); later(5, () => gest(mar, 'fluff', 3)); } });
+        if (act === 0) later(2.5, () => { if (live() && e.act === 0) { goRoute(mar, prev[0] + 0.2, prev[1] + (prev[2] ? 1.2 : -1.2), 0, 1.1); later(5, () => { if (e.act === 0) gest(mar, 'fluff', 3); }); } });
       }
       if (!mom.path && t > (e.momNext || 35)) {
         e.momI = ((e.momI || 0) + 1) % MOMSPOTS.length; const [mx, mz, my] = MOMSPOTS[e.momI];
         goRoute(mom, mx, mz, 0); mom.faceYaw = my; mom.gest = null; mom.holdR = null; mom.browsing = true;
         e.momNext = t + 40 + Math.random() * 25;
-        later(3.5, () => { if (EX === e && e.stage === 'explore') { goRoute(pri, mx + 1.6, mz - 1.2, 0, 1.0); later(6, () => gest(pri, 'sigh', 2.5)); } });
+        if (act === 0) later(3.5, () => { if (live() && e.act === 0) { goRoute(pri, mx + 1.6, mz - 1.2, 0, 1.0); later(6, () => { if (e.act === 0) gest(pri, 'sigh', 2.5); }); } });
       }
       if (mom.arrived && mom.browsing) { mom.browsing = false; mom.holdR = Math.random() < 0.6 ? 'plate' : 'pillow'; gest(mom, mom.holdR === 'plate' ? 'hold2' : 'hold', 8); }
+      // ---- act 1 on: they stop tidying up after your parents and start watching you ----
+      const gathered = e.events.has('gather');
+      if (act >= 1 && !gathered) {
+        once('posts', true, () => { for (const k of ['marcus', 'priya']) { const [x, z, y] = POSTS[k]; goRoute(cast[k], x, z, 0, 1.0); cast[k].faceYaw = y; cast[k].gest = { name: 'fold', t0: NOW }; } man.gest = { name: 'fold', t0: NOW }; });
+        for (const k of STAFF) { const a = cast[k]; if (a.path) { a.look = null; continue; } const d = Math.hypot(a.x - P.x, a.z - P.z); a.look = d < (act >= 2 ? 40 : 14) && (act >= 3 || floorOf(a.y) === floorOf(P.y)) ? eyeOfP() : null; }
+      }
+      // ---- act 2 on: one of them is always somewhere you can see, a little closer each time you look away ----
+      if (act >= 2 && !gathered) {
+        e.stalkT -= dt;
+        const st = pri, f = floorOf(P.y), fy = f ? F1 : 0;
+        const vis = st.visible && floorOf(st.y) === f && inView(st.x, st.y, st.z, 0.9), dS = Math.hypot(st.x - P.x, st.z - P.z);
+        if (vis) { e.seenT += dt; e.unseenT = 0; } else e.unseenT = (e.unseenT || 0) + dt;
+        if (e.leo.mode === 'hidden' && e.leo.hideIdx >= 0 && !e.leo.pointed) {
+          const c = LV.containers[e.leo.hideIdx], px = c.x + (c.x > 6 ? -1.0 : 1.0), pz = c.z + 0.35;
+          if (c.f === f && !inView(px, c.y, pz) && Math.hypot(px - P.x, pz - P.z) > 5) {
+            st.path = null; st.x = px; st.z = pz; st.y = c.y; st.yaw = st.faceYaw = Math.atan2(c.x - px, -(c.z - pz)); st.anim = 'idle'; st.gest = { name: 'point', t0: NOW }; st.look = eyeOfP(); e.leo.pointed = true; e.stalkT = 30;
+          }
+        } else if (e.stalkT <= 0 && !vis && e.unseenT > 1.2 && e.leo.mode !== 'counting') {
+          const wasSeen = e.seenT > 0.8, lim = act >= 3 ? [5, 9] : [9, 15];
+          const spot = watchSpot(wasSeen ? Math.max(lim[0], Math.min(dS - 3, lim[1] - 3)) : lim[0] + 2, wasSeen ? Math.max(lim[0] + 2, Math.min(dS, lim[1])) : lim[1], true);
+          if (spot) {
+            st.path = null; st.x = spot[0]; st.z = spot[1]; st.y = fy; st.yaw = Math.atan2(P.x - st.x, -(P.z - st.z)); st.faceYaw = st.yaw; st.anim = 'idle'; st.gest = { name: act >= 3 ? 'tiltHead' : 'fold', t0: NOW }; st.look = eyeOfP();
+            e.stalkT = (act >= 3 ? 9 : 16) + Math.random() * 8; e.seenT = 0; e.moves = (e.moves || 0) + 1;
+            if (e.moves === 2) later(2.5, () => { if (live() && subT <= 0) say('LEO', 'That lady was over THERE a second ago.', 3); });
+          } else e.stalkT = 2;
+        }
+        // Marcus waits wherever the stairs will bring you out
+        if (!mar.path && e.leo.mode !== 'counting') { const want = f ? [27.6, 28.9, 0] : [27.4, 10.6, F1]; if ((Math.abs(mar.x - want[0]) > 0.5 || Math.abs((mar.y || 0) - want[2]) > 1) && !inView(mar.x, mar.y || 0, mar.z) && !inView(want[0], want[2], want[1])) { mar.x = want[0]; mar.z = want[1]; mar.y = want[2]; mar.yaw = mar.faceYaw = Math.atan2(25.2 - mar.x, -((f ? 26.5 : 11.5) - mar.z)); mar.gest = { name: 'fold', t0: NOW }; } }
+        if (dS < 3.2 && floorOf(st.y) === f) once('help' + act, subT <= 0, () => say('PRIYA', act >= 3 ? 'You can stay as long as you like.' : 'Can I help you find something?', 3));
+      }
+      if (act >= 3) {
+        e.humT -= dt; if (e.humT <= 0) { e.humT = 0.62; for (const k of STAFF) hum(cast[k], 0.2); }
+        music.warp = lerp(music.warp, 0.86, dt * 0.2); ambDim = lerp(ambDim, 0.8, dt * 0.2);
+        if (Math.random() < dt * 0.25) man.look = [32, 9, 20];
+      } else if (act === 2) { music.warp = lerp(music.warp, 0.955, dt * 0.2); ambDim = lerp(ambDim, 0.9, dt * 0.2); }
+      // ---- things people say when you walk by ----
       e.barkT -= dt;
       if (e.barkT <= 0) {
         const lines = [];
-        if (near(dad, 6)) lines.push(['DAD', 'Ooh. Feel this one. Performance velvet.'], ['DAD', 'Hey! Do you guys have this in the back?'], ['DAD', 'Five more minutes, buddy.']);
-        if (near(mom, 6)) lines.push(['MOM', 'We’re just browsing!'], ['MOM', 'Hmm. I wonder if this comes in sage.'], ['MOM', 'Stay where I can see you two.']);
-        if (near(cast.manager, 5)) lines.push(['MANAGER', 'Lovely night for it.'], ['MANAGER', 'Take your time. We’re not going anywhere.']);
-        if (near(cast.dana, 5)) lines.push(['DANA', '(sigh)'], ['DANA', 'We’re closed. Just so you know.']);
-        if (near(pri, 5)) lines.push(['PRIYA', '(muttering) It goes on the OTHER shelf…']);
-        if (lines.length && subT <= 0) { const [w, l] = lines[(Math.random() * lines.length) | 0]; say(w, l, 2.8); e.barkT = 14 + Math.random() * 10; } else e.barkT = 3;
+        if (near(dad, 6)) lines.push(['DAD', 'Ooh. Feel this one. Performance velvet.'], ['DAD', 'Hey! Do you guys have this in the back?'], ['DAD', 'Five more minutes, buddy.'], ['DAD', 'Everyone here is SO nice.']);
+        if (near(mom, 6)) lines.push(['MOM', 'We’re just browsing!'], ['MOM', 'Hmm. I wonder if this comes in sage.'], ['MOM', 'Stay where I can see you two.'], ['MOM', 'Such friendly staff tonight.']);
+        const B = [
+          { manager: ['Lovely night for it.', 'We close at nine. Sharp.'], dana: ['(sigh)', 'We’re closed. Just so you know.'], priya: ['(muttering) It goes on the OTHER shelf…'], marcus: ['It’s nine-oh-six.', '(under his breath) Performance velvet.'] },
+          { manager: ['Take your time.', 'No rush. None at all.'], dana: ['Hi again!', 'Still here! Wonderful.'], priya: ['Finding everything okay?'], marcus: ['Take all the time you need.'] },
+          { manager: ['We love it when families stay.', 'It’s nearly time.'], dana: ['The doors are locked. For your safety.', 'Hi again. Hi again.'], priya: ['Such a small one. He would fit anywhere.'], marcus: ['Don’t go far, now.'] },
+          { manager: ['He likes it when they stay late.', 'Listen. Do you hear them yet?'], dana: ['Nobody leaves early.', 'Hi again.'], priya: ['He would fit in a sack.'], marcus: ['Not long now.'] },
+        ][act];
+        for (const k of STAFF) if (near(cast[k], 5) && !cast[k].path) for (const l of B[k]) lines.push([k.toUpperCase(), l]);
+        if (lines.length && subT <= 0) { const [w, l] = lines[(Math.random() * lines.length) | 0]; say(w, l, 2.8); e.barkT = (act >= 2 ? 9 : 14) + Math.random() * 9; } else e.barkT = 3;
       }
-      once('lamp', t > 150 && near(dad, 16) && dad.anim === 'sit', () => {
+      once('lamp', t > 100 && act === 0 && near(dad, 16) && dad.anim === 'sit', () => {
         const lamp = LV.lights.filter((l) => l.zone === lightZone(dad.x, dad.z, 0) && l.r > 3 && l.r < 3.5 && Math.hypot(l.x - dad.x, l.z - dad.z) < 3.5)[0];
         goRoute(mar, dad.x + 1.6, dad.z + (dad.faceYaw ? 1.1 : -1.1), 0, 1.2); mar.face = { eyes: 'narrow' };
         later(4, () => { if (lamp) lamp.off = true; tone(900, 0.03, 0.15, 'square'); gest(mar, 'reach', 0.8); });
         later(5.2, () => say('DAD', 'Oh, it’s so cozy in here now.', 3));
-        later(9, () => { mar.face = {}; });
+        later(9, () => { if (!mar.creep) mar.face = {}; });
       });
-      if (Math.random() < dt * 0.05) gest(cast.manager, 'lookUp', 2.5);
+      // Leo notices before you do
+      const leoSay = (k, cond, line, dur) => once(k, cond && subT <= 0 && e.leo.mode === 'follow', () => say('LEO', line, dur || 3));
+      leoSay('n1', act >= 1 && t > ACT_AT[1] + 25 && STAFF.some((k) => near(cast[k], 9)), 'Why is everybody smiling now? They were grumpy before.');
+      leoSay('n2', act >= 2 && t > ACT_AT[2] + 20 && STAFF.some((k) => near(cast[k], 12) && inView(cast[k].x, cast[k].y || 0, cast[k].z)), 'He hasn’t blinked. I’ve been counting.');
+      leoSay('n3', act >= 3 && t > ACT_AT[3] + 12, 'They’re all humming the same song.');
+      leoSay('n4', act >= 3 && t > ACT_AT[3] + 45, 'I don’t like it here anymore.');
+      if (act === 0 && Math.random() < dt * 0.05) gest(man, 'lookUp', 2.5);
     }
-    once('bells1', t > 430, () => { jingle(0.05, -0.8, 3); later(0.9, () => say('LEO', 'Did you hear bells?', 2.4)); });
+    once('bells1', t > 470, () => { jingle(0.05, -0.8, 3); later(0.9, () => say('LEO', 'Did you hear bells?', 2.4)); });
     once('gather', t > 545, () => gatherGroup(false));
     once('hungry', t > EXPLORE_SECS, () => {
       e.stage = 'return'; if (!e.events.has('gather')) { e.events.add('gather'); gatherGroup(false); }
       if (e.leo.mode === 'hidden' || e.leo.mode === 'counting') popLeo(true);
-      say('LEO', 'I’m hungry. Can we go find Mom?', 3);
-      later(3.6, () => { if (EX !== e) return; e.leo.mode = 'lead'; say('LEO', floorOf(P.y) === 0 ? 'Wait! One more look from up top! Come on!' : 'I can see the big tree from the lamps! Come on!', 3); showMsg('Follow Leo to the balcony', 4); });
+      say('LEO', 'I want Mom. Can we go find Mom?', 3);
+      later(3.6, () => { if (EX !== e) return; e.leo.mode = 'lead'; say('LEO', floorOf(P.y) === 0 ? 'Wait. I can see everything from up top! Come on!' : 'I can see the big tree from the railing! Come on!', 3); showMsg('Follow Leo to the balcony railing', 4); });
     });
   }
   const GROUP = { manager: [32.5, 12.9, Math.PI], dad: [31.8, 14.4, 0], mom: [33.2, 14.4, 0], dana: [30.6, 13.5, 1.0], marcus: [34.4, 13.6, -1.0], priya: [32.5, 15.8, Math.PI] };
   function gatherGroup(instant) {
     for (const [k, [x, z, y]] of Object.entries(GROUP)) {
-      const a = cast[k]; a.gest = null; a.holdR = null; a.holdL = null; a.after = null; a.browsing = false;
-      if (instant) placeA(a, x, z, y); else { a.sitH = null; a.anim = 'idle'; goRoute(a, x, z, 0, 1.4); a.faceYaw = y; }
+      const a = cast[k]; a.gest = null; a.holdR = null; a.holdL = null; a.after = null; a.browsing = false; a.look = null;
+      if (instant) placeA(a, x, z, y); else { a.sitH = null; a.anim = 'idle'; goRoute(a, x, z, 0, STAFF.includes(k) ? 2.0 : 1.4); a.faceYaw = y; }
+      if (STAFF.includes(k)) { setCreep(a, 3); a.gest = { name: 'fold', t0: NOW }; }
     }
   }
   function leoUpdate(dt) {
@@ -7930,7 +8090,7 @@ const ACT = (() => {
     const d = Math.hypot(tx - L.x, tz - L.z) + (floorOf(L.y) !== tf ? 6 : 0);
     s.repath -= dt;
     if (d > 2.2 || floorOf(L.y) !== tf) {
-      if (s.repath <= 0 || !s.path) { s.repath = 0.6; const p = route(L.x, L.z, floorOf(L.y), tx, tz, tf); s.path = p ? p.slice(1) : null; s.pi = 0; }
+      if (s.repath <= 0 || !s.path) { s.repath = 0.6; const p = routeY(L.x, L.z, L.y || 0, tx, tz, tf); s.path = p ? p.slice(1) : null; s.pi = 0; }
       if (s.path && s.pi < s.path.length) {
         const [px, pz] = s.path[s.pi], dx = px - L.x, dz = pz - L.z, dd = Math.hypot(dx, dz);
         const sp = s.mode === 'lead' ? 3.4 : Math.min(5.2, 1.5 + d * 1.2);
@@ -7945,7 +8105,7 @@ const ACT = (() => {
     }
     L.y = surfaceY(L.x, L.z, L.y);
     L.holdHand = s.mode !== 'lead' && Math.hypot(L.x - P.x, L.z - P.z) < 1.0 ? 0 : null;
-    for (const [f, x, z, r, line] of LV.leoSpots) if (!s.said.has(line) && floorOf(P.y) === f && Math.hypot(P.x - x, P.z - z) < r && subT <= 0) { s.said.add(line); say('LEO', line, 2.8); break; }
+    if (EX.stage === 'explore') for (const [f, x, z, r, line] of LV.leoSpots) if (!s.said.has(line) && floorOf(P.y) === f && Math.hypot(P.x - x, P.z - z) < r && subT <= 0) { s.said.add(line); say('LEO', line, 2.8); break; }
     if (EX.stage === 'explore' && ((EX.t > 70 && EX.hs === 0) || (EX.t > 330 && EX.hs === 1)) && subT <= 0) startHideSeek();
   }
   function startHideSeek() {
@@ -7966,21 +8126,25 @@ const ACT = (() => {
     const s = EX.leo, c = LV.containers[s.hideIdx], L = cast.leo;
     if (!c) { s.mode = 'follow'; return; }
     placeA(L, c.x + 0.7, c.z, 0, { y: c.y, face: { mouth: 'smile' } }); L.yaw = Math.atan2(P.x - L.x, -(P.z - L.z));
-    s.mode = 'follow'; s.hideIdx = -1; giggle(0.3, 0); $('peek').style.opacity = 0;
-    say('LEO', found ? (EX.hs === 1 ? 'You found me! Again! Again!' : 'Okay okay, you’re good at this.') : 'I win! You didn’t even look in the pots!', 2.8);
+    s.mode = 'follow'; s.hideIdx = -1; giggle(0.3, 0); $('peek').style.opacity = 0; if (found) EX.found++;
+    if (found && s.pointed) { say('LEO', 'How did you find me so fast?!', 2.4); const e = EX; later(2.6, () => { if (EX === e) say('', 'She was pointing at it. She is still pointing at it.', 3.4); }); }
+    else say('LEO', found ? (EX.hs === 1 ? 'You found me! Again! Again!' : 'Okay okay, you’re good at this.') : 'I win! You didn’t even look in the pots!', 2.8);
+    s.pointed = false;
   }
   function exploreInteract() {
     const s = EX.leo;
     if (s.mode === 'hidden') { const i = nearContainer(); if (i === s.hideIdx) return popLeo(true); if (i >= 0) showMsg('Not in here.', 1.2); }
   }
   function updateExplore(dt) {
-    EX.t += dt; storeClock = 9 * 60 + 3 + Math.min(EX.t, EXPLORE_SECS + 60) / 60;
+    // once Leo has seen everything on his list and played a round, the evening moves along faster
+    if (EX.stage === 'explore' && !EX.fast && EX.t > 120 && EX.t < 500 && listDone() >= LIST.length && EX.found >= 1) { EX.fast = true; showMsg('Leo has seen it all. It’s getting late.', 3.5); }
+    EX.t += dt * (EX.fast && EX.t < 540 && EX.leo.mode === 'follow' ? 3 : 1); storeClock = 9 * 60 + 3 + Math.min(EX.t, EXPLORE_SECS + 60) / 60;
     runTimers();
     if (EX.leo.mode !== 'counting') movePlayer(dt); else { P.vx = P.vz = 0; }
     npcSchedule(dt); leoUpdate(dt);
     for (const k in cast) if (k !== 'leo') stepActor(cast[k], dt);
-    if (EX.stage === 'return' && floorOf(P.y) === 1 && P.x > 39.6 && P.x < 43 && P.z > 12.5 && P.z < 24 && !EX.balcony) { EX.balcony = true; runScene(sceneBalcony, afterBalcony); }
-    if (EX.stage === 'down' && P.y < 1.6 && P.z > 19 && P.x < 28) { EX.stage = 'crash'; runScene(sceneCrash, () => runScene(sceneDoors, startHunt)); }
+    if (EX.stage === 'return' && floorOf(P.y) === 1 && P.x > 39.6 && P.x < 43 && P.z > 12.5 && P.z < 24 && !EX.balcony) { EX.balcony = true; runScene(sceneBalcony, afterBalcony); return; }
+    if (EX.stage === 'down' && P.y < 1.6 && P.z > 19 && P.x < 28) { EX.stage = 'crash'; runScene(sceneCrash, () => runScene(sceneDoors, startHunt)); return; }
     updateHUD(dt);
   }
   function afterBalcony() {
@@ -7994,16 +8158,24 @@ const ACT = (() => {
   function updateHUD(dt) {
     if (msgT > 0) { msgT -= dt; if (msgT <= 0) $('msg').style.opacity = 0; }
     const ph = $('phase');
+    if (mode !== 'explore' && !G) return;
     if (mode === 'explore') {
       ph.textContent = EX.stage === 'explore' ? 'EXPLORE WITH LEO' : EX.stage === 'return' ? 'GO FIND MOM' : 'GO DOWNSTAIRS';
       ph.className = 'hide'; $('timer').textContent = clockStr(storeClock);
+      $('list').style.display = EX.stage === 'explore' ? 'block' : 'none';
+      if (EX.stage === 'explore') $('list').innerHTML = '<b>Leo wants to see</b>' + LIST.map(([n, i]) => `<span class="${EX.leo.said.has(LV.leoSpots[i][4]) ? 'ok' : ''}">${n}</span>`).join('') + `<span class="${EX.found >= 1 ? 'ok' : ''}">play hide-and-seek</span>`;
       const s = EX.leo; $('obj').innerHTML = s.mode === 'hidden' ? 'Leo is hiding. Listen for the giggling.' : s.mode === 'counting' ? 'Counting…' : s.mode === 'lead' ? 'Follow Leo upstairs' : cast.leo.holdHand === 0 ? 'Holding Leo’s hand' : 'Leo is with you';
       $('alert').style.opacity = 0; $('vignette').style.opacity = 0; $('hidefx').style.opacity = 0;
     } else {
+      $('list').style.display = 'none';
       ph.textContent = G.phase === 'grace' ? 'IT IS HIDING LEO' : G.phase === 'hunt' ? 'FIND LEO' : 'RUN TO THE FRONT DOORS';
       ph.className = G.phase === 'escape' ? 'run' : G.phase === 'grace' ? 'hide' : 'seek';
       $('timer').textContent = G.phase === 'grace' ? fmt(G.t + 1) : fmt(G.time);
-      $('obj').innerHTML = `Clues <b>${G.clues}/3</b> · Keys <b>${G.keys ? '✓' : '✗'}</b> · Leo <b>${G.bro.state === 'follow' ? 'with you' : 'missing'}</b>`;
+      $('obj').innerHTML = `Leo’s things <b>${G.clues}/3</b> · Keys <b>${G.keys ? '✓' : '✗'}</b> · Leo <b>${G.bro.state === 'follow' ? 'with you' : 'missing'}</b>`;
+      { const bc = LV.containers[G.broC];
+        $('goal').textContent = G.phase === 'escape' ? (G.keys ? 'Front doors. Don’t let go of Leo.' : 'Keys first — behind a register — then the front doors!')
+          : G.clues >= 3 ? 'He’s in the ' + zoneName(bc.x, bc.z, bc.y) + (G.keys ? '. Check the pots and hampers.' : '. Grab the keys from a register too.')
+          : G.clues >= 1 ? 'Find the rest of Leo’s things. Follow the crying.' : 'Find Leo’s things. Listen for the crying.'; }
       const a = G.phase === 'escape' ? 1 : G.alert;
       $('alertFill').style.width = Math.round(a * 100) + '%'; $('alert').style.opacity = a > 0.02 ? 1 : 0.25;
       $('vignette').style.opacity = G.phase === 'escape' ? 0.35 : clamp(a * 1.1, 0, 0.85);
@@ -8026,6 +8198,7 @@ const ACT = (() => {
       const sx = (x) => x * MAP_S, sz = (z) => (LV.depth - z) * MAP_S;
       if (mode === 'play' && (G.D.map || debug) && KV.visible && floorOf(K.y) === f) { mg.fillStyle = '#7a1010'; mg.beginPath(); mg.arc(sx(K.x), sz(K.z), 4, 0, TAU); mg.fill(); }
       if (mode === 'explore' && EX.stage === 'return' && f === 1) { mg.fillStyle = '#e0a03a'; mg.beginPath(); mg.arc(sx(40.9), sz(16.4), 5, 0, TAU); mg.fill(); }
+      if (mode === 'explore' && EX.stage === 'explore') for (const [, i] of LIST) { const [lf, lx, lz, , line] = LV.leoSpots[i]; if (lf === f && !EX.leo.said.has(line)) { mg.strokeStyle = '#e0a03a'; mg.lineWidth = 2; mg.beginPath(); mg.arc(sx(lx), sz(lz), 5, 0, TAU); mg.stroke(); } }
       if (mode === 'explore') for (const k of ['mom', 'dad']) { const a = cast[k]; if (a.visible && floorOf(a.y) === f) { mg.fillStyle = '#2f6fd0'; mg.beginPath(); mg.arc(sx(a.x), sz(a.z), 3, 0, TAU); mg.fill(); } }
       if (debug && mode === 'play') { const c = LV.containers[G.broC]; mg.fillStyle = '#18a0ff'; mg.beginPath(); mg.arc(sx(c.x), sz(c.z), 3, 0, TAU); mg.fill(); }
       mg.translate(sx(P.x), sz(P.z)); mg.rotate(Math.PI - P.yaw);
@@ -8074,7 +8247,7 @@ const ACT = (() => {
     gest(C.dad, 'nod', 1);
     yield say('DAD', 'In and out.', 1.8);
     C.leo.look = head(C.you); C.you.look = head(C.leo); C.you.face = { eyes: 'narrow', mouth: 'frown' }; C.leo.face = { mouth: 'smile', brows: 'up' };
-    cut([32.7, 1.25, -5.4], [32.7, 1.05, -3.7], 0.75);
+    cut([32.75, 1.02, -2.75], [32.7, 0.98, -3.75], 0.85);
     yield say('', 'You and Leo exchange a look. It is never five minutes.', 3.4);
     for (const k of ['dad', 'mom', 'you', 'leo']) C[k].look = null;
     par(function* () { for (let i = 0; i < 40; i++) { DOORS.front = Math.min(1, DOORS.front + 0.04); yield 0.02; } });
@@ -8160,11 +8333,12 @@ const ACT = (() => {
     gatherGroup(true);
     for (const k of Object.keys(GROUP)) C[k].look = k === 'manager' ? head(C.dad) : head(C.manager);
     C.mom.face = { brows: 'sad' }; C.dad.face = { brows: 'up' };
-    for (const k of ['dana', 'marcus', 'priya']) C[k].face = { eyes: 'narrow' };
-    music.vol = 0.04;
-    cut([40.45, F1 + 1.32, 15.5], [32.5, 1.4, 14.2], 0.7);
-    yield say('', 'Voices below. Every employee is standing around Mom and Dad.', 3.2);
-    move([40.45, F1 + 1.32, 15.5], [32.5, 1.4, 14.2], [40.3, F1 + 1.28, 15.4], [32.5, 1.5, 14.0], 6, 0.7, 0.42);
+    for (const k of STAFF) { setCreep(C[k], 2); C[k].gest = { name: 'fold', t0: NOW }; }
+    music.vol = 0.04; ambDim = 0.85;
+    const POV = [40.45, F1 + 1.32, 15.5];
+    cut(POV, [32.5, 1.4, 14.2], 0.7);
+    yield say('', 'Voices below. Every employee is standing around Mom and Dad. All of them are smiling.', 3.8);
+    move(POV, [32.5, 1.4, 14.2], [40.3, F1 + 1.28, 15.4], [32.5, 1.5, 14.0], 6, 0.7, 0.42);
     gest(C.dad, 'talk', 3);
     yield say('DAD', 'We’re just browsing, we’ll be out of your hair in—', 3);
     yield say('MANAGER', 'We told you not to stay too late.', 2.8);
@@ -8174,13 +8348,21 @@ const ACT = (() => {
     C.manager.look = [32, 9, 20]; gest(C.manager, 'lookUp', 6);
     yield 1.0;
     yield say('MANAGER', 'You don’t want to be here after it’s too late.', 3.2);
-    par(function* () { for (let i = 0; i < 60; i++) { music.warp = lerp(1, 0.55, i / 60); yield 0.05; } });
-    cut([40.45, F1 + 1.32, 15.5], [32.5, 1.4, 14.2], 0.6);
-    par(function* () { for (let i = 0; i < 14; i++) { ambDim = Math.random() < 0.5 ? 0.4 : 1; yield 0.08 + Math.random() * 0.12; } ambDim = 1; });
+    par(function* () { for (let i = 0; i < 60; i++) { music.warp = lerp(music.warp, 0.5, 0.06); yield 0.05; } });
+    cut(POV, [32.5, 1.4, 14.2], 0.6);
+    par(function* () { for (let i = 0; i < 14; i++) { ambDim = Math.random() < 0.5 ? 0.35 : 0.85; yield 0.08 + Math.random() * 0.12; } ambDim = 0.8; });
     yield 1.6; jingle(0.08, 0.6, 4); yield 1.2; jingle(0.1, 0.5, 5);
     C.leo.face = { eyes: 'wide', mouth: 'o' }; C.leo.look = [32, 9, 20];
-    cut([39.5, F1 + 1.0, 17.0], [40.6, F1 + 0.95, 16.3], 0.8);
+    cut([39.25, F1 + 0.5, 16.75], [40.6, F1 + 0.98, 16.3], 0.62);    // low, between the rail cables
     yield say('LEO', '…What was that?', 2.0);
+    // every head comes up at once
+    for (const k of STAFF) { setCreep(C[k], 3); C[k].gest = { name: 'fold', t0: NOW }; C[k].look = POV; }
+    C.leo.look = head(C.manager);
+    tone(98, 2.4, 0.16, 'sine', 0, -18); tone(147, 2.4, 0.07, 'sine', 0, -20);
+    { const over = [39.8, F1 + 1.22, 15.2]; for (const k of STAFF) C[k].look = over; move(over, [32.5, 1.3, 14.3], [39.7, F1 + 1.2, 15.15], [32.5, 1.4, 14.3], 5.2, 0.4, 0.3); }   // leaning out over the rail
+    yield say('', 'Every one of them looks up. Straight at you.', 3.0);
+    C.leo.face = { eyes: 'wide', mouth: 'o', brows: 'sad' };
+    yield say('LEO', '(whisper) They can see us.', 2.2);
     Object.assign(P, { x: 40.8, y: F1, z: 15.4, yaw: -Math.PI / 2, pitch: -0.2 });
   }
   function* sceneCrash() {
@@ -8190,8 +8372,11 @@ const ACT = (() => {
     for (const k of Object.keys(GROUP)) C[k].look = head(C.you);
     cut([24.3, 1.75, 30.2], [30.0, 1.4, 19.0], 0.95);
     yield 0.6;
+    for (const k of STAFF) { setCreep(C[k], 3); C[k].gest = { name: 'fold', t0: NOW }; C[k].look = head(C.you); }
     gest(C.mom, 'wave', 1.5); C.mom.face = { mouth: 'smile' };
     yield say('MOM', 'There you are! Come on, we’re—', 1.6);
+    C.manager.look = [32, 9, 20]; for (const k of ['dana', 'marcus', 'priya']) C[k].look = [32, 9, 20];
+    yield say('MANAGER', 'Here he is.', 1.3);
     SKY.broken = true; shatter(0.8); cam.shake = 0.8;
     burstGlass(32, 8.8, 20, 160, 7, -1);
     par(function* () { for (let i = 0; i < 10; i++) { ambDim = Math.random() < 0.5 ? 0.3 : 1; yield 0.06; } ambDim = 1; });
@@ -8199,12 +8384,15 @@ const ACT = (() => {
     move([24.3, 1.75, 30.2], [30.0, 1.4, 19.0], [24.0, 1.6, 30.6], [29.5, 3.5, 21.5], 0.8, 0.95, 1.05);
     for (let i = 0; i < 12; i++) { KV.y = Math.max(0, 9.5 - 9.8 * Math.pow((i + 1) / 12, 2)); yield 0.04; }
     KV.y = 0; KV.anim = 'land'; DISPLAY.smashed = true; burstOrnaments(29.5, 1, 21.5, 90); boxSmash(); thud(0.9, 0, 200); cam.shake = 1.2;
-    for (const k of Object.keys(GROUP)) C[k].face = { eyes: 'wide', mouth: 'open', brows: 'up' };
+    for (const k of ['mom', 'dad']) { C[k].face = { eyes: 'wide', mouth: 'open', brows: 'up' }; C[k].look = [29.5, 2.5, 21.5]; }
+    for (const k of STAFF) { C[k].look = null; C[k].gest = { name: 'bow', t0: NOW }; }   // heads down, hands folded
     C.you.face = { eyes: 'wide', mouth: 'o', brows: 'up' }; C.leo.face = { eyes: 'wide', mouth: 'o', brows: 'up' };
     yield 0.8;
     KV.anim = 'idle'; KV.gest = { name: 'rise', t0: NOW, dur: 2.6 };
     cut([27.2, 1.0, 25.6], [29.5, 2.0, 21.5], 0.95);
     yield 1.3; jingle(0.25, 0, 3); yield 1.5;
+    cut([29.6, 1.55, 17.9], [32.7, 1.4, 13.9], 0.85);
+    yield say('', 'Mom screams. The employees fold their hands and lower their heads.', 3.0);
     KV.gest = null;
     KV.look = head(C.you);
     cut([27.0, 2.5, 24.9], [29.5, 2.95, 21.5], 0.75);
@@ -8233,35 +8421,42 @@ const ACT = (() => {
     C.you.face = { eyes: 'wide', mouth: 'open', brows: 'sad' };
     cut([31.5, 1.6, 10.8], [32.5, 1.5, 14.5], 0.9);
     C.dad.face = { eyes: 'wide', mouth: 'open', brows: 'up' }; gest(C.dad, 'scream', 1.5);
-    yield say('DAD', 'GO! GO!', 1.2);
-    const exitPath = (x, z) => [[x + 1.5, z - 0.6], [42.2, 13.8], [42.6, 28.9], [62.4, 29.4], [63.8, 30.0], [66.4, 30.2], [68.5, 27.5], [71, 24]];
+    for (const k of STAFF) { C[k].gest = { name: 'fold', t0: NOW }; C[k].look = null; }
+    yield say('DAD', 'THE KIDS! Somebody—', 1.4);
+    // nobody panics. Two of them take a parent by the arm each and walk them to the side door.
+    const exitPath = (x, z, o) => [[x + 1.5, z - 0.6 + o], [42.2, 13.8 + o], [42.6 + o, 28.9], [62.4, 29.4 + o * 0.5], [63.8, 30.0], [66.4, 30.2], [68.5, 27.5 + o], [71, 24]];
     par(function* () { for (let i = 0; i < 30; i++) { DOORS.side = Math.min(1, DOORS.side + 0.04); yield 0.03; } });
-    for (const k of ['dad', 'mom', 'manager', 'marcus', 'priya', 'dana']) { C[k].look = null; C[k].gest = null; C[k].face = { eyes: 'wide', mouth: 'open' }; goA(C[k], exitPath(C[k].x, C[k].z), 3.6 + Math.random() * 0.4); }
-    C.dana.face = {}; C.marcus.face = {};
+    const off = { dad: 0, marcus: 0.75, mom: -0.2, priya: -0.95, dana: 0.3, manager: -0.5 };
+    for (const k of ['dad', 'mom', 'manager', 'marcus', 'priya', 'dana']) { C[k].look = null; goA(C[k], exitPath(C.dad.x, C.dad.z, off[k]), k === 'dana' ? 5.0 : k === 'manager' ? 3.4 : 3.9); }
+    for (const k of ['marcus', 'priya']) C[k].gest = { name: 'usher', t0: NOW };
+    C.mom.face = { eyes: 'wide', mouth: 'open', brows: 'sad' };
+    cut([36.6, 1.5, 12.2], [34.2, 1.45, 14.3], 0.8);
+    yield say('MARCUS', 'This way, sir. We’re closed.', 2.2);
     follow(() => [[C.mom.x - 3.2, 2.0, C.mom.z - 2.0], [C.mom.x, 1.3, C.mom.z]], 1.0);
-    yield 2.5;
-    C.mom.path = null; C.mom.anim = 'idle'; C.mom.faceYaw = Math.atan2(25 - C.mom.x, -(27 - C.mom.z)); gest(C.mom, 'scream', 2);
-    yield say('MOM', 'NO— LEO!', 1.5);
-    gest(C.dad, 'push', 1.2); goA(C.mom, exitPath(C.mom.x, C.mom.z).slice(2), 3.8);
-    yield 4.4;
+    yield 0.6;
+    C.mom.look = [25, 1.2, 27]; gest(C.mom, 'scream', 2);
+    yield say('MOM', 'NO— LEO! Let GO of me!', 2.0);
+    yield say('PRIYA', 'Thank you for shopping with us.', 2.2);
+    C.mom.look = null;
+    { let w = 0; yield () => (w += 1) > 900 || C.mom.x > 64.4; }
     placeA(C.you, 54, 29.2, Math.PI / 2, { face: { eyes: 'wide', mouth: 'open' } }); goA(C.you, [[62.6, 29.6]], 4.2);
     follow(() => [[C.you.x - 3.0, 1.7, C.you.z - 1.2], [C.you.x + 2, 1.3, C.you.z]], 1.0);
     yield () => C.you.arrived;
     par(function* () { for (let i = 0; i < 25; i++) { DOORS.side = Math.max(0, DOORS.side - 0.05); yield 0.02; } });
-    placeA(C.dana, 65.3, 30.3, -Math.PI / 2, { holdR: 'keys' }); C.dana.look = head(C.you);
+    placeA(C.dana, 64.75, 30.52, -Math.PI / 2, { holdR: 'keys' }); C.dana.look = head(C.you);
     yield 0.4; gest(C.dana, 'lock', 1.0); lockClick(); yield 1.0;
-    cut([62.0, 1.55, 29.6], [65.3, 1.55, 30.3], 0.6);
+    cut([62.3, 1.55, 30.42], [64.75, 1.55, 30.52], 0.6);
     gest(C.dana, 'shake', 1.8); yield 2.0;
-    move([62.4, 1.6, 29.9], [65.3, 1.55, 30.3], [63.2, 1.6, 30.15], [65.3, 1.58, 30.3], 3.0, 0.45, 0.35);
-    C.dana.face = { mouth: 'smile', eyes: 'narrow' }; yield 1.0; C.dana.face = { mouth: 'grin', eyes: 'narrow', brows: 'angry' }; tone(180, 1.6, 0.12, 'sine', 0, -60);
+    move([62.6, 1.6, 30.45], [64.75, 1.55, 30.52], [63.25, 1.6, 30.5], [64.75, 1.57, 30.52], 3.0, 0.45, 0.33);
+    C.dana.face = { mouth: 'wide', eyes: 'stare' }; C.dana.noBlink = true; yield 1.2; C.dana.face = { mouth: 'grin', eyes: 'stare' }; C.dana.gest = { name: 'tiltHead', t0: NOW }; tone(180, 1.6, 0.12, 'sine', 0, -60);
     yield 2.4;
-    placeA(C.you, 32.1, 1.5, 0, { face: { eyes: 'wide', mouth: 'open' } });
-    placeA(C.marcus, 32.5, -1.1, Math.PI, { holdR: 'keys' }); C.marcus.look = head(C.you); DOORS.front = 0;
+    placeA(C.you, 32.75, 1.5, 0, { face: { eyes: 'wide', mouth: 'open' } });
+    placeA(C.marcus, 33.0, -0.7, Math.PI, { holdR: 'keys' }); C.marcus.look = head(C.you); DOORS.front = 0;
     cut([31.2, 1.7, 4.4], [32.3, 1.4, -0.6], 0.8);
     gest(C.marcus, 'lock', 1.0); lockClick(); yield 1.2;
     gest(C.marcus, 'shake', 1.6); yield 1.4;
-    cut([32.2, 1.75, 0.9], [32.5, 1.75, -1.1], 0.45);
-    C.marcus.face = { mouth: 'grin', eyes: 'narrow', brows: 'angry' }; tone(160, 1.6, 0.12, 'sine', 0, -60);
+    cut([33.05, 1.72, 0.75], [33.0, 1.74, -0.7], 0.5);
+    C.marcus.face = { mouth: 'grin', eyes: 'stare' }; C.marcus.noBlink = true; C.marcus.gest = { name: 'tiltHead', t0: NOW }; tone(160, 1.6, 0.12, 'sine', 0, -60);
     yield 2.6;
     goA(C.marcus, [[30.5, -6], [27, -16]], 1.1); C.marcus.look = null;
     placeA(C.dana, 40, -2.5, -Math.PI / 2); goA(C.dana, [[33.5, -7], [29, -17]], 1.1);
@@ -8342,7 +8537,7 @@ const ACT = (() => {
   function startJump() { audioInit(); showOnly(null); runScene(sceneQuickIntro, startHunt); }
   function pause() { if (!playing()) return; pausedFrom = mode; mode = 'pause'; showOnly('pause'); $('skipAhead').style.display = pausedFrom === 'explore' && EX && EX.stage === 'explore' ? 'inline-block' : 'none'; if (document.pointerLockElement) document.exitPointerLock(); }
   function resume() { mode = pausedFrom || 'play'; showOnly(null); lastTime = performance.now(); lock(); }
-  function toTitle() { mode = 'title'; SC = null; timers.length = 0; document.body.classList.remove('cine', 'explore'); $('fade').style.opacity = 0; showOnly('title'); $('hud').style.display = 'none'; $('skipBtn').style.display = 'none'; refreshBest(); if (document.pointerLockElement) document.exitPointerLock(); music.on = false; hideAll(); timeScale = 1; }
+  function toTitle() { $('ears').style.display = 'none'; mode = 'title'; SC = null; timers.length = 0; document.body.classList.remove('cine', 'explore'); $('fade').style.opacity = 0; showOnly('title'); $('hud').style.display = 'none'; $('skipBtn').style.display = 'none'; refreshBest(); if (document.pointerLockElement) document.exitPointerLock(); music.on = false; hideAll(); timeScale = 1; }
   function caught(reason) {
     if (mode !== 'play') return;
     // jumpscare first: he is suddenly right there, and the camera is dragged up to his face
@@ -8357,7 +8552,12 @@ const ACT = (() => {
   function endCaught() {
     const reason = G.reason; mode = 'end'; KV.gest = null;
     $('endTitle').textContent = 'INTO THE SACK'; $('endTitle').className = 'lose';
-    $('endText').innerHTML = `${reason}<br>You lasted ${fmt(G.time)} and found ${G.clues} of 3 clues.`;
+    const tip = /climb into/.test(reason) ? 'Get out of his sight before you hide. If he watches you climb in, he pulls you out.'
+      : /You moved/.test(reason) ? 'When he bends down and stares, stay put. He leaves after about half a minute.'
+      : /Leo back/.test(reason) ? 'Leo falls at the bottom of the stairs. Turn around and go back for him straight away.'
+      : /last second/.test(reason) ? (G.keys ? 'Sprint the whole way and take the big staircase. He is slow on the stairs.' : 'Pick up the keys from a register before you open Leo’s hiding place.')
+      : 'Walking is quiet, running is loud. Crouch behind furniture when you hear the bells getting louder.';
+    $('endText').innerHTML = `${reason}<br>You lasted ${fmt(G.time)} and found ${G.clues} of 3 of Leo’s things.<br><span class="tipline">${tip}</span>`;
     showOnly('end'); $('hud').style.display = 'none'; if (document.pointerLockElement) document.exitPointerLock();
   }
   function win() {
@@ -8369,7 +8569,7 @@ const ACT = (() => {
     runScene(sceneEnding, () => {
       mode = 'end'; $('fade').style.transition = 'none'; $('fade').style.opacity = 0;
       $('endTitle').textContent = 'YOU GOT LEO OUT'; $('endTitle').className = 'win';
-      $('endText').innerHTML = `Escaped in <b>${fmt(t)}</b> on ${G.D.label}${best ? ' — new best!' : ''}`;
+      $('endText').innerHTML = `Escaped in <b>${fmt(t)}</b> on ${G.D.label}${best ? ' — new best!' : ''}<br>He spotted you ${G.sightings} time${G.sightings === 1 ? '' : 's'}. You hid ${G.hides} time${G.hides === 1 ? '' : 's'}.`;
       showOnly('end');
     });
   }
@@ -8381,7 +8581,7 @@ const ACT = (() => {
   $('menu').addEventListener('click', toTitle);
   $('resume').addEventListener('click', resume);
   $('quit').addEventListener('click', toTitle);
-  $('skipAhead').addEventListener('click', () => { if (EX) { EX.t = Math.max(EX.t, EXPLORE_SECS - 2); gatherGroup(true); EX.events.add('gather'); resume(); } });
+  $('skipAhead').addEventListener('click', () => { if (EX) { EX.t = Math.max(EX.t, EXPLORE_SECS - 2); gatherGroup(true); for (const k of ['gather', 'bells1', 'n1', 'n2', 'n3', 'n4', 'posts']) EX.events.add(k); EX.hs = 2; if (EX.leo.mode !== 'follow') popLeo(true); resume(); } });
 
   // ---------------- drawing ----------------
   const BUF = new DynBuf(), ABUF = new DynBuf(1 << 14), MBUF = new DynBuf(1 << 14);
@@ -8452,15 +8652,18 @@ const ACT = (() => {
   let titleCam = 0, fpsT = 0, fpsN = 0, fps = 60;
   const MENU_Z = new Float32Array(16).fill(0.7);
   function frame(nowMs) {
+    if (debug && window.__hold) { lastTime = nowMs; window.__held = (window.__held || 0) + 1; requestAnimationFrame(frame); return; } // test tools drive the clock themselves
     const dt = Math.min(0.05, (nowMs - lastTime) / 1000); lastTime = nowMs;
     fpsT += dt; fpsN++; if (fpsT > 1) { fps = fpsN / fpsT; fpsT = 0; fpsN = 0; }
     R.resize(isTouch ? 1.0 : 1.35);
     const sdt = dt * timeScale;
     if (mode !== 'pause' && mode !== 'title' && mode !== 'end') NOW += sdt;
-    if (mode === 'cine') { sceneTick(sdt); for (const k in cast) stepActor(cast[k], sdt); camUpdate(sdt); runTimers(); }
-    else if (mode === 'explore') updateExplore(dt);
-    else if (mode === 'play') tick(dt);
-    else if (mode === 'scare') { SCARE.t += dt; FEAR = 1; if (SCARE.t > 1.8) endCaught(); }
+    try {
+      if (mode === 'cine') { sceneTick(sdt); for (const k in cast) stepActor(cast[k], sdt); camUpdate(sdt); runTimers(); }
+      else if (mode === 'explore') updateExplore(dt);
+      else if (mode === 'play') tick(dt);
+      else if (mode === 'scare') { SCARE.t += dt; FEAR = 1; if (SCARE.t > 1.8) endCaught(); }
+    } catch (e) { if (!frame.warned) { frame.warned = true; console.error(e); } }
     if (mode !== 'play' && mode !== 'scare') FEAR += (0 - FEAR) * Math.min(1, dt * 2);
     if (mode !== 'pause') { stepParticles(sdt); for (let i = 0; i < 16; i++) ZL[i] += (ZT[i] - ZL[i]) * Math.min(1, dt * 5); flick = Math.random() < 0.3 ? 0.35 + Math.random() * 0.65 : lerp(flick, 1, 0.3); }
     if (subT > 0) { subT -= dt; if (subT <= 0) $('sub').style.opacity = 0; }
@@ -8495,7 +8698,7 @@ const ACT = (() => {
     R.drawDynamic(MBUF.view(), 'mul');
     R.drawDynamic(ABUF.view(), 'alpha');
     R.end();
-    if (debug) $('fps').textContent = fps.toFixed(0) + ' fps';
+    if (debug) { $('fps').textContent = fps.toFixed(0) + ' fps'; window.__frames = (window.__frames || 0) + 1; }
     requestAnimationFrame(frame);
   }
   function tick(dt) {
@@ -8514,21 +8717,65 @@ const ACT = (() => {
       G.heartT = (G.heartT || 0) - dt;
       if (FEAR > 0.25 && G.heartT <= 0) { G.heartT = lerp(1.05, 0.42, FEAR); tone(58, 0.13, 0.32 * FEAR, 'sine', 0, -20); tone(50, 0.16, 0.26 * FEAR, 'sine', 0.14, -18); }
     }
-    for (const k of ['marcus', 'dana']) { const a = cast[k]; a.look = [P.x, P.y + 1.2, P.z]; a.yaw = Math.atan2(P.x - a.x, -(P.z - a.z)); }
-    updateHUD(dt);
+    staffOutside(dt);
+    hints(dt);
+    updateHUD(dt); drawEars();
+  }
+
+  // ---------------- the staff outside ----------------
+  function staffOutside(dt) {
+    const fd = LV.doors.front, sd = LV.doors.side;
+    cast.priya.visible = cast.priya.visible || G.clues >= 1; cast.manager.visible = cast.manager.visible || G.clues >= 2;
+    for (const k of STAFF) { const a = cast[k]; if (!a.visible) continue; a.look = [P.x, P.y + 1.2, P.z]; const g = a.gest; if (!g || (g.dur && NOW - g.t0 > g.dur)) a.gest = { name: k === 'manager' ? 'fold' : 'glass', t0: NOW }; }
+    // stand around near a door and they rap on the glass to tell him where you are
+    G.knockCool -= dt;
+    const nearF = Math.hypot(P.x - fd.x, P.z - fd.z) < 7.5, nearS = Math.hypot(P.x - sd.x, P.z - sd.z) < 6.5;
+    if (G.phase === 'hunt' && floorOf(P.y) === 0 && G.hiding == null && (nearF || nearS)) G.lingerT += dt; else G.lingerT = Math.max(0, G.lingerT - dt * 2);
+    if (G.lingerT > 3.2 && G.knockCool <= 0 && K.state !== 'chase' && K.state !== 'wait') {
+      G.knockCool = 14; G.lingerT = 0;
+      const a = nearS && !nearF ? cast.dana : cast.marcus, [v, pan] = hear(a.x, a.z, 0, 16);
+      a.gest = { name: 'knock', t0: NOW, dur: 1.4 };
+      for (let i = 0; i < 4; i++) { tone(1500, 0.035, 0.25 * (v + 0.25), 'square', i * 0.22, -500, pan); tone(310, 0.06, 0.2 * (v + 0.25), 'triangle', i * 0.22, -80, pan); }
+      showMsg(G.tips.knock ? 'They’re knocking again.' : 'They’re knocking on the glass. They’re telling him where you are.', 3.2); G.tips.knock = true;
+      investigate(P.x, P.z, 0, false);
+    }
+  }
+  // one-time pointers, shown the first time each thing matters
+  function hints(dt) {
+    G.tipT -= dt; if (G.tipT > 0 || msgT > 0.4) return;
+    const tip = (k, text, secs = 4.5) => { if (G.tips[k]) return false; G.tips[k] = true; showMsg(text, secs, 'tip'); G.tipT = 6; return true; };
+    const sameFloor = K && Math.abs(K.y - P.y) < 1, dP = K ? Math.hypot(P.x - K.x, P.z - K.z) : 99;
+    if (G.phase === 'grace' && G.t < DIFF[diffKey].grace - 5 && tip('start', 'Look for Leo’s things. They glow. Each one makes his crying easier to follow.')) return;
+    if (G.phase === 'hunt' && K.state !== 'wait' && sameFloor && dP < 15 && G.hiding == null && tip('close', isTouch ? 'He’s close. Crouch behind something, or climb into a pot or hamper (Hide).' : 'He’s close. Crouch (C) behind something, or climb into a pot or hamper (E).')) return;
+    if (G.phase === 'hunt' && G.hiding == null) for (const t of G.traps) if (t.on && t.f === floorOf(P.y) && Math.hypot(t.x - P.x, t.z - P.z) < 4.5 && tip('trap', 'Bells on a string. Crouch to slip under them.')) return;
+    if (G.phase === 'hunt' && G.clues >= 1 && !G.keys && G.time > 75 && tip('keys', 'You’ll need the store keys to get out. There’s a ring behind every register.')) return;
+    if (G.phase === 'hunt' && G.clues >= 3 && tip('pots', 'Follow the crying. Look inside the pots and hampers.')) return;
+  }
+  // which way a sound is coming from, drawn at the edge of the screen (crying always; bells on Easy and on phones)
+  function drawEars() {
+    const set = (el, on, x, z, y, col, glyph) => {
+      if (!on) { el.style.opacity = 0; return; }
+      const [v] = hear(x, z, y, 60), rel = Math.atan2(x - P.x, -(z - P.z)) - P.yaw, fl = floorOf(y) - floorOf(P.y);
+      el.style.left = (50 + Math.sin(rel) * 43) + '%'; el.style.top = (50 - Math.cos(rel) * 40) + '%';
+      el.textContent = glyph + (fl > 0 ? ' ▲' : fl < 0 ? ' ▼' : ''); el.style.color = col; el.style.opacity = col === '#ff6a55' ? clamp(0.25 + v * 1.6, 0, 1) : 0.85;
+    };
+    const b = G.bro, cryR = 14 + 6 * G.clues, cd = Math.hypot(b.x - P.x, b.z - P.z);
+    set($('earCry'), mode === 'play' && b.state !== 'follow' && G.phase !== 'grace' && cd < cryR * (floorOf(b.y) === floorOf(P.y) ? 1 : 0.6) && G.hiding == null, b.x, b.z, b.y, '#9fd0ff', '◦ crying');
+    set($('earBell'), mode === 'play' && (G.D.map || isTouch) && KV.visible && K.spd > 0 && K.state !== 'rage' && Math.hypot(K.x - P.x, K.z - P.z) < 26, K.x, K.z, K.y, '#ff6a55', '◦ bells');
   }
 
   // ---------------- test hooks ----------------
   window.__box = {
     R, get P() { return P; }, get G() { return G; }, get K() { return K; }, get mode() { return mode; }, get EX() { return EX; }, get NOW() { return NOW; }, LV, ZL, ZT, cast, KV, CAR, cam,
+    log: () => EV.splice(0),
     stats: () => ({ walk: walk.reduce((a, b) => a + b, 0), reach: REACH.length, spots: SPOTS.length, links: stairLinks, verts: STATIC.count, obbs: LV.obbs.length, lights: LV.lights.length }),
     start: (d) => { if (d) diffKey = d; showOnly(null); startHunt(); },
     explore: () => { showOnly(null); startExplore(); },
     scene: (name, then) => { showOnly(null); const m = { opening: sceneOpening, balcony: sceneBalcony, crash: sceneCrash, doors: sceneDoors, ending: sceneEnding }; if (name === 'ending' && !G) newRound(); if (name === 'balcony' && !EX) startExplore(); runScene(m[name], then === 'hunt' ? startHunt : then === 'explore' ? startExplore : () => { mode = 'end'; }); },
     sceneTime: (sec) => { for (let i = 0; i < sec * 30 && SC; i++) { NOW += 1 / 30 * timeScale; sceneTick(1 / 30 * timeScale); for (const k in cast) stepActor(cast[k], 1 / 30 * timeScale); camUpdate(1 / 30); stepParticles(1 / 30 * timeScale); runTimers(); } },
     skip: () => skipScene(),
-    tick: (dt, n) => { for (let i = 0; i < n && mode === 'play'; i++) { NOW += dt; tick(dt); } },
-    exploreTick: (dt, n) => { for (let i = 0; i < n && mode === 'explore'; i++) { NOW += dt; updateExplore(dt); } },
+    tick: (dt, n) => { for (let i = 0; i < n && mode === 'play'; i++) { NOW += dt; subT = Math.max(0, subT - dt); tick(dt); } },
+    exploreTick: (dt, n) => { for (let i = 0; i < n && mode === 'explore'; i++) { NOW += dt; subT = Math.max(0, subT - dt); updateExplore(dt); } },
     setP: (x, y, z, yaw, pitch, crouch) => { Object.assign(P, { x, y, z, yaw, pitch: pitch || 0 }); if (crouch != null) { P.crouch = crouch; P.ct = crouch ? 1 : 0; } },
     interact, zoneName, killLights, mapImg,
     // test hooks for the scares: hide in the nearest pot/hamper and bring him over; or get caught on the spot

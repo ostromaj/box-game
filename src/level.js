@@ -802,6 +802,8 @@ function buildLevel() {
       [1, 56, 34, 5, 'Everything here has a red tag. Is it broken?'],
       [1, 41.4, 18, 3, 'Spin the stools! Spin them!'],
       [0, 52, 6, 5, 'This couch is squishy. Dad’s gonna sit on all of them.'],
+      [0, 23, 6.6, 3.2, 'There’s keys behind the counter. A whole ring of them.'],
+      [1, 44.5, 8, 3.2, 'More keys! Every register has keys.'],
     ],
   };
 }
