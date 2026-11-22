@@ -11,6 +11,7 @@ Open `index.html` in a browser. It's one self-contained file (Three.js and the t
 
 - **Computer:** WASD/arrows to move, mouse to look (click the view first), Shift to run, or R to toggle running (loud), C to crouch, E to hide in or look inside a pot or hamper, M for the map, Esc to pause.
 - **Phone/tablet:** left thumb moves, right thumb looks. Hide, Crouch and Run buttons are on the right. Landscape works best.
+- **Microphone (optional):** turn it on from the title screen or Pause. Krampus then hears your real room: a whisper carries a few metres, talking across a department, a scream across the floor. If he's staring into your hiding place and hears you, you get one warning on Normal (two on Easy, none on Hard). Headphones work best, so he doesn't hear the game itself. Nothing is recorded or sent anywhere; the game only measures loudness. The mic needs the GitHub Pages link (or any https page); it won't work from inside a sandboxed preview.
 
 ## How a round goes
 1. **Grace period.** Krampus is upstairs hiding your brother in a random hamper or big planter.
@@ -38,7 +39,12 @@ Open `index.html` in a browser. It's one self-contained file (Three.js and the t
 
 ## Krampus
 - While you get your bearings he walks across the upstairs with the sack. Watch where he goes.
-- He says **"I can hear you"** when you're hiding and he's close.
+- He talks while he hunts (`tools/krampus_voice.py` makes the five lines):
+  - **"I can hear you"**: when he hears a bell trap, you running nearby, or your real voice with the mic on.
+  - **"I'm going to find you"**: when you lose him after a chase.
+  - **"Come out, come out, wherever you are"**: every minute or so while he searches.
+  - **"I can smell you, little one"**: when you're crouched or hiding close by and he hasn't seen you.
+  - **"Your brother is waiting for you"**: after you pick up the first and third clue.
 - Sometimes he then walks over, bends down and **stares into your hiding place** for about half a minute. Don't climb out.
 - If he catches you there's a **jumpscare** before the end screen.
 

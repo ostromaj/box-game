@@ -376,9 +376,13 @@
   // --- Krampus's voice: a growl under whatever speech voice the device has, pitched as low as it goes
   function growl(vol, len = 1.8) { tone(52, len, vol * 0.5, 'sawtooth', 0, -14); tone(79, len * 0.9, vol * 0.28, 'square', 0.04, -22); noise(vol * 0.45, 0, 240, 'lowpass', len * 7); }
   function breath(vol, pan) { noise(vol, pan, 520, 'bandpass', 9); tone(70, 0.9, vol * 0.25, 'sawtooth', 0, -18, pan); }
+  // his five recorded lines (assets/sounds/, made by tools/krampus_voice.py)
+  const KLINES = { 'I can hear you': 'hear', 'I’m going to find you': 'k_find', 'Come out, come out, wherever you are': 'k_comeout', 'I can smell you, little one': 'k_smell', 'Your brother is waiting for you': 'k_brother' };
+  let kSaidAt = -99;
   function krampusSay(text, vol = 1) {
+    if (NOW - kSaidAt < 5) return; kSaidAt = NOW;   // never two lines on top of each other
     showMsg('\u201c' + text + '\u201d', 3.8, 'krampus'); growl(0.4 * vol, 2.4);
-    if (/hear you/i.test(text) && playSnd('hear', clamp(vol, 0.3, 1) * 1.5)) return;
+    if (KLINES[text] && playSnd(KLINES[text], clamp(vol, 0.3, 1) * 1.5)) return;
     try { if (window.speechSynthesis && !muted) { const u = new SpeechSynthesisUtterance(text); u.pitch = 0.01; u.rate = 0.5; u.volume = clamp(vol, 0.25, 1); speechSynthesis.cancel(); speechSynthesis.speak(u); } } catch (e) { /* no voice on this device: growl + subtitle only */ }
   }
   function scream() { roar(); for (const f of [622, 880, 933, 1244, 1760]) tone(f, 1.3, 0.2, 'sawtooth', 0, -f * 0.45); noise(0.9, 0, 2400, 'highpass', 11); tone(41, 1.6, 0.6, 'sine'); shatter(0.35); }
@@ -578,6 +582,7 @@
 
   // ---------------- round setup (hunt) ----------------
   function newRound() {
+    timers.length = 0;   // nothing left over from a cutscene or the last round
     const D = DIFF[diffKey];
     Object.assign(P, { x: 32, y: 0, z: 3.6, yaw: Math.PI, pitch: 0.05, vx: 0, vz: 0, crouch: false, ct: 0, run: false });
     const up = LV.containers.map((c, i) => i).filter((i) => LV.containers[i].f === 1);
@@ -590,7 +595,7 @@
     for (let i = 0; i < D.traps; i++) traps[i].on = true;
     K = { x: -50, z: -50, y: -50, yaw: 0, state: 'wait', path: null, pi: 0, t: 0, look: 0, step: 0, stuck: 0, lastP: [0, 0], seeing: false, lastSeen: null, searchLeft: 0, repath: 0, spd: 0, sawT: 99, stun: 0 };
     G = { hearCool: 8, peerCool: 25, peerAt: 0, D, phase: 'grace', t: D.grace, time: 0, huntT: 0, clues: 0, keys: false, items, traps, broC, bro: { state: 'hidden', x: bc.x, z: bc.z, y: bc.y }, trail: [], hiding: null, back: null,
-      alert: 0, noiseT: 0, hunchT: 30, lightT: 70, cryT: 2, doorT: 7, lingerT: 0, knockCool: 0, tipT: 5, tips: {}, breathT: 0, sightings: 0, hides: 0, slips: D.slips, dead: shuffle([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]), reason: '', extraStun: 0 };
+      alert: 0, noiseT: 0, hunchT: 30, lightT: 70, cryT: 2, doorT: 7, lingerT: 0, knockCool: 0, tipT: 5, tips: {}, breathT: 0, sightings: 0, hides: 0, slips: D.slips, micStrikes: diffKey === 'easy' ? 2 : diffKey === 'normal' ? 1 : 0, micCool: 0, dead: shuffle([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]), reason: '', extraStun: 0 };
     hideAll();
     const fd = LV.doors.front, sd = LV.doors.side;
     // the staff wait outside, at the glass. More of them come to watch with every clue you find.
@@ -673,7 +678,56 @@
     K.state = fast ? 'rush' : 'investigate';
     if (!goTo(x + (Math.random() - 0.5) * 2, z + (Math.random() - 0.5) * 2, f)) goTo(x, z, f);
   }
-  function hearNoise(x, z, f, radius) { let r = floorOf(K.y) === f ? radius : radius * 0.45; if (K.state === 'look' && K.listen) r *= 1.7; /* standing dead still, bells silent, listening */ if (Math.hypot(K.x - x, K.z - z) < r) investigate(x, z, f, false); }
+  // ---------- the microphone (optional): he hears the room you are playing in ----------
+  // Only loudness is measured, a few times a second; nothing is recorded, stored or sent anywhere.
+  const MIC = { on: false, ok: false, err: '', stream: null, an: null, buf: null, outAn: null, outBuf: null, floor: -60, cal: 0, level: 0, hot: 0, db: -100 };
+  try { MIC.on = localStorage.getItem('box-mic') === '1'; } catch (e) {}
+  async function micStart() {
+    if (MIC.ok) return true;
+    audioInit(); if (!AC) { MIC.err = 'No audio on this device.'; return false; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { MIC.err = 'This page can’t use the microphone here. Try the GitHub link in Chrome, Edge or Safari.'; return false; }
+    try {
+      MIC.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false } });
+      const src = AC.createMediaStreamSource(MIC.stream); MIC.an = AC.createAnalyser(); MIC.an.fftSize = 1024; src.connect(MIC.an); MIC.buf = new Float32Array(MIC.an.fftSize);
+      MIC.outAn = AC.createAnalyser(); MIC.outAn.fftSize = 1024; master.connect(MIC.outAn); MIC.outBuf = new Float32Array(MIC.outAn.fftSize);   // the game's own sound, to tell it apart
+      MIC.ok = true; MIC.err = ''; MIC.cal = 2.0; return true;
+    } catch (e) { MIC.err = /denied|NotAllowed/i.test(String(e && (e.name || e))) ? 'Microphone blocked. Allow it for this site in the browser’s address bar, then try again.' : 'Couldn’t open a microphone (' + (e && e.name || 'error') + ').'; return false; }
+  }
+  // "I can hear you" when he really did: always said, but never over the top of a line he's still saying
+  function sayHeard(vol) { const wait = Math.max(0, kSaidAt + 3.4 - NOW); later(wait, () => { if (mode === 'play') { kSaidAt = -99; krampusSay('I can hear you', vol); } }); }
+  function micStop() { if (MIC.stream) for (const t of MIC.stream.getTracks()) t.stop(); MIC.stream = null; MIC.ok = false; MIC.level = 0; }
+  const rmsDb = (an, buf) => { an.getFloatTimeDomainData(buf); let s2 = 0; for (let i = 0; i < buf.length; i++) s2 += buf[i] * buf[i]; return 10 * Math.log10(s2 / buf.length + 1e-12); };
+  // 0..1: how loud you are right now above your room's normal background
+  function micTick(dt) {
+    if (window.__micTest != null) { MIC.level = window.__micTest; return MIC.level; }
+    if (!MIC.on || !MIC.ok) { MIC.level = 0; return 0; }
+    const db = rmsDb(MIC.an, MIC.buf), game = rmsDb(MIC.outAn, MIC.outBuf); MIC.db = db;
+    if (MIC.cal > 0) { MIC.cal -= dt; MIC.floor = MIC.cal > 1.6 ? db : Math.min(MIC.floor, db) * 0.7 + db * 0.3; MIC.level = 0; return 0; }   // first two seconds: learn the room
+    MIC.floor = db < MIC.floor ? lerp(MIC.floor, db, Math.min(1, dt * 2)) : MIC.floor + Math.min(db - MIC.floor, 6) * dt * 0.03;            // background drifts up slowly, down quickly
+    const margin = 11 + Math.max(0, game + 32) * 0.75;   // loud game sound coming through speakers raises the bar (headphones are best)
+    const lv = clamp((db - MIC.floor - margin) / 24, 0, 1);
+    MIC.level = lv > MIC.level ? lerp(MIC.level, lv, Math.min(1, dt * 14)) : lerp(MIC.level, lv, Math.min(1, dt * 3));
+    return MIC.level;
+  }
+  // he hears your real voice: a whisper carries a few metres, talking across a department, a scream across the floor
+  function micHear(dt) {
+    const L = micTick(dt); MIC.hot = L > 0.08 ? MIC.hot + dt : 0; G.micCool = (G.micCool || 0) - dt;
+    const el = $('mic'); if (el) { el.style.display = MIC.on && (MIC.ok || window.__micTest != null) ? 'flex' : 'none'; $('micFill').style.width = Math.round(L * 100) + '%'; el.classList.toggle('loud', L > 0.08); }
+    if (G.phase === 'grace' || MIC.hot < 0.12 || K.state === 'wait') return;
+    const f = floorOf(P.y), r = (4 + 30 * L) * (floorOf(K.y) === f ? 1 : 0.45), dK = Math.hypot(K.x - P.x, K.z - P.z);
+    if (dK > r || K.state === 'rage') return;
+    if (K.state === 'peer') {   // he is right there, staring in
+      if (G.micStrikes > 0 && G.micCool <= 0) { G.micStrikes--; G.micCool = 2.5; kSaidAt = -99; krampusSay('I can hear you', 1); K.peerDur += 8; FEAR = 1; cam.shake = 0.4; showMsg('He heard that. Not a sound.', 2.4, 'tip'); }
+      else if (G.micCool <= 0) caught('He heard you breathing.');
+      return;
+    }
+    if (G.micCool > 0) return;
+    G.micCool = 4; G.micHeard = (G.micHeard || 0) + 1;
+    if (G.hiding != null) { const c = LV.containers[G.hiding]; sayHeard(clamp(1.3 - dK / 20, 0.35, 1)); if (goTo(c.x, c.z, c.f)) K.state = 'peerwalk'; G.peerCool = 0; }
+    else if (K.state !== 'chase') { sayHeard(clamp(1.3 - dK / 20, 0.35, 1)); investigate(P.x, P.z, f, L > 0.4); }
+  }
+
+  function hearNoise(x, z, f, radius) { let r = floorOf(K.y) === f ? radius : radius * 0.45; if (K.state === 'look' && K.listen) r *= 1.7; /* standing dead still, bells silent, listening */ if (Math.hypot(K.x - x, K.z - z) < r) { investigate(x, z, f, false); if (radius >= 10 && Math.hypot(K.x - x, K.z - z) < 20 && NOW - (G.heardSaid || -99) > 25) { G.heardSaid = NOW; krampusSay('I can hear you', clamp(1.3 - Math.hypot(K.x - x, K.z - z) / 20, 0.35, 1)); } } }
   // While you hide: he says "I can hear you", and sometimes walks over, bends down and stares into the
   // opening for about half a minute. Hold still and he leaves. Climb out and he has you.
   function startPeer(c) { K.state = 'peer'; K.path = null; K.peerT = 0; K.peerDur = 27 + Math.random() * 6; K.breathT = 0.5; KV.gest = { name: 'peer', t0: NOW }; G.peerLook = 2.4; G.peerCool = 80; showMsg('Don\u2019t move.', 2.6); }
@@ -694,15 +748,15 @@
       K.yaw = turnTo(K.yaw, Math.atan2(c.x - K.x, -(c.z - K.z)), dt * 4);
       K.breathT -= dt; if (K.breathT <= 0) { K.breathT = 2.1 + Math.random() * 0.8; breath(0.3, 0); }
       if (G.peerLook > 0 && KV._eye) { G.peerLook -= dt; const e = KV._eye, ey = P.y + EYE(); P.yaw = turnTo(P.yaw, Math.atan2(e[0] - P.x, -(e[2] - P.z)), dt * 2.5); P.pitch = lerp(P.pitch, clamp(Math.atan2(e[1] - ey, Math.hypot(e[0] - P.x, e[2] - P.z)), -1.3, 1.3), Math.min(1, dt * 3)); }
-      if (K.peerT > 9 && !K.peerSaid) { K.peerSaid = true; krampusSay('I can hear you', 1); }
+      if (K.peerT > 9 && !K.peerSaid) { K.peerSaid = true; krampusSay('I can smell you, little one', 1); }
       if (K.peerT > K.peerDur) { KV.gest = null; K.peerSaid = false; K.state = 'look'; K.t = 2.6; K.look = K.yaw + 2.4; G.alert = 0; showMsg('He’s leaving. Wait for the bells to fade.', 3, 'tip'); }
       // the stare was staged for his old size, so he swells as he bends over the opening (all you can see is the face)
       Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: lerp(KS, 1.1, smooth(K.peerT / 0.8)), sackFull: false, look: null });
       return true;
     }
     if (c && sameFloor && K.state !== 'chase' && K.state !== 'rush') {
-      if (dP < 13 && G.hearCool <= 0) {
-        G.hearCool = 24 + Math.random() * 14; krampusSay('I can hear you', clamp(1.25 - dP / 13, 0.3, 1));
+      if (dP < 13 && G.hearCool <= 0 && NOW - kSaidAt > 8) {
+        G.hearCool = 40 + Math.random() * 20; krampusSay('I can smell you, little one', clamp(1.25 - dP / 13, 0.3, 1));
         if (G.peerCool <= 0 && Math.random() < 0.7) G.peerAt = NOW + 2.5;
       }
       if (G.peerAt && NOW > G.peerAt) { G.peerAt = 0; if (goTo(c.x, c.z, c.f)) K.state = 'peerwalk'; }
@@ -773,7 +827,7 @@
         if (G.seenHide && G.hiding != null && sameFloor && dP < 1.9) return caught('He watched you climb into the ' + LV.containers[G.hiding].type + '.');
         K.repath -= dt;
         if (K.repath <= 0) { K.repath = 0.4; goTo(K.lastSeen[0], K.lastSeen[1], K.lastSeen[2]); }
-        if (!K.seeing && (!K.path || K.pi >= K.path.length)) { G.seenHide = false; K.state = 'search'; K.t = 2.2; K.look = K.yaw; K.searchLeft = 2 + Math.min(2, G.clues); G.alert = 0.6; if (msgT <= 0.3) showMsg(G.hiding != null ? 'He lost you. Stay still.' : 'He lost you. Hide before he looks around.', 2.6, 'tip'); }
+        if (!K.seeing && (!K.path || K.pi >= K.path.length)) { G.seenHide = false; later(0.8, () => { if (mode === 'play' && K.state !== 'chase') krampusSay('I’m going to find you', clamp(1.3 - Math.hypot(K.x - P.x, K.z - P.z) / 24, 0.4, 1)); }); K.state = 'search'; K.t = 2.2; K.look = K.yaw; K.searchLeft = 2 + Math.min(2, G.clues); G.alert = 0.6; if (msgT <= 0.3) showMsg(G.hiding != null ? 'He lost you. Stay still.' : 'He lost you. Hide before he looks around.', 2.6, 'tip'); }
       } else if (K.state === 'look' || K.state === 'search') {
         K.t -= dt; K.yaw = K.look + Math.sin((2.2 - K.t) * 1.9) * 1.2;
         if (K.t <= 0) {
@@ -858,6 +912,7 @@
         const c = CLUES[G.clues]; G.clues++; tone(660, 0.2, 0.2, 'triangle'); tone(880, 0.3, 0.2, 'triangle', 0.12);
         const bc = LV.containers[G.broC];
         showMsg(c.text || ('His scarf. The crying is coming from ' + placeName(bc.x, bc.z, bc.y) + '.'), 4.5);
+        if (G.clues === 1 || G.clues === 3) later(3.5, () => { if (mode === 'play') krampusSay('Your brother is waiting for you', clamp(1.2 - Math.hypot(K.x - P.x, K.z - P.z) / 30, 0.45, 1)); });
         killLights(3); let add = G.D.map ? 1 : 2; for (const t of G.traps) if (!t.on && add > 0) { t.on = true; add--; }
       }
     }
@@ -865,7 +920,7 @@
       if (t.cool > 0) t.cool -= dt;
       if (!t.on || t.cool > 0 || t.f !== floorOf(P.y) || P.ct > 0.6) continue;
       const along = t.ax === 'x' ? P.x - t.x : P.z - t.z, across = t.ax === 'x' ? P.z - t.z : P.x - t.x;
-      if (Math.abs(along) < t.len / 2 && Math.abs(across) < 0.35) { t.cool = 6; jingle(0.5, 0, 9); jingle(0.4, 0, 6); if (G.phase === 'hunt') { showMsg('A bell trap! He heard that.', 2.5); investigate(t.x, t.z, t.f, true); } }
+      if (Math.abs(along) < t.len / 2 && Math.abs(across) < 0.35) { t.cool = 6; jingle(0.5, 0, 9); jingle(0.4, 0, 6); if (G.phase === 'hunt') { showMsg('A bell trap! He heard that.', 2.5); investigate(t.x, t.z, t.f, true); if (NOW - (G.heardSaid || -99) > 15) { G.heardSaid = NOW; later(1.6, () => { if (mode === 'play') krampusSay('I can hear you', 0.8); }); } } }
     }
     G.doorT -= dt;
     const fd = LV.doors.front, sd = LV.doors.side;
@@ -1585,7 +1640,8 @@
   function endCaught() {
     const reason = G.reason; mode = 'end'; KV.gest = null;
     $('endTitle').textContent = 'INTO THE SACK'; $('endTitle').className = 'lose';
-    const tip = /climb into/.test(reason) ? 'Get out of his sight before you hide. If he watches you climb in, he pulls you out.'
+    const tip = /breathing/.test(reason) ? 'With the microphone on, he hears your room. When he bends over your hiding place, keep completely quiet.'
+      : /climb into/.test(reason) ? 'Get out of his sight before you hide. If he watches you climb in, he pulls you out.'
       : /You moved/.test(reason) ? 'When he bends down and stares, stay put. He leaves after about half a minute.'
       : /Leo back/.test(reason) ? 'Leo falls at the bottom of the stairs. Turn around and go back for him straight away.'
       : /last second/.test(reason) ? (G.keys ? 'Sprint the whole way and take the big staircase. He is slow on the stairs.' : 'Pick up the keys from a register before you open Leo’s hiding place.')
@@ -1608,6 +1664,17 @@
   }
   function refreshBest() { $('best').textContent = 'Best escapes — ' + ['easy', 'normal', 'hard'].map((k) => `${DIFF[k].label}: ${getBest(k) ? fmt(getBest(k)) : '—'}`).join(' · '); }
   document.querySelectorAll('[data-diff]').forEach((b) => b.addEventListener('click', () => { diffKey = b.dataset.diff; document.querySelectorAll('[data-diff]').forEach((x) => x.classList.toggle('sel', x === b)); }));
+  function micLabel() { const t = 'Microphone: ' + (MIC.on ? 'ON — he can hear your room' : 'off'); $('micBtn').textContent = t; $('micBtn2').textContent = t; $('micBtn').classList.toggle('sel', MIC.on); $('micNote').textContent = MIC.err || (MIC.on ? (MIC.ok ? 'Listening. Headphones work best. Stay quiet while you hide.' : 'Your browser will ask to use the microphone.') : 'Optional: let Krampus hear you talk, laugh or scream in real life.'); }
+  async function micToggle() {
+    MIC.on = !MIC.on; MIC.err = '';
+    if (MIC.on) { $('micBtn').textContent = $('micBtn2').textContent = 'Microphone: asking…'; $('micNote').textContent = 'Allow the microphone in the box your browser shows.'; }
+    if (MIC.on && !(await micStart())) MIC.on = false; else if (!MIC.on) micStop();
+    try { localStorage.setItem('box-mic', MIC.on ? '1' : '0'); } catch (e) {}
+    micLabel();
+  }
+  $('micBtn').addEventListener('click', micToggle); $('micBtn2').addEventListener('click', micToggle);
+  micLabel();
+  for (const id of ['play', 'jump', 'again']) $(id).addEventListener('click', () => { if (MIC.on && !MIC.ok) micStart().then((ok) => { if (!ok) MIC.on = false; micLabel(); }); });   // switched on last time: reconnect
   $('play').addEventListener('click', startStory);
   $('jump').addEventListener('click', startJump);
   $('again').addEventListener('click', startJump);
@@ -1737,11 +1804,19 @@
   }
   function tick(dt) {
     G.time += dt;
+    runTimers();   // delayed lines and sounds during the hunt (Leo's sob on the stairs, his lines)
     updatePlayer(dt); if (mode !== 'play') return;
     if (G.phase === 'grace') {
       G.t -= dt;
       if (G.t <= 0) { G.phase = 'hunt'; if (!K.carry) dropKrampus(); pickPatrol(); jingle(0.35, 0, 8); showMsg('Listen for the bells. Follow the crying.', 4); }
-    } else if (G.phase === 'hunt') { G.huntT += dt; G.lightT -= dt; if (G.lightT <= 0) { G.lightT = 70; killLights(1); } }
+    } else if (G.phase === 'hunt') {
+      G.huntT += dt; G.lightT -= dt; if (G.lightT <= 0) { G.lightT = 70; killLights(1); }
+      G.tauntT = (G.tauntT == null ? 35 : G.tauntT) - dt;
+      const dK = Math.hypot(K.x - P.x, K.z - P.z), sameF = Math.abs(K.y - P.y) < 1;
+      if (G.tauntT <= 0 && (K.state === 'patrol' || K.state === 'look') && G.hiding == null) { G.tauntT = 45 + Math.random() * 30; krampusSay('Come out, come out, wherever you are', clamp(1.2 - dK / 30, 0.3, 1) * (sameF ? 1 : 0.6)); }
+      if (sameF && dK < 7 && P.crouch && G.hiding == null && !K.seeing && K.state !== 'chase' && NOW - (G.smellSaid || -99) > 30) { G.smellSaid = NOW; krampusSay('I can smell you, little one', 0.9); }
+    }
+    if (G.phase !== 'escape') micHear(dt); if (mode !== 'play') return;
     updateKrampus(dt); if (mode !== 'play') return;
     updateBrother(dt);
     { // dread: the picture drains and closes in as he gets near; heartbeat with it
@@ -1801,7 +1876,7 @@
   // ---------------- test hooks ----------------
   window.__box = {
     R, get P() { return P; }, get G() { return G; }, get K() { return K; }, get mode() { return mode; }, get EX() { return EX; }, get NOW() { return NOW; }, LV, ZL, ZT, cast, KV, CAR, cam,
-    log: () => EV.splice(0),
+    log: () => EV.splice(0), MIC,
     stats: () => ({ walk: walk.reduce((a, b) => a + b, 0), reach: REACH.length, spots: SPOTS.length, links: stairLinks, verts: STATIC.count, obbs: LV.obbs.length, lights: LV.lights.length }),
     start: (d) => { if (d) diffKey = d; showOnly(null); startHunt(); },
     explore: () => { showOnly(null); startExplore(); },

@@ -29,6 +29,8 @@ you from the balcony scene, bow when Krampus lands, walk your parents out, and w
 
 **Voices**: every character line is spoken (`assets/sounds/v_*.mp3`). After changing any dialogue, run `python3 tools/voices.py --model DIR` (Kokoro; see the top of that file for the two model files) and rebuild. Narration captions are not voiced.
 
+**Krampus talks and can hear you**: five lines (see README) from `tools/krampus_voice.py`, and an optional real-microphone mode (`micStart`/`micTick`/`micHear` in `src/game.js`). The mic learns the room's background for two seconds, then compares loudness against it; game sound leaking from speakers raises the bar. `window.__micTest = 0..1` fakes a loudness level for tests. Also fixed: timed events (`later()`) never ran during the hunt, because `tick()` didn't run them.
+
 ## Still to do
 1. **People and Krampus are still hand-built.** Rigged CC0 packs (Quaternius) would need their faces and gestures rebuilt
    for the cutscenes: the stare, the wide smile, the owl head-turn and the bow all live in `src/actors.js`. Worth doing only
@@ -36,8 +38,8 @@ you from the balcony scene, bow when Krampus lands, walk your parents out, and w
 2. **Sofas, beds and shelves are still hand-built.** Poly Haven's sofas are antique styles that don't suit this store.
    A modern CC0 sofa and bed would slot straight in: add the `.glb` to `assets/models/` and wrap the builder in `model(...)`
    in `src/level.js` the way `chair()` does.
-3. **Listen to the Krampus line** on a real device. It was generated and processed blind (text-to-speech pitched down, with
-   gravel and reverb). If it is mush, re-run with less processing or record one.
+3. **Try the mic mode with a real voice.** It was tuned with simulated loudness. If he hears too much or too little, change the
+   margin in `micTick` (higher = deafer) or the hearing radius in `micHear`.
 4. **Balance with real players.** The autopilot (`tools/hunt_sim.py`) wins about 7 in 10 on Easy, 1 in 3 on Normal and
    rarely on Hard, but it knows where everything is and panics in corners. Tune `DIFF` at the top of `src/game.js`.
 5. Keep the "Box" name and the shuffled layout; no real store name or private store details.
