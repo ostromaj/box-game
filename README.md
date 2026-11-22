@@ -9,7 +9,7 @@ You're a kid locked in the store after closing. Krampus came through the skyligh
 ## Play
 Open `index.html` in a browser. It's one self-contained file (Three.js and the textures are built in), and it works offline. Sound matters, so turn it on.
 
-- **Computer:** WASD/arrows to move, mouse to look (click the view first), Shift to run (loud), C to crouch, E to hide in or look inside a pot or hamper, M for the map, Esc to pause.
+- **Computer:** WASD/arrows to move, mouse to look (click the view first), Shift to run, or R to toggle running (loud), C to crouch, E to hide in or look inside a pot or hamper, M for the map, Esc to pause.
 - **Phone/tablet:** left thumb moves, right thumb looks. Hide, Crouch and Run buttons are on the right. Landscape works best.
 
 ## How a round goes
