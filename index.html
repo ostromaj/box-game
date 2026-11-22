@@ -121,7 +121,7 @@
   <div id="msg"></div>
   <div id="ears"><span id="earCry"></span><span id="earBell"></span></div>
   <div id="prompt"><span class="keyonly"><b>E</b> · </span><span id="promptText"></span></div>
-  <div id="hint">WASD move · Mouse look · Shift run (loud) · C crouch · E hide / look inside · M map · Esc pause</div>
+  <div id="hint">WASD move · Mouse look · Shift or R run (loud) · C crouch · E hide / look inside · M map · Esc pause</div>
   <button class="tbtn" id="btnUse">Hide</button>
   <button class="tbtn" id="btnCrouch">Crouch</button>
   <button class="tbtn" id="btnRun">Run</button>
@@ -7199,8 +7199,15 @@ const ACT = (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
   const canvas = $('view');
-  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  // Phone/tablet mode only when touch is the main input. A touchscreen laptop or a PC browser that merely reports touch
+  // support still has a mouse, so it gets the PC controls. If someone does start tapping, we switch to touch then.
+  const mq = (q) => { try { return matchMedia(q).matches; } catch (e) { return false; } };
+  let isTouch = /[?&]touch=1/.test(location.search) || (/[?&]touch=0/.test(location.search) ? false : (mq('(pointer: coarse)') && !mq('(any-pointer: fine)')) || (!window.matchMedia && 'ontouchstart' in window));
   if (isTouch) document.body.classList.add('touch');
+  window.addEventListener('touchstart', () => { if (!isTouch) { isTouch = true; document.body.classList.add('touch'); } }, { passive: true, capture: true });
+  // ...and a real mouse moving means this is a PC after all (touchscreen laptops, PC browsers that report touch)
+  let mouseMoves = 0;
+  window.addEventListener('pointermove', (e) => { if (isTouch && e.pointerType === 'mouse' && (e.movementX || e.movementY) && ++mouseMoves > 3) { isTouch = false; document.body.classList.remove('touch'); } }, { passive: true });
   const debug = /debug/.test(location.search);
   const DIFF = {
     easy:   { label: 'Easy',   rage: 3.7,  behind: 20, spd: 0.78, range: 11, rate: 0.5, grace: 40, map: true, lose: 9,  slips: 3, traps: 2, hunch: 70 },
@@ -7444,8 +7451,9 @@ const ACT = (() => {
 
   // ---------------- input ----------------
   window.addEventListener('keydown', (e) => {
-    keys[e.code] = true;
+    keys[e.code] = true; if (e.key === 'Shift') keys.Shift = true;
     if (mode === 'play' || mode === 'explore') {
+      if (e.code === 'KeyR' && !e.repeat) runToggle = !runToggle;   // R toggles running, for anyone who'd rather not hold Shift
       if (e.code === 'KeyC' || e.code === 'ControlLeft') P.crouch = !P.crouch;
       if (e.code === 'KeyM') mapOn = !mapOn;
       if (e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter') interact();
@@ -7454,7 +7462,8 @@ const ACT = (() => {
     else if (mode === 'cine' && (e.code === 'Escape' || e.code === 'Enter')) skipScene();
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
   });
-  window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+  let runToggle = false;
+  window.addEventListener('keyup', (e) => { keys[e.code] = false; if (e.key === 'Shift') keys.Shift = false; });
   window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
   let dragLook = false, hadLock = false;
   const playing = () => mode === 'play' || mode === 'explore';
@@ -7498,11 +7507,14 @@ const ACT = (() => {
     }
   };
   canvas.addEventListener('touchend', endTouch); canvas.addEventListener('touchcancel', endTouch);
-  $('btnCrouch').addEventListener('touchstart', (e) => { P.crouch = !P.crouch; e.preventDefault(); }, { passive: false });
-  $('btnRun').addEventListener('touchstart', (e) => { P.run = true; e.preventDefault(); }, { passive: false });
-  $('btnRun').addEventListener('touchend', (e) => { P.run = false; e.preventDefault(); }, { passive: false });
-  $('btnUse').addEventListener('touchstart', (e) => { interact(); e.preventDefault(); }, { passive: false });
-  $('btnUse').addEventListener('click', () => { if (!isTouch) interact(); });
+  const press = (el, down, up) => {
+    el.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); try { el.setPointerCapture(e.pointerId); } catch (er) {} down(); });
+    if (up) for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(ev, () => up());
+    el.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });   // no double-firing or zoom on phones
+  };
+  press($('btnCrouch'), () => { P.crouch = !P.crouch; });
+  press($('btnRun'), () => { P.run = true; }, () => { P.run = false; });
+  press($('btnUse'), () => interact());
   $('btnPause').addEventListener('click', () => pause());
   $('skipBtn').addEventListener('click', () => skipScene());
   $('minimap').addEventListener('click', () => { mapOn = !mapOn; });
@@ -8014,7 +8026,8 @@ const ACT = (() => {
     if (keys.KeyD || keys.ArrowRight) str += 1; if (keys.KeyA || keys.ArrowLeft) str -= 1;
     if (touch.move) { fwd = -touch.mz; str = touch.mx; }
     const mag = Math.hypot(fwd, str); if (mag > 1) { fwd /= mag; str /= mag; }
-    const running = (keys.ShiftLeft || keys.ShiftRight || P.run) && !P.crouch;
+    const running = (keys.ShiftLeft || keys.ShiftRight || keys.Shift || P.run || runToggle) && !P.crouch;
+    if (runToggle && P.crouch) runToggle = false;
     const sp = P.crouch ? 1.6 : running ? 5.0 : 2.8;
     const sy = Math.sin(P.yaw), cy = Math.cos(P.yaw);
     const wx = (sy * fwd + cy * str) * sp, wz = (-cy * fwd + sy * str) * sp, k = Math.min(1, dt * 12);
@@ -8367,7 +8380,7 @@ const ACT = (() => {
       $('hidefx').style.opacity = G.hiding != null ? 1 : 0; $('hidefx').classList.toggle('peer', K.state === 'peer'); document.body.classList.toggle('stare', K.state === 'peer');
     }
     $('where').textContent = (floorOf(P.y) ? 'Upstairs · ' : 'Downstairs · ') + zoneName(P.x, P.z, P.y);
-    $('stance').textContent = G && G.hiding != null && mode === 'play' ? 'Hiding' : P.crouch ? 'Crouched' : (P.run || keys.ShiftLeft || keys.ShiftRight) ? 'Running' : 'Standing';
+    $('stance').textContent = G && G.hiding != null && mode === 'play' ? 'Hiding' : P.crouch ? 'Crouched' : (P.run || keys.ShiftLeft || keys.ShiftRight || keys.Shift || runToggle) ? 'Running' : 'Standing';
     $('btnCrouch').classList.toggle('on', P.crouch);
     let prompt = '';
     if (mode === 'play') { if (G.hiding != null) prompt = 'Climb out'; else { const c = nearContainer(); if (c >= 0) prompt = LV.containers[c].type === 'pot' ? 'Look in / hide in the pot' : 'Look in / hide in the hamper'; } }

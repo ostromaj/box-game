@@ -1,5 +1,7 @@
 # BOX — Krampus
 
+**Play it:** https://ostromaj.github.io/box-game/ (GitHub Pages, served from `main`).
+
 A first-person horror hide-and-seek game set in a two-floor home-goods store called **Box**. The store is invented: it has an atrium, a big staircase and a round skylight, but the layout is deliberately not a copy of any real store, and there are no real names, signage or brands.
 
 You're a kid locked in the store after closing. Krampus came through the skylight and carried your little brother upstairs in a sack.
