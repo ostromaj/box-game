@@ -1386,19 +1386,38 @@
     SKY.broken = true; shatter(0.8); cam.shake = 0.8;
     burstGlass(32, 8.8, 20, 160, 7, -1);
     par(function* () { for (let i = 0; i < 10; i++) { ambDim = Math.random() < 0.5 ? 0.3 : 1; yield 0.06; } ambDim = 1; });
-    Object.assign(KV, { x: 29.5, y: 9.5, z: 21.5, yaw: Math.atan2(25.5 - 29.5, -(27.3 - 21.5)), visible: true, anim: 'leap', gest: null, sackFull: false, look: null });
+    // he comes down facing your parents, with his back to you
+    const toParents = Math.atan2(32.5 - 29.5, -(14.4 - 21.5)), toKids = Math.atan2(25.8 - 29.5, -(27.4 - 21.5));
+    Object.assign(KV, { x: 29.5, y: 9.5, z: 21.5, yaw: toParents, visible: true, anim: 'leap', gest: null, sackFull: false, look: null, sack: false });
     move([24.3, 1.75, 30.2], [30.0, 1.4, 19.0], [24.0, 1.6, 30.6], [29.5, 3.5, 21.5], 0.8, 0.95, 1.05);
     for (let i = 0; i < 12; i++) { KV.y = Math.max(0, 9.5 - 9.8 * Math.pow((i + 1) / 12, 2)); yield 0.04; }
     KV.y = 0; KV.anim = 'land'; DISPLAY.smashed = true; burstOrnaments(29.5, 1, 21.5, 90); boxSmash(); thud(0.9, 0, 200); cam.shake = 1.2;
-    for (const k of ['mom', 'dad']) { C[k].face = { eyes: 'wide', mouth: 'open', brows: 'up' }; C[k].look = [29.5, 2.1, 21.5]; }
-    for (const k of STAFF) { C[k].look = null; C[k].gest = { name: 'bow', t0: NOW }; }   // heads down, hands folded
     C.you.face = { eyes: 'wide', mouth: 'o', brows: 'up' }; C.leo.face = { eyes: 'wide', mouth: 'o', brows: 'up' };
-    yield 0.8;
+    // your parents turn to face it and stagger back; Dad puts an arm out in front of Mom. The staff do not move.
+    for (const [k, bx, bz] of [['dad', 31.9, 13.5], ['mom', 33.3, 13.3]]) {
+      const a = C[k]; a.face = { eyes: 'wide', mouth: 'open', brows: 'up' }; a.look = [29.5, 2.1, 21.5];
+      a.yaw = a.faceYaw = Math.atan2(29.5 - a.x, -(21.5 - a.z)); goA(a, [[bx, bz]], 0.9); a.faceYaw = a.yaw;
+    }
+    goA(C.priya, [[34.7, 16.3]], 1.4); C.priya.faceYaw = Math.atan2(29.5 - 34.7, -(21.5 - 16.3));
+    for (const k of STAFF) { C[k].look = null; C[k].gest = { name: 'bow', t0: NOW }; }   // heads down, hands folded
+    yield 0.5;
+    // wide, from the balcony: the tree, the thing in the broken display, your parents, the bowing staff
+    cut([39.8, 6.0, 24.5], [29.6, 1.0, 20.2], 0.95);
     KV.anim = 'idle'; KV.gest = { name: 'rise', t0: NOW, dur: 2.6 };
-    cut([27.2, 0.9, 25.6], [29.5, 1.7, 21.5], 0.95);
-    yield 1.3; jingle(0.25, 0, 3); yield 1.5;
-    cut([29.6, 1.55, 17.9], [32.7, 1.4, 13.9], 0.85);
+    yield 1.4; jingle(0.25, 0, 3); yield 1.2;
+    // over its shoulder: your parents' faces
+    move([28.5, 4.0, 25.9], [32.4, 1.3, 14.2], [28.9, 3.75, 25.0], [32.4, 1.35, 14.2], 1.8, 0.38, 0.33);   // down over its horns at your parents, pushing in
+    KV.gest = { name: 'roar', t0: NOW, dur: 1.8 }; roar();
+    gest(C.mom, 'scream', 2.6); gest(C.dad, 'shield', 2.8); yelp(0.18);
+    yield 1.6;
+    cut([31.65, 1.72, 17.5], [32.55, 1.56, 14.1], 0.5);
+    yield say('DAD', 'What— what is that?!', 2.0);
     yield say('', 'Mom screams. The staff fold their hands and bow their heads.', 3.0);
+    // then, slowly, it turns around
+    cut([27.2, 1.15, 25.4], [29.5, 2.0, 21.5], 0.9);
+    KV.sack = true; jingle(0.2, 0, 3);
+    { const y0 = KV.yaw; let d = toKids - y0; d = Math.atan2(Math.sin(d), Math.cos(d)); KV.anim = 'walk';
+      for (let i = 0; i < 30; i++) { KV.yaw = y0 + d * smooth((i + 1) / 30); KV.phase += 0.12; yield 0.05; } KV.anim = 'idle'; }
     KV.gest = null;
     KV.look = head(C.you);
     cut([27.2, 2.0, 24.7], [29.5, 2.3, 21.5], 0.7);

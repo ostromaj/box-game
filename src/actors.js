@@ -351,6 +351,7 @@ const ACT = (() => {
       case 'hips': for (const i of [0, 1]) { set('shX', i, -0.15); set('shZ', i, 0.55); set('shY', i, i ? -0.9 : 0.9); set('el', i, 1.5); } break;
       case 'hold': set('shX', 1, 0.45); set('el', 1, 1.05); set('shZ', 1, 0.08); break;
       case 'hold2': for (const i of [0, 1]) { set('shX', i, 0.4); set('el', i, 1.1); set('shZ', i, 0.05); set('shY', i, i ? 0.25 : -0.25); } set('headX', null, 0.3); break;
+      case 'shield': set('shX', 0, 1.35); set('shZ', 0, 0.75); set('el', 0, 0.15); set('lean', null, -0.08); set('shX', 1, 0.6); set('el', 1, 1.1); break;   // left arm thrown out across the person beside him
       case 'reach': set('shX', 1, 1.2); set('el', 1, 0.25); set('shZ', 1, 0.05); set('lean', null, 0.12); break;
       case 'reachHigh': set('shX', 1, 2.0); set('el', 1, 0.3); break;
       case 'lock': set('shX', 1, 1.35); set('el', 1, 0.5); set('wr', 1, 0.6 * Math.sin(age * 6)); set('shY', 1, -0.3); break;
@@ -433,6 +434,17 @@ const ACT = (() => {
 
   // ---------- Krampus ----------
   const KC = { fur: '#2a1e17', fur2: '#3b2a1f', skin: '#2b1916', horn: '#cdbf9f', hornTip: '#5e5038', eye: '#ffae1f', tongue: '#a8222e', teeth: '#e8e2d0', chain: '#7d8288', bell: '#d6b24a', sack: '#8a6a46', hoof: '#151110' };
+  // Put a hoof at (fwd, up) relative to the ground under the hip, with the cannon bone at angle `meta` (from straight
+  // down, + = forward). Solves thigh and shin (knee forward), so feet plant instead of swinging through the air.
+  function legIK(P, i, fwd, up, meta) {
+    const L1 = KD.thigh, L2 = KD.shin, L3 = KD.meta, hj = P.hip - 0.05;
+    const ax = fwd - L3 * Math.sin(meta), ay = hj - (up + L3 * Math.cos(meta));                 // ankle, measured down from the hip
+    let d = Math.hypot(ax, ay); const dm = (L1 + L2) * 0.995; const sc = d > dm ? dm / d : d < 0.35 ? 0.35 / d : 1;
+    const x = ax * sc, y = ay * sc; d = Math.hypot(x, y);
+    const a0 = Math.atan2(x, y), al = Math.acos(clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1));
+    const th = a0 + al, kx = L1 * Math.sin(th), ky = L1 * Math.cos(th), sh = Math.atan2(x - kx, y - ky);
+    P.hipX[i] = th - P.pelvisX; P.kn[i] = th - sh; P.an[i] = meta - sh;
+  }
   const KD = { hip: 1.62, spine: 0.45, chest: 0.9, neck: 0.3, shW: 0.46, upper: 0.86, fore: 0.92, hand: 0.3, thigh: 0.68, shin: 0.66, meta: 0.44, hipW: 0.22 };
   function tufts(g, n, cx, cy, cz, rx, ry, rz, len, seed, keep) {
     const r = mulberry32(seed);
@@ -557,8 +569,35 @@ const ACT = (() => {
     // step, both arms hanging so low the claws nearly drag. With a child in the sack, one fist holds the rope.
     // (angles: a positive Rx swings a hanging limb forward and tips an upright one back, so a forward hunch is a negative lean)
     const carry = () => { if (!k.sackFull) return; P.shX[1] = 0.15 - P.lean * 0.6; P.shY[1] = -0.4; P.shZ[1] = 0.05; P.el[1] = 1.55; P.wr[1] = 0.3; };   // fist at the collarbone, on the rope
-    if (an === 'walk' || an === 'run') {
-      const run = an === 'run';
+    if (an === 'run') {
+      // A charge, not a jog: low and heavy, a bound with a moment off the ground between strides, hooves planted
+      // and pushed back under him at the speed he is moving, arms pumping and raking forward, head up and locked on.
+      const C = 2.016 / (k.scale || 1), beta = 0.36, sweep = C * beta, fo = 0.12;
+      const U = [0, Math.PI].map((o) => (((ph + o) / TAU) % 1 + 1) % 1);   // per leg: 0..beta on the ground, then in the air
+      let comp = 0; for (const u of U) if (u < beta) comp = Math.max(comp, Math.sin(Math.PI * u / beta));
+      P.hip = 1.3 - 0.1 * comp + 0.07 * (1 - comp);                             // sinks onto each stride, lifts between them
+      for (const i of [0, 1]) {
+        const u = U[i];
+        if (u < beta) {
+          const q = u / beta;
+          legIK(P, i, fo + sweep * (0.5 - q), 0, lerp(0.32, -0.15, q));                       // planted, rolling onto the toe
+        } else {
+          const q = (u - beta) / (1 - beta), e = q * q * (3 - 2 * q);
+          legIK(P, i, fo + sweep * (e - 0.5) + 0.12 * Math.sin(Math.PI * q), 0.5 * Math.pow(Math.sin(Math.PI * Math.pow(q, 0.75)), 1.2), lerp(-0.7, 0.32, Math.pow(q, 1.5)));   // knee up, hoof tucked, reaching forward
+        }
+      }
+      P.lean = -0.72 - 0.08 * Math.sin(ph * 2 + 0.6); P.roll = 0.06 * Math.sin(ph);
+      P.twist = -0.3 * Math.sin(ph);                                            // shoulders against the hips
+      P.neckX = 0.42 + 0.05 * Math.sin(ph * 2); P.headX = 0.42 - 0.06 * Math.sin(ph * 2 + 0.6); P.headY = 0; P.headZ = 0.05 * Math.sin(ph);
+      P.jaw = 0.55 + 0.1 * Math.sin(ph * 2);
+      for (const [i, sg] of [[0, -1], [1, 1]]) {                                // each arm opposite its leg
+        const w = Math.sin(ph + (i ? Math.PI : 0)) * sg * -1;
+        P.shX[i] = 0.9 + 0.42 * w; P.shZ[i] = 0.34 + 0.06 * w; P.el[i] = 0.55 + 0.55 * Math.max(0, w) + 0.35 * Math.max(0, -w); P.wr[i] = 0.75 + 0.35 * Math.max(0, w);   // claws hooked, raking low (0.72 = hanging straight down from the hunched chest)
+      }
+      carry();
+      P.sackRot = 0.25 * Math.sin(ph * 2);
+    } else if (an === 'walk') {
+      const run = false;
       for (const [i, o] of [[0, Math.PI], [1, 0]]) {
         const p = ph + o;
         P.hipX[i] = (run ? 0.55 : 0.5) + (run ? 0.8 : 0.5) * Math.sin(p);

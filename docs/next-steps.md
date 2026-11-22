@@ -27,7 +27,7 @@ you from the balcony scene, bow when Krampus lands, walk your parents out, and w
 
 **Models**: Poly Haven chairs, armchairs, coffee and side tables, potted plants and a night sky (`assets/CREDITS.md`).
 
-**Voices**: every character line is spoken (`assets/sounds/v_*.mp3`). After changing any dialogue, run `python3 tools/voices.py --model DIR` (see the top of that file) and rebuild. Narration captions are not voiced.
+**Voices**: every character line is spoken (`assets/sounds/v_*.mp3`). After changing any dialogue, run `python3 tools/voices.py --model DIR` (Kokoro; see the top of that file for the two model files) and rebuild. Narration captions are not voiced.
 
 ## Still to do
 1. **People and Krampus are still hand-built.** Rigged CC0 packs (Quaternius) would need their faces and gestures rebuilt
