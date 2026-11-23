@@ -45,12 +45,16 @@ you from the balcony scene, bow when Krampus lands, walk your parents out, and w
 
 **Performance + head shape**: people more than 7 m from the camera use a lighter copy of every part (`loGeo` proxy, `'|lo'` key suffix, `setEye`), limbs use 6 sides far away, hair/beard shells only span the part of the head they cover, people behind the camera or past 55 m aren't drawn, desktop render scale capped at 1.15x. Frame mesh building went from 19-33 ms to ~8 ms in the test browser. Heads: `hsz` 0.95, rx 0.98, jaw `J` 0.24/0.3/0.16 turning in late (s2 from 0.52), softer eye sockets, flatter crown. `window.__prof` (debug) times logic / mesh building / limbs / draw.
 
+**Round 5 (real bodies, reveal, three additions)**:
+- *Bodies*: people are MakeHuman meshes (CC0) baked by `tools/humans.py` (`python3 tools/humans.py /path/to/makehuman-data`, a checkout of makehuman-js/makehuman-data with `targets.bin` pulled from LFS). Per character it shapes the body with the macro targets (gender/age/muscle/weight/race, `CAST` table), fits a clothes proxy and shoes, tints them (AO keeps folds), puffs winter coats with baffles, adds boot shafts and mittens, drops the head, collapses the skin weights onto the rig's 16 joints, simplifies to ~9k and ~2.6k triangles, and packs `assets/humans.bin` (embedded as `window.BOX_HUM`). In `actors.js`, `dims()` measures the rig off the real joints (`d.real`, z offsets `pz/cz/nz/hz/sz`, `shY`), `bindOf()` fits the rig to MakeHuman's A-pose once per character, and `emitBody()` skins on the CPU every frame (about 2 ms for the whole cast in the test browser). Aprons, ties, lanyards and the purse strap read the body's measured front (`d.pf`, `frontP`, `frontC`). The game's own heads sit at `d.hoff`.
+- *Reveal (`sceneCrash`)*: every kid shot is through your eyes at 1.3 m (`pov()`, a follow camera with a handheld wobble): walking up to your parents, eyes snapping up to the bursting skylight and riding him down, a dolly-zoom as he turns, his stare, the rush, and the floor-level view as he bounds to the balcony. The kids now stand clear of the stairs (27.5, 26.0) so the sightlines work.
+- *New*: hold your breath (`breathTick`, `#lungs`, `#btnBreath`), close calls (`closeTick`, `body.close` vignette), and a report card on both end screens (`reportCard`).
+
 ## Still to do
 0a. **Black screen on "Jump to the hunt"**: couldn't reproduce in headless Chrome (fresh, after caught, after a win, mic on/off). Ask which device/browser if it comes back.
 0. **Cutscene camera pass**: Joseph says the scenes' camera views and movement still feel a little off. Go shot by shot.
-1. **People and Krampus are still hand-built.** Rigged CC0 packs (Quaternius) would need their faces and gestures rebuilt
-   for the cutscenes: the stare, the wide smile, the owl head-turn and the bow all live in `src/actors.js`. Worth doing only
-   if the result keeps those.
+1. **Krampus is still hand-built.** People have real bodies now. Fingers are in MakeHuman's open rest pose; a slight curl
+   baked in `tools/humans.py` (rotate finger verts about the knuckle joints) would read more relaxed.
 2. **Sofas, beds and shelves are still hand-built.** Poly Haven's sofas are antique styles that don't suit this store.
    A modern CC0 sofa and bed would slot straight in: add the `.glb` to `assets/models/` and wrap the builder in `model(...)`
    in `src/level.js` the way `chair()` does.

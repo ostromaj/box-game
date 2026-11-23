@@ -86,6 +86,18 @@
   #msg.tip { font-size: clamp(15px, 3vw, 22px); font-weight: 700; top: 72%; }
   #ears { display: none; position: absolute; inset: 0; }
   #ears span { position: absolute; transform: translate(-50%, -50%); font-size: 12px; font-weight: 700; letter-spacing: .08em; white-space: nowrap; opacity: 0; transition: opacity .3s; text-shadow: 0 1px 5px #000; background: rgba(20,18,16,.45); padding: 2px 8px; border-radius: 999px; }
+  #btnBreath { display: none !important; right: calc(max(24px, env(safe-area-inset-right)) + 92px); bottom: max(24px, env(safe-area-inset-bottom)); background: rgba(70,110,160,0.7); line-height: 1.15; }
+  body.touch.hiding #btnBreath { display: block !important; }
+  body.touch.hiding #btnRun { display: none; }
+  #lungs { position: absolute; left: 50%; bottom: calc(max(18px, env(safe-area-inset-bottom)) + 34px); transform: translateX(-50%); display: flex; gap: 8px; align-items: center; font-size: 11px; letter-spacing: .14em; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  #lungsBar { width: 150px; height: 7px; border-radius: 4px; background: rgba(255,255,255,0.18); overflow: hidden; }
+  #lungsFill { height: 100%; width: 100%; background: #9cc8f0; transition: width .1s linear; }
+  #lungs.held #lungsFill { background: #f0f4f8; } #lungs.low #lungsFill { background: #e0573c; }
+  body.close::after { content: ''; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 45%, rgba(90,0,0,0.55)); animation: closecall 0.9s ease-out forwards; }
+  @keyframes closecall { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+  .card { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; margin: 12px auto 4px; max-width: 420px; text-align: left; font-size: 14px; }
+  .card div { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.12); padding: 2px 0; }
+  .card span { opacity: .7; } .card b { color: var(--gold); }
   .tipline { display: inline-block; margin-top: 8px; font-size: 14px; opacity: .8; font-style: italic; }
   body.stare #top, body.stare #hint, body.stare #where, body.stare #stance, body.stare #minimap, body.stare #btnPause { opacity: 0; transition: opacity .6s; }
   body.touch #sub { max-width: 60vw; font-size: clamp(19px, 5.4vmin, 27px); bottom: 7vh; }
@@ -134,6 +146,8 @@
   <div id="prompt"><span class="keyonly"><b>E</b> · </span><span id="promptText"></span></div>
   <div id="hint">WASD move · Mouse look · Shift or R run (loud) · C crouch · E hide / look inside · M map · Esc pause</div>
   <button class="tbtn" id="btnUse">Hide</button>
+  <button class="tbtn" id="btnBreath">Hold<br>breath</button>
+  <div id="lungs"><span>BREATH</span><div id="lungsBar"><div id="lungsFill"></div></div></div>
   <button class="tbtn" id="btnCrouch">Crouch</button>
   <button class="tbtn" id="btnRun">Run</button>
 </div>
@@ -7809,6 +7823,10 @@ const ACT = (() => {
   press($('btnCrouch'), () => { P.crouch = !P.crouch; });
   press($('btnRun'), () => { P.run = true; }, () => { P.run = false; });
   press($('btnUse'), () => interact());
+  press($('btnBreath'), () => { keys.Breath = true; }, () => { keys.Breath = false; });
+  canvas.addEventListener('mousedown', (e) => { if (e.button === 2) keys.Breath = true; });
+  window.addEventListener('mouseup', (e) => { if (e.button === 2) keys.Breath = false; });
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   $('btnPause').addEventListener('click', () => pause());
   $('skipBtn').addEventListener('click', () => skipScene());
   $('minimap').addEventListener('click', () => { mapOn = !mapOn; });
@@ -8165,12 +8183,13 @@ const ACT = (() => {
   const cam = { pos: [0, 1.6, 0], look: [0, 1.6, -1], fov: 1.15, shake: 0, shot: null };
   function cut(pos, lookAt, fov = 1.0) { cam.shot = { type: 'fixed', pos, look: lookAt, fov }; }
   function move(p0, l0, p1, l1, dur, fov = 1.0, fov1 = null) { cam.shot = { type: 'move', p0, l0, p1, l1, t0: NOW, dur, fov, fov1: fov1 == null ? fov : fov1 }; }
-  function follow(fn, fov = 1.0) { cam.shot = { type: 'follow', fn, fov, cur: null }; }
+  function follow(fn, fov = 1.0, wob = 0, k = 3.5) { cam.shot = { type: 'follow', fn, fov, cur: null, wob, k }; }
   function camUpdate(dt) {
     const s = cam.shot; if (!s) return;
     if (s.type === 'fixed') { cam.pos = s.pos.slice(); cam.look = s.look.slice(); cam.fov = s.fov; }
     else if (s.type === 'move') { const u = smooth((NOW - s.t0) / s.dur); for (let i = 0; i < 3; i++) { cam.pos[i] = lerp(s.p0[i], s.p1[i], u); cam.look[i] = lerp(s.l0[i], s.l1[i], u); } cam.fov = lerp(s.fov, s.fov1, u); }
-    else if (s.type === 'follow') { const [p, l] = s.fn(); if (!s.cur) s.cur = [p.slice(), l.slice()]; const k = Math.min(1, dt * 3.5); for (let i = 0; i < 3; i++) { s.cur[0][i] = lerp(s.cur[0][i], p[i], k); s.cur[1][i] = lerp(s.cur[1][i], l[i], k); } cam.pos = s.cur[0].slice(); cam.look = s.cur[1].slice(); cam.fov = s.fov; }
+    else if (s.type === 'follow') { const [p, l, fv] = s.fn(); if (!s.cur) s.cur = [p.slice(), l.slice()]; const k = Math.min(1, dt * (s.k || 3.5)); for (let i = 0; i < 3; i++) { s.cur[0][i] = lerp(s.cur[0][i], p[i], k); s.cur[1][i] = lerp(s.cur[1][i], l[i], k); } cam.pos = s.cur[0].slice(); cam.look = s.cur[1].slice(); cam.fov = fv != null ? fv : s.fov;
+      if (s.wob) { const w = s.wob, T = NOW; cam.pos[0] += w * 0.012 * Math.sin(T * 1.3); cam.pos[1] += w * (0.009 * Math.sin(T * 2.1) + 0.004 * Math.sin(T * 5.3)); cam.pos[2] += w * 0.01 * Math.sin(T * 1.7 + 1); cam.look[0] += w * 0.05 * Math.sin(T * 0.9 + 2); cam.look[1] += w * 0.035 * Math.sin(T * 1.6); } }   // a held breath: the camera is a scared kid, not a tripod
     cam.shake = Math.max(0, cam.shake - dt * 1.5);
   }
 
@@ -8223,7 +8242,7 @@ const ACT = (() => {
     for (let i = 0; i < D.traps; i++) traps[i].on = true;
     K = { x: -50, z: -50, y: -50, yaw: 0, state: 'wait', path: null, pi: 0, t: 0, look: 0, step: 0, stuck: 0, lastP: [0, 0], seeing: false, lastSeen: null, searchLeft: 0, repath: 0, spd: 0, sawT: 99, stun: 0 };
     G = { hearCool: 8, peerCool: 25, peerAt: 0, D, phase: 'grace', t: D.grace, time: 0, huntT: 0, clues: 0, keys: false, items, traps, broC, bro: { state: 'hidden', x: bc.x, z: bc.z, y: bc.y }, trail: [], hiding: null, back: null,
-      alert: 0, noiseT: 0, hunchT: 30, lightT: 70, cryT: 2, doorT: 7, lingerT: 0, knockCool: 0, tipT: 5, tips: {}, breathT: 0, sightings: 0, hides: 0, slips: D.slips, micStrikes: diffKey === 'easy' ? 2 : diffKey === 'normal' ? 1 : 0, micCool: 0, dead: shuffle([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]), reason: '', extraStun: 0 };
+      alert: 0, noiseT: 0, hunchT: 30, lightT: 70, cryT: 2, doorT: 7, lingerT: 0, knockCool: 0, tipT: 5, tips: {}, breathT: 0, sightings: 0, hides: 0, slips: D.slips, micStrikes: diffKey === 'easy' ? 2 : diffKey === 'normal' ? 1 : 0, micCool: 0, dead: shuffle([0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15]), reason: '', extraStun: 0, breath: 1, holding: false, gasping: 0, held: 0, heldPeer: false, close: 0, closeArm: true, breathTipT: 0, myBreathT: 2 };
     hideAll();
     const fd = LV.doors.front, sd = LV.doors.side;
     // the staff wait outside, at the glass. More of them come to watch with every clue you find.
@@ -8397,8 +8416,42 @@ const ACT = (() => {
   // While you hide: he says "I can hear you", and sometimes walks over, bends down and stares into the
   // opening for about half a minute. Hold still and he leaves. Climb out and he has you.
   function startPeer(c) { K.state = 'peer'; K.path = null; K.peerT = 0; K.peerCyc = -1; K.mimicked = false; K.peerDur = 27 + Math.random() * 6; K.breathT = 0.5; KV.gest = { name: 'peer', t0: NOW }; G.peerLook = 2.4; G.peerCool = 80; showMsg('Don\u2019t move.', 2.6); }
+  // ---------- holding your breath ----------
+  // While you hide, hold B (or the right mouse button, or the Breath button) to hold your breath. He gives up on a stare
+  // much sooner if he can't hear you breathing, but your lungs only last a few seconds. Run out and you gasp: right in his
+  // face, that's the end; anywhere near, he heard it.
+  function breathTick(dt, dP, sameFloor, c) {
+    const lungs = G.D.label === 'Easy' ? 9 : G.D.label === 'Hard' ? 5.5 : 7;
+    const want = !!c && (keys.KeyB || keys.KeyH || keys.Breath) && G.gasping <= 0;
+    if (want && G.breath > 0) { if (!G.holding) { G.holding = true; tone(320, 0.12, 0.03, 'sine', 0, -60); } G.breath = Math.max(0, G.breath - dt / lungs); }
+    else { if (G.holding && G.breath > 0) { G.holding = false; breath(0.06, 0); } G.breath = Math.min(1, G.breath + dt / (G.gasping > 0 ? 6 : 3.5)); }
+    G.gasping = Math.max(0, G.gasping - dt);
+    if (G.holding) { FEAR = Math.min(1, FEAR + dt * 0.08); if (K.state === 'peer') { K.peerDur -= dt * 0.85; G.heldPeer = true; } }
+    if (G.holding && G.breath <= 0) {   // out of air
+      G.holding = false; G.gasping = 2.5; breath(0.55, 0); noise(0.35, 0, 900, 'bandpass', 4); tone(210, 0.35, 0.12, 'triangle', 0, 90); cam.shake = 0.25;
+      if (K.state === 'peer') { caught('You gasped for air right in front of him.'); return true; }
+      if (sameFloor && dP < 8 && K.state !== 'chase' && c) { showMsg('He heard you gasp.', 2.2); sayHeard(0.9); if (goTo(c.x, c.z, c.f)) K.state = 'peerwalk'; G.peerCool = 0; }
+      else showMsg('Breathe. Slowly.', 1.6, 'tip');
+    }
+    // your own breathing while you hide: soft, and it stops when you hold it
+    if (c && !G.holding) { G.myBreathT -= dt; if (G.myBreathT <= 0) { G.myBreathT = lerp(3.2, 1.6, FEAR); breath(0.018 + 0.03 * FEAR, 0); } }
+    const el = $('lungs'); if (el) { el.style.opacity = c ? 1 : 0; $('lungsFill').style.width = Math.round(G.breath * 100) + '%'; el.classList.toggle('low', G.breath < 0.3); el.classList.toggle('held', G.holding); }
+    document.body.classList.toggle('hiding', !!c);
+    if (c && !G.tips.breath && K.state === 'peerwalk') { G.tips.breath = true; showMsg(isTouch ? 'Hold BREATH when he leans in' : 'Hold B (or right mouse) to hold your breath', 3.2, 'tip'); }
+    return false;
+  }
+  // ---------- close calls: he passes within arm's reach and doesn't see you ----------
+  function closeTick(dP, sameFloor) {
+    if (!sameFloor || dP > 4.5) { G.closeArm = true; return; }
+    if (G.closeArm && dP < 2.0 && !K.seeing && K.state !== 'chase' && K.state !== 'peer' && K.state !== 'rage') {
+      G.closeArm = false; G.close++;
+      tone(52, 0.32, 0.55, 'sine', 0, -18); tone(47, 0.3, 0.45, 'sine', 0.27, -16);   // one heavy heartbeat
+      FEAR = Math.max(FEAR, 0.85); document.body.classList.remove('close'); void document.body.offsetWidth; document.body.classList.add('close');
+    }
+  }
   function hideTick(dt, dP, sameFloor) {
     const c = G.hiding != null ? LV.containers[G.hiding] : null;
+    if (breathTick(dt, dP, sameFloor, c)) return true;
     G.hearCool -= dt; G.peerCool -= dt; if (K.state !== 'peer') PEEK = Math.max(0, PEEK - dt * 1.5);
     if (K.state === 'peerwalk') {
       if (!c) { K.state = 'search'; K.t = 1.5; K.look = K.yaw; K.searchLeft = 1; K.lastSeen = [K.x, K.z, floorOf(K.y)]; return false; }
@@ -8421,7 +8474,7 @@ const ACT = (() => {
         if (at(7.6) && MIC.clip && !K.mimicked) { K.mimicked = mimic(1, true); }
         if (at(9.6) && NOW - kSaidAt > 2) playSnd('k_laugh', 1.3);
         if (at(14.8) || at(15.6) || at(16.3)) sniff(0.55); }
-      if (K.peerT > K.peerDur) { KV.gest = null; K.peerSaid = false; K.state = 'look'; K.t = 2.6; K.look = K.yaw + 2.4; G.alert = 0; showMsg('He’s leaving. Wait for the bells to fade.', 3, 'tip'); }
+      if (K.peerT > K.peerDur) { if (G.heldPeer) G.held++; G.heldPeer = false; KV.gest = null; K.peerSaid = false; K.state = 'look'; K.t = 2.6; K.look = K.yaw + 2.4; G.alert = 0; showMsg('He’s leaving. Wait for the bells to fade.', 3, 'tip'); }
       // the stare was staged for his old size, so he swells as he bends over the opening (all you can see is the face)
       Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: lerp(KS, 1.02, smooth(K.peerT / 0.8)), sackFull: false, look: null });
       return true;
@@ -8476,6 +8529,7 @@ const ACT = (() => {
       if (hideTick(dt, dP, sameFloor)) return;
       const s = canSee();
       K.seeing = !!s; K.sawT = K.seeing ? 0 : K.sawT + dt;
+      closeTick(dP, sameFloor);
       if (s) {
         const [d, range] = s;
         let r = d < 2.4 ? 5 : 0.2 + 2.2 * Math.pow(1 - d / range, 1.8);   // slow to notice you far away, quick up close
@@ -9114,23 +9168,34 @@ const ACT = (() => {
   }
   function* sceneCrash() {
     music.warp = 0.5; music.vol = 0.025;
-    placeA(C.you, 25.5, 27.3, 0.5); placeA(C.leo, 26.2, 27.6, 0.5, { holdHand: 0 });
+    placeA(C.you, 27.5, 26.0, 0.4); placeA(C.leo, 28.14, 25.89, 0.4, { holdHand: 0 });   // clear of the stairs, with your parents in sight past the tree
     gatherGroup(true);
     for (const k of Object.keys(GROUP)) C[k].look = head(C.you);
-    cut([24.3, 1.75, 30.2], [30.0, 1.4, 19.0], 0.95);
+    // Your eyes: eleven years old, about 1.3 m off the floor. Every kid shot in this scene is from here.
+    const fw = [Math.sin(0.4), -Math.cos(0.4)];
+    const eye = (back = 0, h = 1.3) => [27.5 + fw[0] * (0.12 - back), h, 26.0 + fw[1] * (0.12 - back)];
+    let back = 0, eyeH = 1.3;
+    const pov = (look, fov = 0.9, wob = 1, k = 3.5) => { C.you.visible = false; follow(() => { const L = typeof look === 'function' ? look() : look; return [eye(back, eyeH), L]; }, fov, wob, k); };
+    const kHead = () => [KV.x, (KV.y || 0) + 2.5, KV.z];
+    // 1. walking up to your parents: the store is huge from down here, and every face in it is turned to you
+    pov([32.0, 1.4, 14.6], 0.72, 1);
+    par(function* () { for (let i = 0; i < 24; i++) { back = -0.012 * i; eyeH = 1.3 + 0.012 * Math.abs(Math.sin(i * 0.9)); yield 0.05; } eyeH = 1.3; });   // two small steps forward
     yield 0.6;
     for (const k of STAFF) { setCreep(C[k], 3); C[k].gest = { name: 'fold', t0: NOW }; C[k].look = head(C.you); }
     gest(C.mom, 'wave', 1.5); C.mom.face = { mouth: 'smile' };
     yield say('MOM', 'There you are! Come on, we’re—', 1.6);
     C.manager.look = [32, 9, 20]; for (const k of ['dana', 'marcus', 'priya']) C[k].look = [32, 9, 20];
+    pov([32.0, 2.1, 15.0], 0.9, 1);   // their heads tip back; yours follows theirs
     yield say('MANAGER', 'Here he is.', 1.3);
+    // 2. your eyes snap up to the skylight as it bursts, and ride him all the way down
+    pov([30.5, 8.6, 20.6], 1.0, 1.6, 9);
     SKY.broken = true; shatter(0.8); cam.shake = 0.8;
     burstGlass(32, 8.8, 20, 160, 7, -1);
     par(function* () { for (let i = 0; i < 10; i++) { ambDim = Math.random() < 0.5 ? 0.3 : 1; yield 0.06; } ambDim = 1; });
-    // he comes down facing your parents, with his back to you
-    const toParents = Math.atan2(32.5 - 29.5, -(14.4 - 21.5)), toKids = Math.atan2(25.8 - 29.5, -(27.4 - 21.5));
+    const toParents = Math.atan2(32.5 - 29.5, -(14.4 - 21.5)), toKids = Math.atan2(27.8 - 29.5, -(26.0 - 21.5));
     Object.assign(KV, { x: 29.5, y: 9.5, z: 21.5, yaw: toParents, visible: true, anim: 'leap', gest: null, sackFull: false, look: null, sack: false });
-    move([24.3, 1.75, 30.2], [30.0, 1.4, 19.0], [24.0, 1.6, 30.6], [29.5, 3.5, 21.5], 0.8, 0.95, 1.05);
+    yield 0.35;
+    pov(() => [KV.x, KV.y + 1.3, KV.z], 1.0, 1.4, 7);
     for (let i = 0; i < 12; i++) { KV.y = Math.max(0, 9.5 - 9.8 * Math.pow((i + 1) / 12, 2)); yield 0.04; }
     KV.y = 0; KV.anim = 'land'; DISPLAY.smashed = true; burstOrnaments(29.5, 1, 21.5, 90); boxSmash(); thud(0.9, 0, 200); cam.shake = 1.2;
     C.you.face = { eyes: 'wide', mouth: 'o', brows: 'up' }; C.leo.face = { eyes: 'wide', mouth: 'o', brows: 'up' };
@@ -9142,46 +9207,56 @@ const ACT = (() => {
     goA(C.priya, [[34.7, 16.3]], 1.4); C.priya.faceYaw = Math.atan2(29.5 - 34.7, -(21.5 - 16.3));
     for (const k of STAFF) { C[k].look = null; C[k].gest = { name: 'bow', t0: NOW }; }   // heads down, hands folded
     yield 0.5;
-    // wide, from the balcony: the tree, the thing in the broken display, your parents, the bowing staff
+    // wide, from the balcony: the tree, the thing in the broken display, your parents, the bowing staff, and the two of you
+    C.you.visible = true;
     cut([39.8, 6.0, 24.5], [29.6, 1.0, 20.2], 0.95);
     KV.anim = 'idle'; KV.gest = { name: 'rise', t0: NOW, dur: 2.6 };
     yield 1.4; jingle(0.25, 0, 3); yield 1.2;
     // over its shoulder: your parents' faces
-    move([28.5, 4.0, 25.9], [32.4, 1.3, 14.2], [28.9, 3.75, 25.0], [32.4, 1.35, 14.2], 1.8, 0.38, 0.33);   // down over its horns at your parents, pushing in
+    move([28.5, 3.8, 25.9], [32.4, 1.3, 14.2], [28.9, 3.65, 25.0], [32.4, 1.35, 14.2], 1.8, 0.38, 0.33);
     KV.gest = { name: 'roar', t0: NOW, dur: 1.8 }; roar();
     gest(C.mom, 'scream', 2.6); gest(C.dad, 'shield', 2.8); yelp(0.18);
     yield 1.6;
     cut([31.65, 1.72, 17.5], [32.55, 1.56, 14.1], 0.5);
     yield say('DAD', 'What— what is that?!', 2.0);
     yield say('', 'Mom screams. The staff fold their hands and bow their heads.', 3.0);
-    // then, slowly, it turns around
-    cut([27.2, 1.15, 25.4], [29.5, 2.0, 21.5], 0.9);
+    // 3. back in your eyes.  Its back is to you.  It turns.  You back away, and it only gets bigger (a dolly-zoom).
+    back = 0; eyeH = 1.3;
+    pov(kHead, 0.85, 1);
     KV.sack = true; jingle(0.2, 0, 3);
+    yield 0.5;
     { const y0 = KV.yaw; let d = toKids - y0; d = Math.atan2(Math.sin(d), Math.cos(d)); KV.anim = 'walk';
-      for (let i = 0; i < 30; i++) { KV.yaw = y0 + d * smooth((i + 1) / 30); KV.phase += 0.12; yield 0.05; } KV.anim = 'idle'; }
+      const fov0 = 0.85;
+      follow(() => [eye(back, eyeH), kHead()], fov0, 1);
+      for (let i = 0; i < 44; i++) { const u = smooth((i + 1) / 44); if (i < 30) { KV.yaw = y0 + d * smooth((i + 1) / 30); KV.phase += 0.12; } else KV.anim = 'idle';
+        back = 0.6 * u; cam.shot.fov = lerp(fov0, 0.44, u); if (i % 9 === 4) breath(0.05); yield 0.05; } KV.anim = 'idle'; }
     KV.gest = null;
     KV.look = head(C.you);
-    cut([27.2, 2.0, 24.7], [29.5, 2.3, 21.5], 0.7);
-    yield 1.8;
-    KV.look = head(C.leo); KV.gest = { name: 'tilt', t0: NOW, dur: 2 };
-    yield 1.2;
+    cam.shake = 0.12;
+    yield 1.8;   // it is looking at you
+    // then its head tips, slowly, toward Leo beside you
+    KV.look = head(C.leo); KV.gest = { name: 'tilt', t0: NOW, dur: 2 }; slurp(0.12);
     C.leo.look = [29.5, 2.3, 21.5];
-    { const L = C.leo, fx = Math.sin(L.yaw), fz = -Math.cos(L.yaw); cut([L.x + fx * 0.95, 1.0, L.z + fz * 0.95], [L.x, 0.95, L.z], 0.6); }
+    yield 1.4;
+    { const L = C.leo, fx = Math.sin(L.yaw), fz = -Math.cos(L.yaw); C.you.visible = true; cut([L.x + fx * 0.95, 1.0, L.z + fz * 0.95], [L.x, 0.95, L.z], 0.6); }
     yield say('LEO', '(whisper) …Is he part of the store?', 2.4);
-    cut([29.9, 1.6, 29.7], [26.7, 1.2, 26.1], 1.0);
+    // 4. it comes at you.  It takes him.  You're on the floor.
+    pov(kHead, 0.85, 1.8, 6);
     KV.look = null; KV.anim = 'run';
     { const sx = KV.x, sz = KV.z, ex = C.leo.x + 0.6, ez = C.leo.z - 0.9; for (let i = 0; i < 10; i++) { const u = (i + 1) / 10; KV.x = lerp(sx, ex, u); KV.z = lerp(sz, ez, u); KV.phase += 0.6; yield 0.04; } }
     KV.anim = 'idle'; KV.gest = { name: 'grab', t0: NOW, dur: 0.8 }; roar(); yelp(0.25);
-    yield 0.35; C.leo.visible = false; C.you.holdHand = null; KV.sackFull = true; cam.shake = 0.6;
+    yield 0.35; C.leo.visible = false; C.you.holdHand = null; KV.sackFull = true; cam.shake = 0.9;
+    par(function* () { for (let i = 0; i < 8; i++) { eyeH = lerp(1.3, 0.32, smooth((i + 1) / 8)); back = 0.55 + 0.4 * (i + 1) / 8; yield 0.03; } });   // knocked flat
+    thud(0.5, 0.2, 140);
     yield 0.6;
     KV.anim = 'crouch'; KV.yaw = Math.atan2(31 - KV.x, -(30 - KV.z)); yield 0.45;
     KV.anim = 'leap'; jingle(0.3, 0, 6);
-    follow(() => [[33.2, 1.3, 23.9], [KV.x, KV.y + 1.6, KV.z]], 1.05);
+    pov(() => [KV.x, KV.y + 1.6, KV.z], 1.05, 1.5, 4);   // from the floor, watching it go
     { const sx = KV.x, sz = KV.z; for (let i = 0; i < 20; i++) { const u = (i + 1) / 20; KV.x = lerp(sx, 31, u); KV.z = lerp(sz, 30.5, u); KV.y = F1 * u + 4.2 * Math.sin(u * Math.PI); yield 0.04; } }
     KV.y = F1; KV.anim = 'land'; thud(0.6, 0.3, 300); yield 0.5;
     KV.anim = 'walk'; KV.yaw = -Math.PI / 2 - 0.4;
     for (let i = 0; i < 30; i++) { KV.x -= 0.09; KV.z += 0.05; KV.phase += 0.25; if (i % 4 === 0) jingle(0.25 * (1 - i / 30), 0.4, 4); yield 0.04; }
-    KV.visible = false;
+    KV.visible = false; C.you.visible = true;
   }
   function* sceneDoors() {
     C.you.face = { eyes: 'wide', mouth: 'open', brows: 'sad' };
@@ -9329,16 +9404,22 @@ const ACT = (() => {
     try { if (navigator.vibrate) navigator.vibrate([60, 30, 220]); } catch (e) {}
   }
   let SCARE = null;
+  function reportCard(best) {
+    const row = (k, v) => `<div><span>${k}</span><b>${v}</b></div>`;
+    return `<div class="card">${row('Time', fmt(G.time))}${row('Leo\u2019s things', G.clues + ' / 3')}${row('Times hidden', G.hides)}${row('Close calls', G.close)}${row('Breath-held stares', G.held)}${row('Times he spotted you', G.sightings)}${best ? row('Best escape', best) : ''}</div>`;
+  }
   function endCaught() {
     const reason = G.reason; mode = 'end'; KV.gest = null;
     $('endTitle').textContent = 'INTO THE SACK'; $('endTitle').className = 'lose';
-    const tip = /breathing/.test(reason) ? 'With the microphone on, he hears your room. When he bends over your hiding place, keep completely quiet.'
+    const tip = /gasped/.test(reason) ? 'Let your breath go before the bar runs out, then hold it again. He gives up on a stare much sooner when he can’t hear you breathing.'
+      : /breathing/.test(reason) ? 'With the microphone on, he hears your room. When he bends over your hiding place, keep completely quiet.'
       : /climb into/.test(reason) ? 'Get out of his sight before you hide. If he watches you climb in, he pulls you out.'
       : /You moved/.test(reason) ? 'When he bends down and stares, stay put. He leaves after about half a minute.'
       : /Leo back/.test(reason) ? 'Leo falls at the bottom of the stairs. Turn around and go back for him straight away.'
       : /last second/.test(reason) ? (G.keys ? 'Sprint the whole way and take the big staircase. He is slow on the stairs.' : 'Pick up the keys from a register before you open Leo’s hiding place.')
       : 'Walking is quiet, running is loud. Crouch behind furniture when you hear the bells getting louder.';
-    $('endText').innerHTML = `${reason}<br>You lasted ${fmt(G.time)} and found ${G.clues} of 3 of Leo’s things.<br><span class="tipline">${tip}</span>`;
+    const pb = getBest(diffKey);
+    $('endText').innerHTML = `${reason}${reportCard(pb ? fmt(pb) : '')}<span class="tipline">${tip}</span>`;
     showOnly('end'); $('hud').style.display = 'none'; if (document.pointerLockElement) document.exitPointerLock();
   }
   function win() {
@@ -9350,7 +9431,7 @@ const ACT = (() => {
     runScene(sceneEnding, () => {
       mode = 'end'; $('fade').style.transition = 'none'; $('fade').style.opacity = 0;
       $('endTitle').textContent = 'YOU GOT LEO OUT'; $('endTitle').className = 'win';
-      $('endText').innerHTML = `Escaped in <b>${fmt(t)}</b> on ${G.D.label}${best ? ' — new best!' : ''}<br>He spotted you ${G.sightings} time${G.sightings === 1 ? '' : 's'}. You hid ${G.hides} time${G.hides === 1 ? '' : 's'}.`;
+      $('endText').innerHTML = `Escaped in <b>${fmt(t)}</b> on ${G.D.label}${best ? ' — new best!' : ''}${reportCard(fmt(getBest(diffKey)))}`;
       showOnly('end');
     });
   }

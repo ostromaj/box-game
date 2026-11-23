@@ -10,7 +10,8 @@ You're a kid locked in the store after closing. Krampus came through the skyligh
 Open `index.html` in a browser. It's one self-contained file (Three.js and the textures are built in), and it works offline. Sound matters, so turn it on.
 
 - **Computer:** WASD/arrows to move, mouse to look (click the view first), Shift to run, or R to toggle running (loud), C to crouch, E to hide in or look inside a pot or hamper, M for the map, Esc to pause.
-- **Phone/tablet:** left thumb moves, right thumb looks. Hide, Crouch and Run buttons are on the right. Landscape works best.
+- **Phone/tablet:** left thumb moves, right thumb looks. Hide, Crouch and Run buttons are on the right (Run turns into Hold breath while you hide). Landscape works best.
+- **Hold your breath:** while hiding, hold B (or the right mouse button, or the Hold breath button). When Krampus bends over your hiding place, he gives up much sooner if he can't hear you breathing, but the bar only lasts a few seconds (9 on Easy, 7 on Normal, 5.5 on Hard). Run out and you gasp: in his face that's the end, anywhere near and he comes to look.
 - **Microphone (optional):** turn it on from the title screen or Pause. Krampus then hears your real room: a whisper carries a few metres, talking across a department, a scream across the floor. If he's staring into your hiding place and hears you, you get one warning on Normal (two on Easy, none on Hard). It ignores the game's own sound and music: it listens to the game's output too and, frequency by frequency, learns how much of it reaches your mic, so only sound that's clearly *not* the game counts. Nothing quieter than talking at a normal level counts, and it has to last a third of a second. When the game is loud, it's deliberately hard of hearing; it hears you best in the quiet moments, which is when hiding matters. Headphones still work best. Nothing is recorded or sent anywhere; the game only measures loudness. The mic needs the GitHub Pages link (or any https page); it won't work from inside a sandboxed preview.
 
 ## How a round goes
@@ -28,6 +29,8 @@ Open `index.html` in a browser. It's one self-contained file (Three.js and the t
 - `src/render3.js`: the Three.js drawing layer (PBR materials, textures, shadows, AO, bloom, depth of field, grain)
 - `src/engine.js`: geometry builder (boxes, lathes, tubes), math, collision, line of sight
 - `src/level.js`: the store (furniture builders and layout)
+- `src/actors.js`: people (real skinned bodies from `assets/humans.bin` plus hand-built expressive heads, aprons, ties and scarves), Krampus, poses and gestures
+- `tools/humans.py`: bakes the bodies from MakeHuman data (CC0): shape targets, clothes, colours, a 16-joint skin, two levels of detail
 - `src/actors.js`: the family, the staff, Krampus, the car
 - `src/game.js`: player, Krampus (A* across both floors), brother, clues, traps, lights, cutscenes, HUD, audio, touch controls
 - `tools/build.py`: bundles Three.js + `render3.js` (esbuild), embeds `assets/textures`, inlines `src/` into `index.html`.
