@@ -10,7 +10,9 @@ root = Path(__file__).resolve().parent.parent
 mdir = Path(sys.argv[sys.argv.index('--model') + 1]) if '--model' in sys.argv else Path('.')
 SLOW = {'hear': 0.66, 'k_comeout': 0.74}   # these two smear when pitched down, so they are spoken slower first
 LINES = {'hear': 'I can hear you.', 'k_find': "I'm going to find you.", 'k_comeout': 'Come out... come out... wherever you are.',
-         'k_smell': 'I can smell you, little one.', 'k_brother': 'Your brother is waiting for you.'}
+         'k_smell': 'I can smell you, little one.', 'k_brother': 'Your brother is waiting for you.',
+         'k_laugh': 'Heh. heh. heh heh heh heh.'}   # the low chuckle while he stares into your hiding place
+ONLY = sys.argv[sys.argv.index('--only') + 1].split(',') if '--only' in sys.argv else None
 tts = Kokoro(str(mdir / 'kokoro-v1.0.onnx'), str(mdir / 'voices-v1.0.bin'))
 def stretch(x, f, win=1024, hop=256):   # overlap-add time stretch (keeps pitch)
     out = np.zeros(int(len(x) * f) + win); w = np.hanning(win); pos = 0.0; o = 0
@@ -18,6 +20,7 @@ def stretch(x, f, win=1024, hop=256):   # overlap-add time stretch (keeps pitch)
     return out / (win / (2 * hop))
 rng = np.random.default_rng(11)
 for key, text in LINES.items():
+    if ONLY and key not in ONLY: continue
     a, sr = tts.create(text, voice='am_onyx', speed=SLOW.get(key, 0.86), lang='en-us'); a = np.asarray(a, dtype=np.float64)
     idx = np.where(np.abs(a) > 0.01)[0]; a = a[max(0, idx[0] - 300): idx[-1] + 600]
     pd = 0.72 if key in SLOW else 0.66; low = signal.resample(a, int(len(a) / pd))   # down 6-7 semitones, and slower

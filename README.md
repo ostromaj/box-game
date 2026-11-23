@@ -45,6 +45,7 @@ Open `index.html` in a browser. It's one self-contained file (Three.js and the t
   - **"Come out, come out, wherever you are"**: every minute or so while he searches.
   - **"I can smell you, little one"**: when you're crouched or hiding close by and he hasn't seen you.
   - **"Your brother is waiting for you"**: after you pick up the first and third clue.
+- Leo's things shimmer (circling sparks, rising motes, a ring pulsing across the floor) and twinkle when you're close; they're on the map on Easy and Normal.
 - The store keeps talking during the hunt: the manager on the store speakers, Leo calling out (muffled) from the sack and then from his hiding place, the staff whispering through the glass when you go near the doors, and Leo again once you've rescued him. Quiet air-handling hum and wind through the smashed skylight underneath.
 - Sometimes he then walks over, bends down and **stares into your hiding place** for about half a minute. Don't climb out.
 - If he catches you there's a **jumpscare** before the end screen.

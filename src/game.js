@@ -468,6 +468,22 @@
   const audioKick = () => { if (AC && AC.state !== 'running' && AC.state !== 'closed') { try { AC.resume(); } catch (e) {} } };
   for (const ev of ['pointerdown', 'touchend', 'keydown']) window.addEventListener(ev, audioKick, true);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) audioKick(); });
+  // wet: filtered noise, chopped fast, sliding in pitch
+  function slurp(vol = 0.5) {
+    if (!AC || muted) return; if (!noiseBuf) noise(0.011, 0);
+    const t = AC.currentTime, s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain(), lfo = AC.createOscillator(), lg = AC.createGain();
+    s.buffer = noiseBuf; s.loop = true; f.type = 'bandpass'; f.Q.value = 4; f.frequency.setValueAtTime(700, t); f.frequency.linearRampToValueAtTime(1600, t + 0.55);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol * 0.5, t + 0.08); g.gain.linearRampToValueAtTime(0.0001, t + 0.7);
+    lfo.frequency.value = 23; lg.gain.value = vol * 0.35; lfo.connect(lg); lg.connect(g.gain);
+    s.connect(f); f.connect(g); out(g, 0); s.start(t); s.stop(t + 0.75); lfo.start(t); lfo.stop(t + 0.75);
+  }
+  function sniff(vol = 0.5) {
+    if (!AC || muted) return; if (!noiseBuf) noise(0.011, 0);
+    const t = AC.currentTime, s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
+    s.buffer = noiseBuf; s.loop = true; f.type = 'highpass'; f.frequency.value = 1800;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol * 0.6, t + 0.12); g.gain.linearRampToValueAtTime(0.0001, t + 0.3);
+    s.connect(f); f.connect(g); out(g, 0); s.start(t); s.stop(t + 0.35);
+  }
   function yelp(vol = 0.3) { tone(880, 0.6, vol, 'sawtooth', 0, 300); tone(1100, 0.5, vol * 0.6, 'triangle', 0.05, 200); }
   function lockClick() { tone(1300, 0.04, 0.2, 'square'); thud(0.35, 0, 1500); tone(700, 0.06, 0.15, 'square', 0.06); }
   // "Jingle Bells" (public domain, 1857) on soft bells; the warp setting bends it down
@@ -823,7 +839,7 @@
   function hearNoise(x, z, f, radius) { let r = floorOf(K.y) === f ? radius : radius * 0.45; if (K.state === 'look' && K.listen) r *= 1.7; /* standing dead still, bells silent, listening */ if (Math.hypot(K.x - x, K.z - z) < r) { investigate(x, z, f, false); if (radius >= 10 && Math.hypot(K.x - x, K.z - z) < 20 && NOW - (G.heardSaid || -99) > 25) { G.heardSaid = NOW; krampusSay('I can hear you', clamp(1.3 - Math.hypot(K.x - x, K.z - z) / 20, 0.35, 1)); } } }
   // While you hide: he says "I can hear you", and sometimes walks over, bends down and stares into the
   // opening for about half a minute. Hold still and he leaves. Climb out and he has you.
-  function startPeer(c) { K.state = 'peer'; K.path = null; K.peerT = 0; K.peerDur = 27 + Math.random() * 6; K.breathT = 0.5; KV.gest = { name: 'peer', t0: NOW }; G.peerLook = 2.4; G.peerCool = 80; showMsg('Don\u2019t move.', 2.6); }
+  function startPeer(c) { K.state = 'peer'; K.path = null; K.peerT = 0; K.peerCyc = -1; K.peerDur = 27 + Math.random() * 6; K.breathT = 0.5; KV.gest = { name: 'peer', t0: NOW }; G.peerLook = 2.4; G.peerCool = 80; showMsg('Don\u2019t move.', 2.6); }
   function hideTick(dt, dP, sameFloor) {
     const c = G.hiding != null ? LV.containers[G.hiding] : null;
     G.hearCool -= dt; G.peerCool -= dt; if (K.state !== 'peer') PEEK = Math.max(0, PEEK - dt * 1.5);
@@ -837,14 +853,19 @@
       K.peerT += dt; K.spd = 0; PEEK = Math.min(1, PEEK + dt * 1.2);
       // settle one step back from the rim, facing it
       const dx = K.x - c.x, dz = K.z - c.z, d = Math.hypot(dx, dz) || 1, k = Math.min(1, dt * 2);
-      K.x += (c.x + dx / d * 1.3 - K.x) * k; K.z += (c.z + dz / d * 1.3 - K.z) * k;
+      K.x += (c.x + dx / d * 1.55 - K.x) * k; K.z += (c.z + dz / d * 1.55 - K.z) * k;
       K.yaw = turnTo(K.yaw, Math.atan2(c.x - K.x, -(c.z - K.z)), dt * 4);
       K.breathT -= dt; if (K.breathT <= 0) { K.breathT = 2.1 + Math.random() * 0.8; breath(0.3, 0); }
       if (G.peerLook > 0 && KV._eye) { G.peerLook -= dt; const e = KV._eye, ey = P.y + EYE(); P.yaw = turnTo(P.yaw, Math.atan2(e[0] - P.x, -(e[2] - P.z)), dt * 2.5); P.pitch = lerp(P.pitch, clamp(Math.atan2(e[1] - ey, Math.hypot(e[0] - P.x, e[2] - P.z)), -1.3, 1.3), Math.min(1, dt * 3)); }
-      if (K.peerT > 9 && !K.peerSaid) { K.peerSaid = true; krampusSay('I can smell you, little one', 1); }
+      if (K.peerT > 7.2 && !K.peerSaid) { K.peerSaid = true; krampusSay('I can smell you, little one', 1); }
+      { const cyc = K.peerT < 2.4 ? -1 : (K.peerT - 2.4) % 22, prev = K.peerCyc == null ? -1 : K.peerCyc; K.peerCyc = cyc;   // the same clock as his pose
+        const at = (x) => prev < x && cyc >= x;
+        if (at(3.4) || at(17.4)) slurp(0.6); if (at(4.6) || at(18.6)) slurp(0.45);
+        if (at(9.6) && NOW - kSaidAt > 2) playSnd('k_laugh', 1.3);
+        if (at(14.8) || at(15.6) || at(16.3)) sniff(0.55); }
       if (K.peerT > K.peerDur) { KV.gest = null; K.peerSaid = false; K.state = 'look'; K.t = 2.6; K.look = K.yaw + 2.4; G.alert = 0; showMsg('He’s leaving. Wait for the bells to fade.', 3, 'tip'); }
       // the stare was staged for his old size, so he swells as he bends over the opening (all you can see is the face)
-      Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: lerp(KS, 1.1, smooth(K.peerT / 0.8)), sackFull: false, look: null });
+      Object.assign(KV, { x: K.x, y: K.y, z: K.z, yaw: K.yaw, visible: true, anim: 'idle', scale: lerp(KS, 1.02, smooth(K.peerT / 0.8)), sackFull: false, look: null });
       return true;
     }
     if (c && sameFloor && K.state !== 'chase' && K.state !== 'rush') {
@@ -997,8 +1018,14 @@
     if (G.hiding != null) { P.vx = P.vz = 0; return; }
     const { spd, running } = movePlayer(dt);
     if (G.phase === 'hunt') { G.noiseT -= dt; if (spd > 0.6 && G.noiseT <= 0) { G.noiseT = 0.35; hearNoise(P.x, P.z, floorOf(P.y), running && spd > 4 ? 14 : P.crouch ? 0 : 3.6); } }
+    if (G.phase !== 'grace') for (const it of G.items) {   // a twinkle as you get near one of Leo's things
+      if (it.taken || it.kind !== 'clue') continue;
+      const dd = Math.hypot(it.x - P.x, it.z - P.z) + (it.f !== floorOf(P.y) ? 8 : 0);
+      if (dd < 10) { it.tw = (it.tw || 0) - dt; if (it.tw <= 0) { it.tw = 1.6 + dd * 0.18; const [v, pan] = hear(it.x, it.z, it.y, 12); tone(1568, 0.25, 0.09 * v + 0.015, 'sine', 0, 0, pan); tone(2093, 0.3, 0.07 * v + 0.01, 'sine', 0.09, 0, pan); }
+        if (dd < 8 && !it.noticed) { it.noticed = true; showMsg('Something glints nearby. One of Leo\u2019s things?', 2.6, 'tip'); } }
+    }
     for (const it of G.items) {
-      if (it.taken || it.f !== floorOf(P.y) || Math.hypot(it.x - P.x, it.z - P.z) > (it.kind === 'keys' ? 1.7 : 1.0)) continue;
+      if (it.taken || it.f !== floorOf(P.y) || Math.hypot(it.x - P.x, it.z - P.z) > (it.kind === 'keys' ? 1.7 : 1.6)) continue;
       it.taken = true;
       if (it.kind === 'keys') { G.keys = true; jingle(0.25, 0, 3); showMsg('The store keys! These open the front doors.', 3.5); }
       else {
@@ -1348,7 +1375,7 @@
       mg.translate(Wd / 2, H / 2); mg.scale(s / MAP_S, s / MAP_S); mg.translate(-P.x * MAP_S, -(LV.depth - P.z) * MAP_S);
       mg.globalAlpha = 0.9; mg.drawImage(mapImg[f], 0, 0); mg.globalAlpha = 1;
       const sx = (x) => x * MAP_S, sz = (z) => (LV.depth - z) * MAP_S;
-      if (mode === 'play' && G.D.map) for (const it of G.items) if (!it.taken && it.f === f) { mg.fillStyle = it.kind === 'keys' ? '#e0a03a' : '#3aa0e0'; mg.beginPath(); mg.arc(sx(it.x), sz(it.z), 3.5, 0, TAU); mg.fill(); }
+      if (mode === 'play') for (const it of G.items) if (!it.taken && it.f === f && (G.D.label !== 'Hard' || it.kind === 'clue' && Math.hypot(it.x - P.x, it.z - P.z) < 15) && (G.D.map || it.kind === 'clue')) { mg.fillStyle = it.kind === 'keys' ? '#e0a03a' : '#3aa0e0'; mg.beginPath(); mg.arc(sx(it.x), sz(it.z), 3.5, 0, TAU); mg.fill(); }
       if (mode === 'play' && (G.D.map || debug) && KV.visible && floorOf(K.y) === f) { mg.fillStyle = '#7a1010'; mg.beginPath(); mg.arc(sx(K.x), sz(K.z), 4, 0, TAU); mg.fill(); }
       if (mode === 'explore' && EX.stage === 'return' && f === 1) { mg.fillStyle = '#e0a03a'; mg.beginPath(); mg.arc(sx(40.9), sz(16.4), 5, 0, TAU); mg.fill(); }
       if (mode === 'explore' && EX.stage === 'explore') for (const [, i] of LIST) { const [lf, lx, lz, , line] = LV.leoSpots[i]; if (lf === f && !EX.leo.said.has(line)) { mg.strokeStyle = '#e0a03a'; mg.lineWidth = 2; mg.beginPath(); mg.arc(sx(lx), sz(lz), 5, 0, TAU); mg.stroke(); } }
@@ -1379,19 +1406,20 @@
     cut([18, 3.2, -24], [32, 3.4, -2], 0.95);
     say('', '8:59 PM. Snowing.', 3.5);
     par(function* () {
-      const path = [[52, -15.5], [42, -13], [37.5, -9.5], [36.5, -7.5]];
+      const path = [[52, -15.5], [46, -12.6], [42.5, -11.0], [40.6, -10.7]];   // pulls in alongside the kerb, well short of the doors
       for (let i = 0; i < path.length;) { const [tx, tz] = path[i], dx = tx - CAR.x, dz = tz - CAR.z, d = Math.hypot(dx, dz); if (d < 0.2) { i++; continue; } const sp = i === path.length - 1 ? 2.5 : 7, m = Math.min(d, sp * 0.02); CAR.x += dx / d * m; CAR.z += dz / d * m; CAR.yaw = turnTo(CAR.yaw, Math.atan2(-dx, -dz), 0.08); yield 0.02; }
-      CAR.yaw = Math.PI + 0.25;
+      CAR.yaw = Math.PI / 2 - 0.05;
     });
-    move([18, 3.2, -24], [32, 3.4, -2], [24, 2.4, -17], [35, 1.5, -7], 6.5, 0.95, 0.85);
+    move([18, 3.2, -24], [32, 3.4, -2], [24, 2.4, -17], [37, 1.4, -9], 6.5, 0.95, 0.85);
     yield 6.8;
-    placeA(C.dad, 37.9, -7.8, 0); placeA(C.mom, 35.1, -6.6, 0); placeA(C.you, 35.3, -8.6, 0.2); placeA(C.leo, 36.0, -9.0, 0.1, { face: { mouth: 'smile' }, holdHand: 0 });
+    // out of the doors on the kerb side, then up the walk to the entrance (the car's parked; nobody goes near its bumper)
+    placeA(C.dad, 40.6, -9.25, -0.6); placeA(C.mom, 42.1, -9.2, -0.5); placeA(C.you, 41.4, -8.9, -0.4); placeA(C.leo, 42.6, -8.75, -0.5, { face: { mouth: 'smile' }, holdHand: 0 });
     CAR.lights = false; thud(0.3, 0.2, 600); thud(0.3, -0.2, 600);
-    cut([33.2, 1.5, -13.5], [35.5, 1.2, -6], 0.9);
-    goA(C.dad, [[36.4, -5.2], [33, -2.4]], 1.25); goA(C.mom, [[34.8, -4.6], [32.0, -2.5]], 1.25);
-    goA(C.you, [[35.0, -6.0], [32.3, -3.6]], 1.3); goA(C.leo, [[35.8, -6.4], [33.1, -3.9]], 1.35);
+    cut([34.0, 1.6, -5.6], [40.4, 1.0, -9.9], 0.9);
+    goA(C.dad, [[37.4, -6.6], [33, -2.4]], 1.25); goA(C.mom, [[38.4, -6.2], [32.0, -2.5]], 1.25);
+    goA(C.you, [[37.8, -7.0], [32.3, -3.6]], 1.3); goA(C.leo, [[38.8, -6.8], [33.1, -3.9]], 1.35);
     yield 2.2;
-    follow(() => { const m = [(C.dad.x + C.mom.x) / 2, 0, (C.dad.z + C.mom.z) / 2]; return [[m[0] + 2.6, 1.7, m[2] - 4.2], [m[0], 1.3, m[2] + 1]]; }, 0.9);
+    follow(() => { const m = [(C.dad.x + C.mom.x) / 2, 0, (C.dad.z + C.mom.z) / 2]; return [[m[0] - 2.4, 1.65, m[2] + 3.4], [m[0] + 0.4, 1.2, m[2] - 0.6]]; }, 0.9);   // ahead of them, walking backwards
     yield () => C.dad.arrived && C.mom.arrived;
     C.dad.faceYaw = 0.2; gest(C.dad, 'watch', 4.4); yield 0.8;
     { const d = C.dad, fx = Math.sin(d.yaw), fz = -Math.cos(d.yaw); cut([d.x + fx * 1.15 - fz * 0.45, 1.62, d.z + fz * 1.15 + fx * 0.45], [d.x, 1.42, d.z], 0.6); }
@@ -1816,10 +1844,14 @@
         if (it.kind === 'keys') BUF.emit(ACT.propMesh('keys'), A.chain(A.T(it.x, it.y + 0.08 + bob * 0.3, it.z), A.Ry(t)));
         else {
           const col = hex(CLUES[it.n].col);
-          if (it.n === 0) { g.ellipsoid(it.x, it.y + 0.05, it.z, 0.08, 0.045, 0.11, col, MAT.FABRIC, 8, 5); g.ellipsoid(it.x + 0.05, it.y + 0.05, it.z - 0.05, 0.03, 0.03, 0.05, col, MAT.FABRIC, 6, 4); }
-          else if (it.n === 1) BUF.emit(ACT.propMesh('train'), A.chain(A.T(it.x, it.y + 0.06, it.z), A.Ry(0.7), A.S(2)));
-          else g.tube([[it.x - 0.3, it.y + 0.03, it.z], [it.x, it.y + 0.06, it.z + 0.15], [it.x + 0.3, it.y + 0.03, it.z - 0.05]], 0.045, col, MAT.FABRIC, 6);
-          g.sphere(it.x, it.y + 0.55 + bob, it.z, 0.04, hex('#fff1b8'), MAT.GLOW, 6);
+          if (it.n === 0) { g.ellipsoid(it.x, it.y + 0.07, it.z, 0.12, 0.065, 0.16, col, MAT.FABRIC, 8, 5); g.ellipsoid(it.x + 0.07, it.y + 0.07, it.z - 0.07, 0.045, 0.045, 0.075, col, MAT.FABRIC, 6, 4); }
+          else if (it.n === 1) BUF.emit(ACT.propMesh('train'), A.chain(A.T(it.x, it.y + 0.06, it.z), A.Ry(0.7), A.S(2.7)));
+          else g.tube([[it.x - 0.4, it.y + 0.04, it.z], [it.x, it.y + 0.08, it.z + 0.2], [it.x + 0.4, it.y + 0.04, it.z - 0.07]], 0.065, col, MAT.FABRIC, 6);
+          // the shimmer: sparks circling it, and motes drifting up from it, bright enough to catch your eye down an aisle
+          const gl = hex('#ffe9a0');
+          for (let k = 0; k < 5; k++) { const a = t * 1.6 + k * TAU / 5; g.sphere(it.x + Math.cos(a) * 0.38, it.y + 0.25 + 0.1 * Math.sin(t * 2.3 + k), it.z + Math.sin(a) * 0.38, 0.05, gl, MAT.GLOW, 6); }
+          for (let k = 0; k < 10; k++) { const u = ((t * 0.3 + k / 10) % 1), wob = Math.sin(t * 2 + k * 1.7) * 0.15; g.sphere(it.x + wob, it.y + 0.3 + u * 2.6, it.z + Math.cos(t * 1.7 + k) * 0.15, 0.065 * (1 - u * 0.6), gl, MAT.GLOW, 6); }
+          { const pr = (t * 0.6 + it.x) % 1; g.torus(it.x, it.y + 0.02, it.z, 0.3 + pr * 0.5, 0.018 * (1 - pr) + 0.004, gl, MAT.GLOW, 20, 4); }   // a ring pulsing out across the floor
         }
       }
       for (const tr of G.traps) {
@@ -1896,7 +1928,7 @@
     const proj = perspective(fov, canvas.width / Math.max(1, canvas.height), 0.04, 170);
     const view = viewFPS(ex, ey, ez, yaw, pitch, roll), vp = mul4(proj, view);
     drawWorld(NOW);
-    R.begin({ vp, view, fov, fear: FEAR, focus: cine && cam.look ? Math.hypot(cam.look[0] - ex, cam.look[1] - ey, cam.look[2] - ez) : 0, eye: [ex, ey, ez], zones: mode === 'title' ? MENU_Z : ZL, k: KV.visible && mode === 'play' ? [KV.x, KV.y + 1.5, KV.z, flick] : [0, -99, 0, 1], alarm: G && mode === 'play' && G.phase === 'escape' ? 1 : 0, time: NOW, lights: mode === 'scare' ? [{ x: ex, y: ey + 0.25, z: ez, r: 4, c: [1, 0.42, 0.3], i: 1.5 }].concat(pickLights([ex, ey, ez])) : mode === 'play' && K && K.state === 'peer' && KV._eye ? [{ x: (KV._eye[0] + ex) / 2, y: ey + 0.15, z: (KV._eye[2] + ez) / 2, r: 2.6, c: [0.75, 0.6, 0.55], i: 0.55 }].concat(pickLights([ex, ey, ez])) : pickLights([ex, ey, ez]), amb: ambDim, expo: 1.3 });
+    R.begin({ vp, view, fov, fear: FEAR, focus: cine && cam.look ? Math.hypot(cam.look[0] - ex, cam.look[1] - ey, cam.look[2] - ez) : 0, eye: [ex, ey, ez], zones: mode === 'title' ? MENU_Z : ZL, k: KV.visible && mode === 'play' ? [KV.x, KV.y + 1.5, KV.z, flick] : [0, -99, 0, 1], alarm: G && mode === 'play' && G.phase === 'escape' ? 1 : 0, time: NOW, lights: mode === 'scare' ? [{ x: ex, y: ey + 0.25, z: ez, r: 4, c: [1, 0.42, 0.3], i: 1.5 }].concat(pickLights([ex, ey, ez])) : mode === 'play' && K && K.state === 'peer' && KV._eye ? [{ x: lerp(ex, KV._eye[0], 0.35), y: lerp(ey, KV._eye[1], 0.35), z: lerp(ez, KV._eye[2], 0.35), r: 3.6, c: [1.0, 0.66, 0.5], i: 3.2 }].concat(pickLights([ex, ey, ez])) : pickLights([ex, ey, ez]), amb: ambDim, expo: 1.3 });
     R.draw(STATIC);
     R.drawDynamic(BUF.view());
     R.drawDynamic(MBUF.view(), 'mul');
@@ -1924,7 +1956,7 @@
     updateBrother(dt);
     { // dread: the picture drains and closes in as he gets near; heartbeat with it
       const near = KV.visible && Math.abs(K.y - P.y) < 1 ? clamp(1 - Math.hypot(P.x - K.x, P.z - K.z) / 10, 0, 1) : 0;
-      const tgt = K.state === 'peer' ? 1 : K.state === 'chase' || K.state === 'rage' ? Math.max(0.6, near) : near * 0.7;
+      const tgt = K.state === 'peer' ? 0.5 : K.state === 'chase' || K.state === 'rage' ? Math.max(0.6, near) : near * 0.7;
       FEAR += (tgt - FEAR) * Math.min(1, dt * 1.6);
       G.heartT = (G.heartT || 0) - dt;
       if (FEAR > 0.25 && G.heartT <= 0) { G.heartT = lerp(1.05, 0.42, FEAR); tone(58, 0.13, 0.32 * FEAR, 'sine', 0, -20); tone(50, 0.16, 0.26 * FEAR, 'sine', 0.14, -18); }
