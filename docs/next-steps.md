@@ -50,6 +50,8 @@ you from the balcony scene, bow when Krampus lands, walk your parents out, and w
 - *Reveal (`sceneCrash`)*: every kid shot is through your eyes at 1.3 m (`pov()`, a follow camera with a handheld wobble): walking up to your parents, eyes snapping up to the bursting skylight and riding him down, a dolly-zoom as he turns, his stare, the rush, and the floor-level view as he bounds to the balcony. The kids now stand clear of the stairs (27.5, 26.0) so the sightlines work.
 - *New*: hold your breath (`breathTick`, `#lungs`, `#btnBreath`), close calls (`closeTick`, `body.close` vignette), and a report card on both end screens (`reportCard`).
 
+**Krampus, traditional look**: long shaggy goat-hair locks that hang and sway (`tufts`, 3-sided tubes), a big mane framing the face and a long beard, bigger curling ram horns, a birch Rute tied with a red rag in his left hand, big six-sided iron cowbells on the chain belt, a shorter, broader muzzle (`squashFace`, applied to the finished head and jaw vertices), slightly bigger ember eyes. Fixes: the jaw opens downward (`jrot`), the tongue lies in the mouth and hangs with gravity in the jaw's frame, and his face turns down into the hiding place during the stare.
+
 ## Still to do
 0a. **Black screen on "Jump to the hunt"**: couldn't reproduce in headless Chrome (fresh, after caught, after a win, mic on/off). Ask which device/browser if it comes back.
 0. **Cutscene camera pass**: Joseph says the scenes' camera views and movement still feel a little off. Go shot by shot.

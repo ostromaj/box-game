@@ -641,27 +641,33 @@ const ACT = (() => {
     P.hipX[i] = th - P.pelvisX; P.kn[i] = th - sh; P.an[i] = meta - sh;
   }
   const KD = { hip: 1.62, spine: 0.45, chest: 0.9, neck: 0.3, shW: 0.46, upper: 0.86, fore: 0.92, hand: 0.3, thigh: 0.68, shin: 0.66, meta: 0.44, hipW: 0.22 };
+  // Long, heavy goat hair like a Krampuslauf costume: each lock leaves the hide a little, then hangs and sways in loose
+  // waves. Mostly black and dark brown, with the odd grizzled grey lock.
   function tufts(g, n, cx, cy, cz, rx, ry, rz, len, seed, keep) {
-    const r = mulberry32(seed);
-    for (let i = 0; i < n; i++) {
+    const r = mulberry32(seed), N = Math.round(n * 2.1);
+    for (let i = 0; i < N; i++) {
       const u = r() * TAU, v = r() * 2 - 1, c = Math.sqrt(1 - v * v);
       const nx = Math.cos(u) * c, ny = v, nz = Math.sin(u) * c;
       if (keep && !keep(nx, ny, nz)) continue;
-      const px = cx + nx * rx, py = cy + ny * ry, pz = cz + nz * rz;
-      const dir = [nx * 0.42, ny * 0.2 - 0.9, nz * 0.42];
-      g.push(A.mul(A.T(px, py, pz), A.alignY([-dir[0], -dir[1], -dir[2]])));
-      const L = len * (0.6 + r() * 0.7);
-      g.ellipsoid(0, -L * 0.5, 0, L * 0.085, L * 0.6, L * 0.055, shade(H(r() < 0.5 ? KC.fur : KC.fur2), 0.7 + r() * 0.6), MAT.FUR, 5, 4);
-      g.pop();
+      const px = cx + nx * rx * 0.96, py = cy + ny * ry * 0.96, pz = cz + nz * rz * 0.96;
+      const L = len * (0.8 + r() * 0.8) * 1.3, out = 0.25 + 0.25 * r(), ph = r() * TAU, wx = (r() - 0.5) * 0.4, wz = (r() - 0.5) * 0.4;
+      const pts = [], rad = [];
+      for (let k = 0; k <= 5; k++) {
+        const t = k / 5, fall = t * t * 0.85 + t * 0.15, push = Math.sin(Math.min(1, t * 1.8) * Math.PI / 2) * out * L * 0.55;
+        pts.push([px + nx * push + (Math.sin(ph + t * 4.5) * 0.07 + wx * t) * L, py + ny * push * 0.4 - L * fall, pz + nz * push + (Math.cos(ph + t * 4.5) * 0.07 + wz * t) * L]);
+        rad.push(L * 0.034 * (1 - t * 0.8) + 0.0025);
+      }
+      const grey = r() < 0.12, col = grey ? shade(H('#5e4f41'), 0.75 + r() * 0.4) : shade(H(r() < 0.55 ? KC.fur : KC.fur2), 0.6 + r() * 0.65);
+      g.tube(pts, rad, col, MAT.FUR, 3, false);
     }
   }
   // ridged horns: up out of the skull, sweeping back and flaring out, dark at the root and bone at the tip
   function horn(g, side) {
     const N = 40, pts = [], rad = [];
     for (let i = 0; i <= N; i++) {
-      const t = i / N, a = t * 1.55, r = 0.44;
-      pts.push([side * (0.085 + 0.24 * t + 0.16 * t * t * t), 0.29 + r * Math.sin(a) * (1 - 0.15 * t), -0.03 + r * (1 - Math.cos(a)) * 0.95 - 0.06 * Math.sin(t * Math.PI)]);
-      rad.push((0.062 * Math.pow(1 - t, 0.85) + 0.004) * (1 + (t < 0.8 ? 0.13 * Math.max(0, Math.sin(t * 55)) : 0)));
+      const t = i / N, a = t * 1.85, r = 0.5;   // longer, curling further back like a ram's
+      pts.push([side * (0.085 + 0.27 * t + 0.22 * t * t * t + 0.05 * Math.sin(t * 9) * t), 0.29 + r * Math.sin(a) * (1 - 0.15 * t), -0.03 + r * (1 - Math.cos(a)) * 0.95 - 0.06 * Math.sin(t * Math.PI)]);
+      rad.push((0.072 * Math.pow(1 - t, 0.85) + 0.004) * (1 + (t < 0.8 ? 0.13 * Math.max(0, Math.sin(t * 55)) : 0)));
     }
     const cols = ['#1d140c', '#2f2418', '#4f4231', '#857559'];
     for (let k = 0; k < 4; k++) { const i0 = Math.max(0, k * 10 - 1), i1 = Math.min(N, k * 10 + 11); g.tube(pts.slice(i0, i1 + 1), rad.slice(i0, i1 + 1).map((r) => r * (1 + 0.012 * k)), H(cols[k]), MAT.HORN, 9, k === 0 || k === 3); }
@@ -672,8 +678,24 @@ const ACT = (() => {
   const SKULL = [[0, 0.02, 0.02, 0.02, 0.17], [0.07, 0.11, 0.12, 0.09, 0.17], [0.24, 0.16, 0.165, 0.12, 0.175], [0.4, 0.145, 0.14, 0.1, 0.17],
     [0.52, 0.112, 0.095, 0.07, 0.155], [0.74, 0.088, 0.075, 0.045, 0.125], [0.92, 0.078, 0.062, 0.038, 0.11], [1, 0.02, 0.015, 0.012, 0.105]];
   const skullZ = (v) => lerp(0.2, -0.42, v);
+  // A shorter, broader, more brutish muzzle, like the carved Krampus masks: everything in front of the eyes is pulled back
+  // (and the jaw with it) and widened. Done on the finished vertices so the teeth, nostrils and snarl all follow.
+  const FACE_Z0 = -0.1, FACE_K = 0.74;
+  function squashFace(g, z0) {
+    const f = g.f;
+    for (let i = 0; i < g.count; i++) {
+      const o = i * 10, z = f[o + 2];
+      if (z >= z0) continue;
+      const w = 1 + 0.16 * smooth(clamp((z0 - z) / 0.16, 0, 1));
+      f[o + 2] = z0 + (z - z0) * FACE_K; f[o] *= w;
+      let nx = f[o + 3] / w, ny = f[o + 4], nz = f[o + 5] / FACE_K; const l = Math.hypot(nx, ny, nz) || 1; f[o + 3] = nx / l; f[o + 4] = ny / l; f[o + 5] = nz / l;
+    }
+  }
   function kPart(part, extra = '') {
-    return mesh('k:' + part + ':' + extra, (g) => {
+    return mesh('k:' + part + ':' + extra, (g) => { kPartBuild(g, part, extra); if (part === 'head') squashFace(g, FACE_Z0); if (part === 'jaw') squashFace(g, 0); });
+  }
+  function kPartBuild(g, part, extra) {
+    {
       const fur = H(KC.fur), skin = H(KC.skin);
       if (part === 'pelvis') {
         g.ellipsoid(0, 0.08, 0, 0.36, 0.3, 0.3, fur, MAT.FUR, 14, 8);
@@ -681,7 +703,11 @@ const ACT = (() => {
         // chain belt + bells
         const pts = []; for (let i = 0; i <= 18; i++) { const a = i / 18 * TAU; pts.push([Math.sin(a) * 0.39, 0.22 + 0.04 * Math.sin(a * 2), -Math.cos(a) * 0.33]); }
         for (let i = 0; i < 18; i++) { const p = pts[i], q = pts[i + 1]; g.push(A.mul(A.T(p[0], p[1], p[2]), A.alignY([q[0] - p[0], q[1] - p[1], q[2] - p[2]]))); g.push(i % 2 ? A.Rz(Math.PI / 2) : A.I()); g.push(A.Rx(Math.PI / 2)); g.torus(0, 0, 0, 0.035, 0.01, H(KC.chain), MAT.METAL, 8, 4); g.pop(); g.pop(); g.pop(); }
-        for (let i = 0; i < 5; i++) { const a = -0.9 + i * 0.45; g.push(A.T(Math.sin(a) * 0.4, 0.1, -Math.cos(a) * 0.34)); g.lathe(0, -0.1, 0, [[0.07, 0, 1], [0.06, 0.02], [0.045, 0.07], [0.035, 0.1], [0.008, 0.115], [0, 0.115]], H(KC.bell), MAT.METAL, 12); g.sphere(0, -0.105, 0, 0.018, H('#7a5a20'), MAT.METAL, 6); g.cyl(0, 0.01, 0, 0.004, 0.11, H(KC.chain), MAT.METAL, 4); g.pop(); }
+        for (const [a, sz] of [[-1.25, 1.0], [-0.55, 0.8], [0.55, 0.85], [1.25, 1.05], [Math.PI, 1.2]]) {   // big iron cowbells (Schellen) hung off the chain belt
+          g.push(A.chain(A.T(Math.sin(a) * 0.42, 0.14, -Math.cos(a) * 0.36), A.Ry(-a), A.S(sz, sz, sz * 0.75)));
+          g.lathe(0, -0.2, 0, [[0.085, 0, 1], [0.08, 0.02], [0.066, 0.1], [0.056, 0.18], [0.04, 0.2], [0, 0.205]], H('#2e2a26'), MAT.METAL, 6);   // six-sided: rough and boxy, not a sleigh bell
+          g.sphere(0, -0.2, 0, 0.022, H('#1a1714'), MAT.METAL, 6); g.torus(0, 0.01, 0, 0.03, 0.008, H('#5c4a33'), MAT.LEATHER, 8, 4); g.pop();
+        }
         g.lathe(0, -0.3, 0, [[0.42, 0, 1], [0.38, 0.25], [0.36, 0.42, 1]], shade(fur, 1.1), MAT.FUR, 16);
       } else if (part === 'chest') {
         g.ellipsoid(0, 0.4, 0, 0.42, 0.55, 0.32, fur, MAT.FUR, 16, 10);
@@ -712,7 +738,7 @@ const ACT = (() => {
           // a brow that overhangs and slants down to the middle, so he always looks furious
           g.push(A.chain(A.T(s * 0.07, 0.244, -0.14), A.Rz(s * 0.45), A.Ry(-s * 0.3))); g.ellipsoid(0, 0, 0, 0.085, 0.02, 0.048, shade(skin, 0.75), MAT.HIDE, 10, 6); g.pop();
           g.push(A.chain(A.T(s * 0.062, 0.205, -0.15), A.Ry(s * 0.35), A.Rz(s * 0.3))); g.ellipsoid(0, 0, 0, 0.04, 0.028, 0.02, H('#030101'), 0, 10, 6); g.pop();        // deep socket
-          g.push(A.chain(A.T(s * 0.068, 0.204, -0.166), A.Ry(s * 0.35), A.Rz(s * 0.34))); g.ellipsoid(0, 0, 0, 0.038, 0.014, 0.01, H('#ff2a08'), MAT.GLOW, 12, 6);    // narrow ember eye, slanted
+          g.push(A.chain(A.T(s * 0.068, 0.204, -0.166), A.Ry(s * 0.35), A.Rz(s * 0.34))); g.ellipsoid(0, 0, 0, 0.04, 0.018, 0.01, H('#ff2a08'), MAT.GLOW, 12, 6);    // narrow ember eye, slanted
           g.ellipsoid(0, 0.001, -0.006, 0.024, 0.008, 0.007, H('#ffe08a'), MAT.GLOW, 8, 4); g.ellipsoid(0, 0, -0.011, 0.0035, 0.013, 0.003, H('#080000'), 0, 6, 4); g.pop();
           g.push(A.chain(A.T(s * 0.095, 0.168, -0.13), A.Rz(-s * 0.5))); g.ellipsoid(0, 0, 0, 0.038, 0.014, 0.05, shade(skin, 1.15), MAT.HIDE, 8, 5); g.pop();   // cheekbone
           g.push(A.chain(A.T(s * 0.15, 0.27, 0.06), A.Rz(-s * 1.5), A.Rx(0.6))); g.lathe(0, 0, 0, [[0, 0], [0.045, 0.03], [0.04, 0.12], [0.018, 0.22], [0, 0.27]], shade(skin, 0.85), MAT.HIDE, 8); g.pop();   // long ear, laid back
@@ -727,7 +753,7 @@ const ACT = (() => {
           const z = -0.39 + i * 0.032, fang = i === 1, L = fang ? 0.09 : 0.03 + 0.018 * ((i * 7) % 3), x = s * (0.034 + 0.065 * (i / 8) + 0.012);
           g.push(A.chain(A.T(x, 0.08 + i * 0.004, z), A.Rx(Math.PI + (fang ? -0.15 : 0)), A.Rz(s * 0.08))); g.lathe(0, 0, 0, [[0.011, 0], [0.008, L * 0.5], [0, L]], shade(H(KC.teeth), 0.7 + 0.3 * ((i * 5) % 2)), MAT.CERAMIC, 6); g.pop();
         }
-        tufts(g, 40, 0, 0.22, 0.12, 0.15, 0.12, 0.13, 0.26, 66, (x, y, z) => z > -0.2 && y > -0.3);                    // mane behind the horns
+        tufts(g, 80, 0, 0.2, 0.1, 0.17, 0.14, 0.15, 0.42, 66, (x, y, z) => z > -0.25 && y > -0.4);                    // mane behind the horns
       } else if (part === 'jaw') {
         // long lower jaw, hinged under the eyes
         g.param((u, v) => { const a = u * TAU, c = Math.cos(a), sn = Math.sin(a), w = 0.08 - 0.025 * v, d = 0.05 - 0.015 * v, e = Math.sin(Math.min(1, v / 0.08) * Math.PI / 2) * Math.sqrt(Math.max(0, 1 - Math.pow(Math.max(0, (v - 0.88) / 0.12), 2)));
@@ -737,7 +763,7 @@ const ACT = (() => {
           const z = -0.31 + i * 0.034, fang = i === 0, L = fang ? 0.055 : 0.026 + 0.014 * ((i * 5) % 3), x = s * (0.03 + 0.036 * (i / 7));
           g.push(A.chain(A.T(x, -0.004, z), A.Rz(-s * 0.06))); g.lathe(0, 0, 0, [[0.01, 0], [0.007, L * 0.5], [0, L]], shade(H(KC.teeth), 0.68 + 0.3 * ((i * 3) % 2)), MAT.CERAMIC, 6); g.pop();
         }
-        tufts(g, 22, 0, -0.05, 0.0, 0.06, 0.03, 0.08, 0.22, 57, (x, y) => y < 0.2);                                  // matted beard off the jaw
+        tufts(g, 34, 0, -0.04, -0.06, 0.07, 0.03, 0.12, 0.34, 57, (x, y) => y < 0.2);                                  // matted beard off the jaw
       } else if (part === 'upper') {
         g.capsule(KD.upper, 0.17, 0.12, H(KC.fur), MAT.FUR, 12);
         tufts(g, 44, 0, -KD.upper * 0.45, 0, 0.16, KD.upper * 0.5, 0.15, 0.34, 77 + (extra === 'R' ? 1 : 0));
@@ -754,6 +780,17 @@ const ACT = (() => {
           g.push(A.mul(A.T(...pts[2]), A.alignY([0, -0.6, -0.8]))); g.lathe(0, 0, 0, [[0.016, 0], [0.011, 0.12], [0, 0.3]], H('#120d0a'), MAT.CERAMIC, 6); g.pop();
         }
         g.tube([[0.07, -0.08, -0.02], [0.11, -0.13, -0.06], [0.12, -0.18, -0.09]], [0.02, 0.016, 0.012], H(KC.skin), MAT.HIDE, 6);
+        if (extra === 'L') {   // the Rute: a bundle of birch switches gripped in the fist, tied with a red rag, fanning out at the end
+          const r = mulberry32(5);
+          for (let i = 0; i < 18; i++) {
+            const a = r() * TAU, rr = r() * 0.022, sp = 0.06 + r() * 0.16, L = 0.75 + r() * 0.35, bend = (r() - 0.5) * 0.12;
+            const P0 = [Math.cos(a) * rr, -0.02, -0.06 + Math.sin(a) * rr], pts = [];
+            for (let k = 0; k <= 4; k++) { const t = k / 4; pts.push([P0[0] + Math.cos(a) * sp * t * t + bend * t * t, P0[1] - L * t, P0[2] - 0.05 * t + Math.sin(a) * sp * t * t]); }
+            g.tube(pts, [0.007, 0.006, 0.0045, 0.003, 0.0015], shade(H(r() < 0.3 ? '#6b4a36' : '#3b2a20'), 0.8 + r() * 0.4), MAT.WOOD, 3, false);
+          }
+          g.cyl(0, -0.2, -0.06, 0.034, 0.06, H('#7a1418'), MAT.FABRIC, 8);
+          g.tube([[0.02, -0.2, -0.09], [0.05, -0.3, -0.12], [0.04, -0.42, -0.1]], [0.012, 0.01, 0.006], H('#7a1418'), MAT.FABRIC, 4, false);   // the rag's loose end
+        }
       } else if (part === 'thigh') {
         g.capsule(KD.thigh, 0.19, 0.13, H(KC.fur), MAT.FUR, 12);
         tufts(g, 46, 0, -KD.thigh * 0.45, 0, 0.18, KD.thigh * 0.5, 0.18, 0.32, 99 + (extra === 'R' ? 1 : 0));
@@ -772,7 +809,7 @@ const ACT = (() => {
         g.torus(0, 0.12, 0, 0.09, 0.02, H('#5a4530'), MAT.FABRIC, 10, 4);
         if (extra === 'full') g.ellipsoid(0.12, -0.3, -0.18, 0.2, 0.22, 0.18, shade(sk, 1.05), MAT.FABRIC, 10, 6);
       }
-    });
+    }
   }
   function kPose(k, t) {
     const P = { roll: 0, hip: KD.hip, pelvisX: 0.08, lean: 0.2, twist: 0, neckX: -0.15, headY: 0, headX: 0.12, headZ: 0, jaw: 0.08,
@@ -906,13 +943,13 @@ const ACT = (() => {
     const sc = k.gest && k.gest.name === 'scare';
     let gx = -jw[4], gy = -jw[5], gz = -jw[6]; { const l = Math.hypot(gx, gy, gz) || 1; gx /= l; gy /= l; gz /= l; }
     gz = Math.min(gz, 0.1); gy = Math.min(gy, -0.35); { const l = Math.hypot(gx, gy, gz); gx /= l; gy /= l; gz /= l; }   // never back into the mouth or up through the jaw
-    const lip = [0, 0.05, -0.37], hang = (0.22 + 0.2 * P.jaw) * (sc ? 0.4 : 1), UA = 0.42, N = 12;
+    const lip = [0, 0.05, -0.37 * FACE_K], hang = (0.34 + 0.26 * P.jaw) * (sc ? 0.45 : 1), UA = 0.42, N = 12;
     for (let i = 0; i <= N; i++) {
       const u = i / N; let p;
-      if (u <= UA) { const m = u / UA; p = [0, 0.022 + 0.03 * smooth(clamp((m - 0.5) / 0.5, 0, 1)), lerp(-0.1, -0.37, m)]; }   // along the floor of the mouth, up over the teeth
+      if (u <= UA) { const m = u / UA; p = [0, 0.022 + 0.03 * smooth(clamp((m - 0.5) / 0.5, 0, 1)), lerp(-0.1, -0.37, m) * FACE_K]; }   // along the floor of the mouth, up over the teeth
       else { const h = (u - UA) / (1 - UA), L = h * hang, sw = Math.sin(t * 3 + h * 3) * 0.05 * h;
         p = [lip[0] + gx * L + sw, lip[1] + gy * L, lip[2] + gz * L - 0.035 * Math.sin(h * Math.PI)]; }
-      if (lk) { const q = [lk.s * 0.1 * Math.pow(u, 1.4), 0.024 + 0.04 * smooth(clamp((u - 0.3) / 0.4, 0, 1)) + 0.02 * Math.sin(u * Math.PI), lerp(-0.1, -0.44 + 0.05 * Math.abs(lk.s), u)]; p = p.map((v, j) => lerp(v, q[j], lk.a)); }
+      if (lk) { const q = [lk.s * 0.1 * Math.pow(u, 1.4), 0.024 + 0.04 * smooth(clamp((u - 0.3) / 0.4, 0, 1)) + 0.02 * Math.sin(u * Math.PI), lerp(-0.1, -0.44 + 0.05 * Math.abs(lk.s), u) * FACE_K]; p = p.map((v, j) => lerp(v, q[j], lk.a)); }
       pts.push(p); rad.push(0.024 * (1 - u * 0.6) * (lk ? 1 - 0.15 * lk.a : 1));
     }
     tg.tube(pts, rad, hex(KC.tongue), MAT.HIDE, 7); buf.emit(tg.data, jw);
