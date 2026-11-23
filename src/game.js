@@ -345,16 +345,20 @@
   // spoken lines: assets/sounds/v_<hash of "WHO|text">.mp3, made by tools/voices.py
   const vhash = (str) => { let v = 5381; for (let i = 0; i < str.length; i++) v = ((v * 33) ^ str.charCodeAt(i)) >>> 0; return ('0000000' + v.toString(16)).slice(-8); };
   const VOX = new Set();
+  // While the game itself is making a voice-like sound (anyone talking, Leo crying, his laugh, your own words played back),
+  // the microphone is deaf: through speakers those sound exactly like you. Real time, so pauses and slow-mo can't stretch it.
+  const RT = () => performance.now() / 1000;
+  function micDeaf(sec) { if (typeof MIC !== 'undefined') { MIC.deaf = Math.max(MIC.deaf || 0, RT() + sec + 0.5); MIC.level = 0; } }
   function speak(who, text) {
     const buf = SND['v_' + vhash(who + '|' + text)]; if (!AC || muted || !buf) return 0;
     const a = cast[who.toLowerCase()]; let vol = 1, pan = 0;
     if (a && a.visible && mode !== 'cine') { const [v, p] = hear(a.x, a.z, a.y || 0, 16); vol = clamp(0.25 + v * 1.6, 0.25, 1); pan = p; }   // in the store, voices come from where the person is
     const src = AC.createBufferSource(), g = AC.createGain(); src.buffer = buf; g.gain.value = vol * 1.25; src.connect(g); out(g, pan); src.start();
-    VOX.add(src); src.onended = () => VOX.delete(src);
+    VOX.add(src); src.onended = () => VOX.delete(src); micDeaf(buf.duration);
     return buf.duration;
   }
   function hush() { for (const s of VOX) { try { s.stop(); } catch (e) {} } VOX.clear(); }
-  function playSnd(k, vol) { if (!AC || muted || !SND[k]) return false; const s = AC.createBufferSource(), g = AC.createGain(); s.buffer = SND[k]; g.gain.value = vol; s.connect(g); g.connect(master); s.start(); return true; }
+  function playSnd(k, vol) { if (!AC || muted || !SND[k]) return false; const s = AC.createBufferSource(), g = AC.createGain(); s.buffer = SND[k]; g.gain.value = vol; micDeaf(SND[k].duration); s.connect(g); g.connect(master); s.start(); return true; }
   function out(node, pan) {
     if (pan && AC.createStereoPanner) { const p = AC.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); node.connect(p); p.connect(master); } else node.connect(master);
   }
@@ -375,7 +379,7 @@
   }
   const thud = (vol, pan, cut = 900) => noise(vol, pan, cut, 'lowpass', 1);
   function jingle(vol, pan, n = 4) { for (let i = 0; i < n; i++) tone(2300 + Math.random() * 2300, 0.16 + Math.random() * 0.25, vol * (0.5 + Math.random() * 0.5), 'sine', i * 0.04 + Math.random() * 0.05, 0, pan); }
-  function sob(vol, pan) { tone(540, 0.34, vol, 'triangle', 0, -150, pan); tone(480, 0.4, vol, 'triangle', 0.42, -150, pan); tone(610, 0.14, vol * 0.6, 'sine', 0.92, -90, pan); }
+  function sob(vol, pan) { if (vol > 0.01) micDeaf(1.1); tone(540, 0.34, vol, 'triangle', 0, -150, pan); tone(480, 0.4, vol, 'triangle', 0.42, -150, pan); tone(610, 0.14, vol * 0.6, 'sine', 0.92, -90, pan); }
   function giggle(vol, pan) { for (let i = 0; i < 4; i++) tone(780 + i * 40 - (i % 2) * 120, 0.09, vol, 'triangle', i * 0.11, -60, pan); }
   // --- Krampus's voice: a growl under whatever speech voice the device has, pitched as low as it goes
   function growl(vol, len = 1.8) { tone(52, len, vol * 0.5, 'sawtooth', 0, -14); tone(79, len * 0.9, vol * 0.28, 'square', 0.04, -22); noise(vol * 0.45, 0, 240, 'lowpass', len * 7); }
@@ -387,7 +391,7 @@
     if (NOW - kSaidAt < 5) return; kSaidAt = NOW;   // never two lines on top of each other
     showMsg('\u201c' + text + '\u201d', 3.8, 'krampus'); growl(0.4 * vol, 2.4);
     if (KLINES[text] && playSnd(KLINES[text], clamp(vol, 0.3, 1) * 1.5)) return;
-    try { if (window.speechSynthesis && !muted) { const u = new SpeechSynthesisUtterance(text); u.pitch = 0.01; u.rate = 0.5; u.volume = clamp(vol, 0.25, 1); speechSynthesis.cancel(); speechSynthesis.speak(u); } } catch (e) { /* no voice on this device: growl + subtitle only */ }
+    try { if (window.speechSynthesis && !muted) { const u = new SpeechSynthesisUtterance(text); micDeaf(text.length * 0.12 + 1); u.pitch = 0.01; u.rate = 0.5; u.volume = clamp(vol, 0.25, 1); speechSynthesis.cancel(); speechSynthesis.speak(u); } } catch (e) { /* no voice on this device: growl + subtitle only */ }
   }
   function scream() { roar(); for (const f of [622, 880, 933, 1244, 1760]) tone(f, 1.3, 0.2, 'sawtooth', 0, -f * 0.45); noise(0.9, 0, 2400, 'highpass', 11); tone(41, 1.6, 0.6, 'sine'); shatter(0.35); }
   function roar() { tone(95, 1.1, 0.5, 'sawtooth', 0, -50); tone(63, 1.3, 0.4, 'square', 0.05, -25); thud(0.6, 0, 400); }
@@ -419,7 +423,7 @@
     const lag = fx === 'pa' ? 0.9 : 0;
     if (fx === 'pa') { tone(784, 0.7, 0.12, 'sine'); tone(659, 0.9, 0.12, 'sine', 0.35); }   // ding-dong
     if (buf) {
-      const src = AC.createBufferSource(), g = AC.createGain(); src.buffer = buf; g.gain.value = vol * (fx === 'muffled' ? 1.6 : fx === 'pa' ? 0.9 : 1.2);
+      const src = AC.createBufferSource(), g = AC.createGain(); src.buffer = buf; g.gain.value = vol * (fx === 'muffled' ? 1.6 : fx === 'pa' ? 0.9 : 1.2); micDeaf(buf.duration + lag);
       let node = src;
       if (fx === 'muffled') { const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 750; node.connect(f); node = f; }
       if (fx === 'lure') { const d2 = AC.createDelay(1), fb2 = AC.createGain(); d2.delayTime.value = 0.18; fb2.gain.value = 0.3; node.connect(d2); d2.connect(fb2); fb2.connect(d2); d2.connect(g); }   // a little too much room on it
@@ -471,7 +475,37 @@
   }
   // the store at night: air handling, and wind through the smashed skylight. Only while you're playing.
   const AMB = { on: false, g: null };
+  // ---------- the stare: its own track, over everything ----------
+  // When he bends down to look in, a short piece of dread plays on its own bus straight to the speakers while the rest of
+  // the game ducks under it: a sub drone, a swelling minor-second string cluster that trembles, a heartbeat that speeds up
+  // the longer he stays, and a breathy hiss. It fades out when he straightens up (or anything else ends the stare).
+  let PT = null;
+  function peerTrack(on) {
+    if (!AC) return;
+    const t = AC.currentTime;
+    if (on && !PT && !muted) {
+      const bus = AC.createGain(), nodes = []; bus.gain.setValueAtTime(0, t); bus.gain.linearRampToValueAtTime(0.85, t + 0.7); bus.connect(AC.destination);
+      master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(0.75 * 0.4, t + 0.6);
+      const osc = (type, f, v, dest, det = 0, at = t) => { const o = AC.createOscillator(), g = AC.createGain(); o.type = type; o.frequency.value = f; o.detune.value = det; g.gain.value = v; o.connect(g); g.connect(dest); o.start(at); nodes.push(o); return g; };
+      const lp = AC.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 150; lp.connect(bus);
+      osc('sawtooth', 36.7, 0.2, lp); osc('sawtooth', 36.7, 0.2, lp, 13); osc('sine', 55, 0.12, bus);                       // the floor drops out
+      const cl = AC.createGain(); cl.gain.setValueAtTime(0, t); cl.gain.linearRampToValueAtTime(0.045, t + 7); cl.gain.linearRampToValueAtTime(0.07, t + 25); cl.connect(bus);
+      const trem = AC.createOscillator(), tg = AC.createGain(); trem.frequency.value = 5.2; tg.gain.value = 0.02; trem.connect(tg); tg.connect(cl.gain); trem.start(t); nodes.push(trem);
+      for (const [f, d] of [[311.1, -6], [329.6, 5], [349.2, -3], [466.2, 8], [493.9, -9]]) osc('triangle', f, 0.16, cl, d);   // strings, a semitone apart, never resolving
+      let tt = t + 0.5;                                                                                                        // your heart
+      for (let i = 0; i < 70 && tt < t + 45; i++) { const gap = Math.max(0.5, 0.92 - i * 0.012); for (const [dt2, f, v] of [[0, 52, 0.55], [0.24, 46, 0.4]]) { const o = AC.createOscillator(), g = AC.createGain(); o.frequency.setValueAtTime(f * 1.6, tt + dt2); o.frequency.exponentialRampToValueAtTime(f, tt + dt2 + 0.08); g.gain.setValueAtTime(0, tt + dt2); g.gain.linearRampToValueAtTime(v, tt + dt2 + 0.01); g.gain.exponentialRampToValueAtTime(0.001, tt + dt2 + 0.3); o.connect(g); g.connect(bus); o.start(tt + dt2); o.stop(tt + dt2 + 0.32); nodes.push(o); } tt += gap; }
+      if (noiseBuf) { const n = AC.createBufferSource(), bp = AC.createBiquadFilter(), ng = AC.createGain(), lfo = AC.createOscillator(), lg = AC.createGain();   // breath through teeth
+        n.buffer = noiseBuf; n.loop = true; bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 1.4; ng.gain.value = 0.02; lfo.frequency.value = 0.23; lg.gain.value = 0.018; lfo.connect(lg); lg.connect(ng.gain); n.connect(bp); bp.connect(ng); ng.connect(bus); n.start(t); lfo.start(t); nodes.push(n, lfo); }
+      PT = { bus, nodes };
+    } else if (!on && PT) {
+      const p = PT; PT = null;
+      p.bus.gain.cancelScheduledValues(t); p.bus.gain.setValueAtTime(p.bus.gain.value, t); p.bus.gain.linearRampToValueAtTime(0, t + 0.9);
+      master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value, t); master.gain.linearRampToValueAtTime(0.75, t + 0.9);
+      setTimeout(() => { for (const o of p.nodes) { try { o.stop(); } catch (e) {} } try { p.bus.disconnect(); } catch (e) {} }, 1200);
+    }
+  }
   function ambTick() {
+    if (PT && (mode !== 'play' || K.state !== 'peer' || muted)) peerTrack(false);
     if (!AC) return;
     const want = (mode === 'play' || mode === 'scare') && !muted ? 1 : 0;
     if (want && !AMB.g) {
@@ -491,7 +525,7 @@
   // and coming from wherever he is (a whisper, up close, during a stare). Only ever the last thing you said, from memory.
   function mimic(vol = 1, whisper = false) {
     if (!AC || muted || !MIC.clip) return false;
-    const c = MIC.clip.buf, ab = AC.createBuffer(1, c.length, AC.sampleRate); ab.getChannelData(0).set(c);
+    const c = MIC.clip.buf, ab = AC.createBuffer(1, c.length, AC.sampleRate); ab.getChannelData(0).set(c); micDeaf(c.length / AC.sampleRate / 0.5 + 0.8);
     let pk = 0; for (let i = 0; i < c.length; i++) pk = Math.max(pk, Math.abs(c[i]));
     const t = AC.currentTime, g = AC.createGain(), norm = pk > 0.001 ? Math.min(12, 0.6 / pk) : 1;
     const ws = AC.createWaveShaper(), cv = new Float32Array(512); for (let i = 0; i < 512; i++) { const x = i / 255.5 - 1; cv[i] = Math.tanh(x * 2.4); } ws.curve = cv;
@@ -868,6 +902,12 @@
       MIC.nB = new Float32Array(NBd).fill(-80); MIC.lB = new Float32Array(NBd).fill(0); MIC.pB = new Float32Array(NBd).fill(-140); MIC.gfB = new Float32Array(NBd).fill(-140); }
     const db = rmsDb(MIC.an, MIC.buf), game = rmsDb(MIC.outAn, MIC.outBuf); MIC.db = db; MIC.game = game;
     const m = bandsDb(MIC.an, MIC.fb, MIC.mB), g = bandsDb(MIC.outAn, MIC.gfb, MIC.gB);
+    // catch-all: any game sound that jumps above the game's own steady background (a roar, bells, a thud) makes it deaf too
+    if (MIC.gF == null) MIC.gF = game;
+    MIC.gF = game < MIC.gF ? lerp(MIC.gF, game, Math.min(1, dt * 2)) : MIC.gF + Math.min(game - MIC.gF, 6) * dt * 0.05;
+    if (game > MIC.gF + 6 && game > -70) micDeaf(0);
+    if (RT() < (MIC.deaf || 0)) { MIC.level = 0; MIC.deafNow = true; return 0; }
+    MIC.deafNow = false;
     if (MIC.cal > 0) { MIC.cal -= dt; for (let b = 0; b < NBd; b++) { MIC.nB[b] = MIC.cal > 1.6 ? m[b] : Math.min(MIC.nB[b], m[b]) * 0.7 + m[b] * 0.3; MIC.gfB[b] = g[b]; MIC.lB[b] = g[b] > -110 ? (MIC.cal > 1.6 ? m[b] - g[b] : Math.min(MIC.lB[b], m[b] - g[b])) : MIC.lB[b]; } MIC.floor = db; MIC.level = 0; return 0; }   // learn the room, and how much game reaches the mic
     let over = 0, votes = 0;
     for (let b = 0; b < NBd; b++) {
@@ -886,6 +926,12 @@
   }
   // he hears your real voice: a whisper carries a few metres, talking across a department, a scream across the floor
   function micHear(dt) {
+    // Hiding = the mic is off. In there it's only you, your held breath and him; nothing from your room (or the game's
+    // own speakers) can give you away. Out in the open he hears you.
+    if (G.hiding != null) { micTick(dt); MIC.level = 0; MIC.hot = 0; MIC.ph = null;
+      const el = $('mic'); if (el) { el.style.display = MIC.on && MIC.ok ? 'flex' : 'none'; $('micFill').style.width = '0%'; el.classList.remove('loud'); el.classList.add('off'); }
+      return; }
+    { const el = $('mic'); if (el) el.classList.remove('off'); }
     const L = micTick(dt); MIC.hot = L > 0.12 ? MIC.hot + dt : Math.max(0, MIC.hot - dt * 2); G.micCool = (G.micCool || 0) - dt;
     if (MIC.ring) {   // a phrase starts when you get loud and ends after half a second of quiet
       const sr = AC.sampleRate;
@@ -913,7 +959,7 @@
   function hearNoise(x, z, f, radius) { let r = floorOf(K.y) === f ? radius : radius * 0.45; if (K.state === 'look' && K.listen) r *= 1.7; /* standing dead still, bells silent, listening */ if (Math.hypot(K.x - x, K.z - z) < r) { investigate(x, z, f, false); if (radius >= 10 && Math.hypot(K.x - x, K.z - z) < 20 && NOW - (G.heardSaid || -99) > 25) { G.heardSaid = NOW; krampusSay('I can hear you', clamp(1.3 - Math.hypot(K.x - x, K.z - z) / 20, 0.35, 1)); } } }
   // While you hide: he says "I can hear you", and sometimes walks over, bends down and stares into the
   // opening for about half a minute. Hold still and he leaves. Climb out and he has you.
-  function startPeer(c) { K.state = 'peer'; K.path = null; K.peerT = 0; K.peerCyc = -1; K.mimicked = false; K.peerDur = 27 + Math.random() * 6; K.breathT = 0.5; KV.gest = { name: 'peer', t0: NOW }; G.peerLook = 2.4; G.peerCool = 80; showMsg('Don\u2019t move.', 2.6); }
+  function startPeer(c) { peerTrack(true); K.state = 'peer'; K.path = null; K.peerT = 0; K.peerCyc = -1; K.mimicked = false; K.peerDur = 27 + Math.random() * 6; K.breathT = 0.5; KV.gest = { name: 'peer', t0: NOW }; G.peerLook = 2.4; G.peerCool = 80; showMsg('Don\u2019t move.', 2.6); }
   // ---------- holding your breath ----------
   // While you hide, hold B (or the right mouse button, or the Breath button) to hold your breath. He gives up on a stare
   // much sooner if he can't hear you breathing, but your lungs only last a few seconds. Run out and you gasp: right in his
@@ -1935,7 +1981,7 @@
   }
   function refreshBest() { $('best').textContent = 'Best escapes — ' + ['easy', 'normal', 'hard'].map((k) => `${DIFF[k].label}: ${getBest(k) ? fmt(getBest(k)) : '—'}`).join(' · '); }
   document.querySelectorAll('[data-diff]').forEach((b) => b.addEventListener('click', () => { diffKey = b.dataset.diff; document.querySelectorAll('[data-diff]').forEach((x) => x.classList.toggle('sel', x === b)); }));
-  function micLabel() { const t = 'Microphone: ' + (MIC.on ? 'ON — he can hear your room' : 'off'); $('micBtn').textContent = t; $('micBtn2').textContent = t; $('micBtn').classList.toggle('sel', MIC.on); $('micNote').textContent = MIC.err || (MIC.on ? (MIC.ok ? 'Listening. Headphones work best. Stay quiet while you hide.' : 'Your browser will ask to use the microphone.') : 'Optional: let Krampus hear you talk, laugh or scream in real life.'); }
+  function micLabel() { const t = 'Microphone: ' + (MIC.on ? 'ON — he can hear your room' : 'off'); $('micBtn').textContent = t; $('micBtn2').textContent = t; $('micBtn').classList.toggle('sel', MIC.on); $('micNote').textContent = MIC.err || (MIC.on ? (MIC.ok ? 'Listening while you’re out in the open. Once you’re hiding, it’s off: hold your breath instead.' : 'Your browser will ask to use the microphone.') : 'Optional: let Krampus hear you talk, laugh or scream in real life.'); }
   async function micToggle() {
     MIC.on = !MIC.on; MIC.err = '';
     if (MIC.on) { $('micBtn').textContent = $('micBtn2').textContent = 'Microphone: asking…'; $('micNote').textContent = 'Allow the microphone in the box your browser shows.'; }
@@ -2170,9 +2216,9 @@
   }
 
   // ---------------- test hooks ----------------
-  window.__box = {
+  window.__box = { sob: (v, p) => sob(v, p),
     R, get P() { return P; }, get G() { return G; }, get K() { return K; }, get mode() { return mode; }, get EX() { return EX; }, get NOW() { return NOW; }, LV, ZL, ZT, cast, KV, CAR, cam,
-    log: () => EV.splice(0), MIC, BUF, get audio() { return { muted, FF, state: AC ? AC.state : 'none' }; },
+    log: () => EV.splice(0), MIC, BUF, get audio() { return { muted, FF, state: AC ? AC.state : 'none', track: !!PT, duck: master ? +master.gain.value.toFixed(2) : null }; },
     stats: () => ({ walk: walk.reduce((a, b) => a + b, 0), reach: REACH.length, spots: SPOTS.length, links: stairLinks, verts: STATIC.count, obbs: LV.obbs.length, lights: LV.lights.length }),
     start: (d) => { if (d) diffKey = d; showOnly(null); startHunt(); },
     explore: () => { showOnly(null); startExplore(); },

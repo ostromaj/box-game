@@ -106,6 +106,7 @@
   #mic { display: none; position: absolute; left: max(12px, env(safe-area-inset-left)); top: calc(max(12px, env(safe-area-inset-top)) + 62px); align-items: center; gap: 6px; font-size: 14px; background: rgba(20,18,16,.55); padding: 4px 9px; border-radius: 999px; }
   #micBar { width: 70px; height: 6px; background: rgba(255,255,255,.15); border-radius: 3px; overflow: hidden; }
   #micFill { height: 100%; width: 0; background: #9fd0ff; transition: width .08s; }
+  #mic.off { opacity: .35; } #mic.off span::after { content: ' off while hiding'; font-size: 11px; }
   #mic.loud #micFill { background: #ff5a4a; } #mic.loud { box-shadow: 0 0 0 2px rgba(255,90,74,.6); }
   #micBtn.sel { border-color: #ff5a4a; color: #ffb3a8; } #micNote { font-size: 12px; margin-top: -4px; }
   #fatal { display: none; position: fixed; inset: 0; align-items: center; justify-content: center; padding: 30px; text-align: center; z-index: 50; background: #141210; }
