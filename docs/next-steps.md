@@ -43,6 +43,8 @@ you from the balcony scene, bow when Krampus lands, walk your parents out, and w
 
 **Mic, round 3**: `micTick` now works per frequency band (`MIC_BANDS`): mic vs the game's own output, per-band room floor (`nB`), learned speaker-to-mic leak (`lB`, quick to rise while the game is busy), game peak-hold (`pB`), 4 of 7 bands must agree, `MIC_MIN_DB = -38`, 0.35 s sustained, hearing radius 3 + 24 m x level. Tested with `/home/claude/work/microom2.py`-style simulation (game speech/bells/music box leaking at 0.25 and 0.7).
 
+**Performance + head shape**: people more than 7 m from the camera use a lighter copy of every part (`loGeo` proxy, `'|lo'` key suffix, `setEye`), limbs use 6 sides far away, hair/beard shells only span the part of the head they cover, people behind the camera or past 55 m aren't drawn, desktop render scale capped at 1.15x. Frame mesh building went from 19-33 ms to ~8 ms in the test browser. Heads: `hsz` 0.95, rx 0.98, jaw `J` 0.24/0.3/0.16 turning in late (s2 from 0.52), softer eye sockets, flatter crown. `window.__prof` (debug) times logic / mesh building / limbs / draw.
+
 ## Still to do
 0a. **Black screen on "Jump to the hunt"**: couldn't reproduce in headless Chrome (fresh, after caught, after a win, mic on/off). Ask which device/browser if it comes back.
 0. **Cutscene camera pass**: Joseph says the scenes' camera views and movement still feel a little off. Go shot by shot.

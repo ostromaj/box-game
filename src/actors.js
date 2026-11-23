@@ -55,8 +55,18 @@ const ACT = (() => {
   function band(g, y, W, D, zo, r, col, mat) { const P2 = []; for (let i = 0; i <= 32; i++) { const a = i / 32 * TAU; P2.push([Math.cos(a) * W, y, zo + Math.sin(a) * D]); } g.tube(P2, r, col, mat, 5, false); }
   // ---------- part meshes ----------
   const FACE_BINS = new Map();
+  // Level of detail. Every part is built twice at most: full detail for anyone near the camera, and a lighter copy (fewer
+  // segments; eyelashes, creases and the like left out) for anyone further away, where it looks the same.
+  let EYE = [0, 0, 0];
+  const setEye = (e) => { EYE = e; };
+  const SEGI = { ellipsoid: [8, 9], sphere: [6], tube: [4], lathe: [6], param: [1, 2], torus: [6, 7], capsule: [5] };
+  function loGeo(g) {
+    return new Proxy(g, { get(t, k) { const v = t[k]; if (typeof v !== 'function') return v; const ix = SEGI[k];
+      return ix ? (...args) => { for (const i of ix) if (typeof args[i] === 'number') args[i] = Math.max(i === 2 && k === 'param' ? 3 : 4, Math.round(args[i] * 0.55)); return v.apply(t, args); } : v.bind(t); } });
+  }
   function personPart(id, part, extra = '') {
     return mesh(`p:${id}:${part}:${extra}`, (g) => {
+      const LO = extra.endsWith('|lo'); if (LO) { g = loGeo(g); extra = extra.slice(0, -3); }
       const c = CHARS[id], d = dims(id), skin = H(c.skin), top = H(c.top[1]), pants = H(c.pants), shoes = H(c.shoes);
       const puff = c.top[0] === 'puffer', coat = c.top[0] === 'coat', fab = MAT.FABRIC;
       const sleeve = puff ? 1.45 : coat ? 1.25 : 1.12;
@@ -121,31 +131,32 @@ const ACT = (() => {
         }
       } else if (part === 'head') {
         const [eyes, brows, mouth] = extra.split(',');
-        const rx = d.headRx * 0.96, ry = d.headRy, rz = d.headRz, cy = ry * 0.95;
-        const kid = d.k > 0.5, fem = !!c.fem, J = kid ? 0.2 : fem ? 0.4 : 0.32;
+        const hsz = 0.95, rx = d.headRx * 0.98 * hsz, ry = d.headRy * hsz, rz = d.headRz * hsz, cy = ry * 0.95;   // a little smaller (no bobbleheads), between an egg and a ball
+        const kid = d.k > 0.5, fem = !!c.fem, J = kid ? 0.16 : fem ? 0.3 : 0.24;
         // A head, not a balloon: a squarer, flatter face in front, a skull that goes back further than it goes forward,
         // cheekbones, deep-set eyes under a brow, a mouth area that comes forward a little, and a jaw that narrows to a chin.
         const headN = (u, v) => {
           const th = -Math.PI / 2 + v * Math.PI, ph = u * TAU, y = Math.sin(th), cc = Math.cos(th);
           let cx = Math.cos(ph), cz = Math.sin(ph);
-          if (cz < 0) { cx = Math.sign(cx) * Math.pow(Math.abs(cx), 0.82); cz = -Math.pow(-cz, 0.82); }        // flatter face, defined sides
+          if (cz < 0) { cx = Math.sign(cx) * Math.pow(Math.abs(cx), 0.78); cz = -Math.pow(-cz, 0.78); }        // flatter face, defined sides
           let x = cx * cc, z = cz * cc;
           const low = y < 0 ? -y : 0, front = z < 0 ? -z : 0;
-          const s1 = smooth(clamp(low / 0.5, 0, 1)), s2 = smooth(clamp((low - 0.42) / 0.58, 0, 1));
+          const s1 = smooth(clamp(low / 0.5, 0, 1)), s2 = smooth(clamp((low - 0.52) / 0.48, 0, 1));   // the jaw stays wide, then turns in to the chin
           x *= 1 - 0.05 * s1 - J * s2;                                                    // cheeks, then the jaw
           if (z > 0) z *= (1 + 0.1 * (1 - low)) * (1 - 0.25 * s2);                         // the back of the skull; the jaw tucks in toward the neck
           const g2 = (a, w) => Math.exp(-((a / w) ** 2));
           z -= 0.09 * g2(y + 0.86, 0.14) * g2(x, 0.32) * front;                              // chin
           z -= 0.04 * g2(y + 0.45, 0.22) * g2(x, 0.45) * front;                             // mouth area
           const cheek = g2(y + 0.06, 0.2) * g2(Math.abs(x) - 0.6, 0.25) * front; z -= 0.045 * cheek; x *= 1 + 0.03 * cheek;
-          z += 0.13 * g2(y - 0.12, 0.12) * g2(Math.abs(x) - 0.42, 0.19) * front;           // eye sockets
+          z += 0.085 * g2(y - 0.12, 0.15) * g2(Math.abs(x) - 0.42, 0.23) * front;          // eye sockets (soft, so the skin never folds)
           z -= (fem || kid ? 0.02 : 0.045) * g2(y - 0.3, 0.09) * front * (1 - x * x);      // brow ridge
           x *= 1 - 0.05 * g2(y - 0.35, 0.25) * g2(Math.abs(x) - 0.95, 0.15);               // temples
           if (y > 0.35 && z < 0) z *= 1 - 0.12 * (y - 0.35);                                // forehead sloping back
+          if (y > 0.6) { const fl = (y - 0.6) / 0.4; x *= 1 - 0.04 * fl; z *= 1 - 0.04 * fl; }   // a flatter crown
           return [x, y, z];
         };
-        const headFn = (u, v) => { const [x, y, z] = headN(u, v); return [x * rx, cy + y * ry * (y < 0 ? 1.1 : 1), z * rz]; };
-        g.param(headFn, 30, 22, skin, MAT.SKIN);
+        const headFn = (u, v) => { const [x, y, z] = headN(u, v); return [x * rx, cy + y * ry * (y < 0 ? 1.05 : 0.95), z * rz]; };
+        g.param(headFn, 26, 18, skin, MAT.SKIN);
         // where the face's surface is, so eyes, brows, nose and lips sit on it instead of floating in front of it
         const NB = 56, X0 = -rx * 1.1, X1 = rx * 1.1, Y0 = cy - ry * 1.15, Y1 = cy + ry * 1.05, fresh = !FACE_BINS.has(id), bins = fresh ? new Float32Array(NB * NB).fill(1e9) : FACE_BINS.get(id);   // the same face for every expression: work it out once
         if (fresh) FACE_BINS.set(id, bins);
@@ -180,7 +191,7 @@ const ACT = (() => {
             else {
               const drop = nar ? 0.2 : wide ? 1.25 : 0.72;
               g.ellipsoid(s * ex, ey + eh * drop, ez - rz * 0.012, ew * 1.12, eh * 0.62, rz * 0.095, skin, MAT.SKIN, 10, 5);
-              g.tube([[s * ex - ew * 1.05, ey + eh * (drop - 0.45), ez - rz * 0.06], [s * ex, ey + eh * (drop - 0.05), ez - rz * 0.1], [s * ex + ew * 1.05, ey + eh * (drop - 0.45), ez - rz * 0.06]], fem ? 0.0019 : 0.0013, dark, 0, 4, false);   // lash line
+              if (!LO) g.tube([[s * ex - ew * 1.05, ey + eh * (drop - 0.45), ez - rz * 0.06], [s * ex, ey + eh * (drop - 0.05), ez - rz * 0.1], [s * ex + ew * 1.05, ey + eh * (drop - 0.45), ez - rz * 0.06]], fem ? 0.0019 : 0.0013, dark, 0, 4, false);   // lash line
               g.ellipsoid(s * ex, ey - eh * (nar ? 0.75 : 1.02), ez - rz * 0.005, ew * 1.05, eh * 0.4, rz * 0.085, shade(skin, 0.97), MAT.SKIN, 8, 4);
             }
           }
@@ -248,11 +259,11 @@ const ACT = (() => {
         else if (mouth === 'o') g.ellipsoid(0, my, fz(0, my) + rz * 0.02, rx * 0.09, ry * 0.08, rz * 0.05, H('#2a0d0d'), 0, 8, 5);
         // hair: the scalp's own shape pushed out a little above a hairline, tucked under the skin below it (a clean edge, no gaps)
         const hc = H(c.hair[1]), st = c.hair[0];
-        const hairShell = (thick, hl, col, mat, cond) => g.param((u, v) => {
-          const n = headN(u, v), [x, y, z] = n, f = Math.max(0, -z), b = Math.max(0, z), m = smooth(clamp((y - hl(x, z, f, b)) / 0.22, 0, 1)) * (cond ? cond(x, y, z) : 1);
-          const t = lerp(-0.025, thick(x, y, z), Math.pow(m, 0.6)), p = headFn(u, v), q = [p[0], p[1] - cy, p[2]], L = Math.hypot(...q) || 1, k = 1 + t * ry / L;
+        const hairShell = (thick, hl, col, mat, cond, v0 = 0.26, v1 = 1, nu = 30, nv = 14) => g.param((u, vv) => {
+          const v = lerp(v0, v1, vv), n = headN(u, v), [x, y, z] = n, f = Math.max(0, -z), b = Math.max(0, z), m = smooth(clamp((y - hl(x, z, f, b)) / 0.22, 0, 1)) * (cond ? cond(x, y, z) : 1);
+          const t = lerp(-0.07, thick(x, y, z), Math.pow(m, 0.45)), p = headFn(u, v), q = [p[0], p[1] - cy, p[2]], L = Math.hypot(...q) || 1, k = 1 + t * ry / L;
           return [q[0] * k, cy + q[1] * k, q[2] * k];
-        }, 48, 34, col, mat);
+        }, nu, nv, col, mat);
         const hlStd = (x, z, f, b) => 0.1 + 0.5 * f - 0.16 * Math.abs(x) * f - 0.68 * b + 0.06 * f * Math.max(0, -x) - 0.04 * f * Math.max(0, x);   // a hairline that comes back at the temples, parted on one side
         if (st === 'short' || st === 'bun' || st === 'ponytail' || st === 'braid') {
           hairShell((x, y, z) => (st === 'short' ? 0.022 + 0.07 * smooth(clamp(y * 1.6, 0, 1)) + 0.03 * Math.max(0, -z) * Math.max(0, y) * (1 + 0.6 * x) : 0.03 + 0.03 * Math.max(0, y)), st === 'short' ? hlStd : (x, z, f, b) => hlStd(x, z, f, b) - 0.04 * f, hc, MAT.HAIR);
@@ -271,7 +282,7 @@ const ACT = (() => {
         if (c.beard) hairShell((x, y, z) => 0.022 + 0.018 * Math.max(0, -y - 0.6), (x, z, f, b) => -99, H(c.beard), MAT.HAIR, (x, y, z) => {
           const g2 = (a, w) => Math.exp(-((a / w) ** 2)); const below = smooth(clamp((-0.3 - y + 0.12 * Math.max(0, -z) * (1 - Math.abs(x))) / 0.1, 0, 1)), backOK = smooth(clamp((0.25 - z) / 0.12, 0, 1));   // jaw and chin, a moustache, no higher than the cheeks
           const lipsHole = g2(x, 0.3) * g2(y + 0.47, 0.09) * Math.max(0, -z); return below * backOK * (1 - smooth(clamp(lipsHole * 2.2, 0, 1)));
-        });
+        }, 0, 0.5, 30, 16);   // the lower half of the head only
         if (c.glasses) {
           const gc = H('#2a2a2c'), gz = ez - rz * 0.16;
           for (const s of [-1, 1]) { g.push(A.chain(A.T(s * ex, ey, gz), A.Rx(Math.PI / 2))); g.torus(0, 0, 0, rx * 0.21, d.H * 0.0035, gc, MAT.METAL, 16, 4); g.pop(); g.tube([[s * (ex + rx * 0.21), ey, gz], [s * rx * 0.93, ey + 0.002, fz(s * rx * 0.8, ey) + rz * 0.1], [s * rx * 0.97, ey - 0.004, rz * 0.2]], d.H * 0.0025, gc, MAT.METAL, 4, false); }
@@ -452,17 +463,18 @@ const ACT = (() => {
     const P = pose(a, t), B = rig(a, P), id = a.id;
     const f = a.face || {};
     const eyes = (f.eyes === 'closed' || (f.eyes !== 'narrow' && f.eyes !== 'stare' && !a.noBlink && blink(a, t))) ? 'closed' : (f.eyes || 'open');
-    buf.emit(personPart(id, 'pelvis'), B.pelvis);
-    buf.emit(personPart(id, 'chest'), B.chest);
-    buf.emit(personPart(id, 'neck'), B.neck);
+    const lo = Math.hypot(a.x - EYE[0], (a.y || 0) + 1.2 - EYE[1], a.z - EYE[2]) > 7 ? '|lo' : '';
+    buf.emit(personPart(id, 'pelvis', lo), B.pelvis);
+    buf.emit(personPart(id, 'chest', lo), B.chest);
+    buf.emit(personPart(id, 'neck', lo), B.neck);
     // 'maw': the mouth opens slowly from a closed smile (f.open goes 0..1; twelve steps, each cached)
     const mouth = f.mouth === 'maw' ? 'maw' + Math.round(clamp(f.open == null ? 1 : f.open, 0, 1) * 12) : (f.mouth || 'neutral');
-    buf.emit(personPart(id, 'head', `${eyes},${f.brows || 'flat'},${mouth}`), B.head);
+    buf.emit(personPart(id, 'head', `${eyes},${f.brows || 'flat'},${mouth}${lo}`), B.head);
     { const dd = dims(id); a._head = A.p(B.head, 0, dd.headRy * 0.95, 0); }   // for cameras and tests
     for (const i of [0, 1]) {
       const sd = i ? 'R' : 'L';
-      buf.emit(personPart(id, 'hand', sd), B['wr' + i]);
-      buf.emit(personPart(id, 'foot'), B['an' + i]);
+      buf.emit(personPart(id, 'hand', sd + lo), B['wr' + i]);
+      buf.emit(personPart(id, 'foot', lo), B['an' + i]);
     }
     drawLimbs(buf, a, B);
     const d = dims(id);
@@ -475,34 +487,36 @@ const ACT = (() => {
   // Arms and legs as ONE smooth limb each, rebuilt every frame through the real joints: it comes out from inside the
   // torso, swells over the shoulder or thigh, slims into the elbow or knee, bends round it on a curve (no seam, no
   // ball joint), fills out over the forearm or calf and narrows to the wrist or ankle.
-  function limb(g, P0, P1, P2, ext, prof, col, mat, cuff) {
+  function limb(g, P0, P1, P2, ext, prof, col, mat, cuff, sides = 9) {
     const sub = (u, v) => [u[0] - v[0], u[1] - v[1], u[2] - v[2]], L3 = (u, v, t) => [lerp(u[0], v[0], t), lerp(u[1], v[1], t), lerp(u[2], v[2], t)];
     const up = sub(P0, P1), ul = Math.hypot(...up) || 1, start = [P0[0] + up[0] / ul * ext, P0[1] + up[1] / ul * ext, P0[2] + up[2] / ul * ext];
     const pts = [], rad = [], add = (p, k) => { pts.push(p); rad.push(prof(k)); };
     for (const t of [0, 0.5]) add(L3(start, P0, t), -1 + t * 2 * 0.999);                     // inside the body -> the root
-    for (const t of [0.15, 0.35, 0.55, 0.72]) add(L3(P0, P1, t), t);                          // upper segment
+    for (const t of [0.2, 0.45, 0.7]) add(L3(P0, P1, t), t);                                // upper segment
     const q0 = L3(P0, P1, 0.84), q1 = L3(P1, P2, 0.16);
-    for (const t of [0, 0.33, 0.66, 1]) { const a2 = L3(q0, P1, t), b2 = L3(P1, q1, t); add(L3(a2, b2, t), t < 0.5 ? 0.84 + t * 0.32 : 1 + (t - 0.5) * 0.32); }   // round the joint
-    for (const t of [0.3, 0.5, 0.7, 0.86, 1]) add(L3(P1, P2, t), 1 + t);                      // lower segment
-    if (cuff) { const n = pts.length; g.tube(pts.slice(0, n - 1), rad.slice(0, n - 1), col, mat, 12, true); g.tube([L3(P1, P2, 0.84), L3(P1, P2, 1.0)], [prof(1.84) * 1.06, prof(2) * 1.08], cuff, mat, 12, true); }
-    else g.tube(pts, rad, col, mat, 12, true);
+    for (const t of [0, 0.5, 1]) { const a2 = L3(q0, P1, t), b2 = L3(P1, q1, t); add(L3(a2, b2, t), t < 0.5 ? 0.84 + t * 0.32 : 1 + (t - 0.5) * 0.32); }   // round the joint
+    for (const t of [0.35, 0.62, 0.86, 1]) add(L3(P1, P2, t), 1 + t);                         // lower segment
+    if (cuff) { const n = pts.length; g.tube(pts.slice(0, n - 1), rad.slice(0, n - 1), col, mat, sides, true); g.tube([L3(P1, P2, 0.84), L3(P1, P2, 1.0)], [prof(1.84) * 1.06, prof(2) * 1.08], cuff, mat, sides, true); }
+    else g.tube(pts, rad, col, mat, sides, true);
   }
   function drawLimbs(buf, a, B) {
+    const t0 = performance.now();
     const id = a.id, c = CHARS[id], d = dims(id), s = a.scale || 1, g = new Geo();
     const top = H(c.top[1]), pants = H(c.pants), shoes = H(c.shoes), puff = c.top[0] === 'puffer', coat = c.top[0] === 'coat', fab = MAT.FABRIC;
     const sleeve = (puff ? 1.45 : coat ? 1.25 : 1.12) * s, ar = d.armR * sleeve, lr = d.legR * s, kid = d.k > 0.5;
-    const cuffC = c.top[0] === 'shirt' ? shade(top, 1.12) : shade(top, 0.85);
+    const cuffC = c.top[0] === 'shirt' ? shade(top, 1.12) : shade(top, 0.85), sd = Math.hypot(a.x - EYE[0], a.z - EYE[2]) > 7 ? 6 : 9;   // fewer sides far away
     // radius along the limb: k = -1..0 inside the body, 0..1 upper segment, 1..2 lower segment
     const arm = (k) => ar * (k < 0 ? 1.05 : k < 1 ? lerp(1.22, 0.9, k) + 0.14 * Math.exp(-(((k - 0.62) / 0.2) ** 2)) : lerp(1.0, 0.74, (k - 1) ** 0.8) + 0.06 * Math.exp(-(((k - 1.3) / 0.25) ** 2)));
     const leg = (k) => lr * (k < 0 ? 1.5 : k < 1 ? lerp(c.fem ? 1.6 : 1.55, 1.05, k ** 1.2) : (kid ? lerp(1.02, 0.82, k - 1) + 0.12 * Math.exp(-(((k - 1.32) / 0.22) ** 2)) : lerp(1.06, 0.96, k - 1) + 0.06 * Math.exp(-(((k - 1.3) / 0.25) ** 2))));
     for (const i of [0, 1]) {
       const sh = A.p(B['sh' + i], 0, 0, 0), el = A.p(B['el' + i], 0, 0, 0), wr = A.p(B['wr' + i], 0, 0, 0);
-      limb(g, sh, el, wr, ar * 0.9, arm, top, fab, puff ? shade(top, 0.85) : cuffC);
+      limb(g, sh, el, wr, ar * 0.9, arm, top, fab, puff ? shade(top, 0.85) : cuffC, sd);
       const hp = A.p(B['hp' + i], 0, 0, 0), kn = A.p(B['kn' + i], 0, 0, 0), an = A.p(B['an' + i], 0, 0, 0);
-      if (c.boots) { limb(g, hp, kn, an, lr * 1.3, leg, pants, fab, null); const bt = [lerp(kn[0], an[0], 0.42), lerp(kn[1], an[1], 0.42), lerp(kn[2], an[2], 0.42)]; g.tube([bt, an], [lr * 1.12, lr * 0.98], shoes, MAT.LEATHER, 12, true); }
-      else limb(g, hp, kn, an, lr * 1.3, leg, pants, fab, shade(pants, 0.82));
+      if (c.boots) { limb(g, hp, kn, an, lr * 1.3, leg, pants, fab, null, sd); const bt = [lerp(kn[0], an[0], 0.42), lerp(kn[1], an[1], 0.42), lerp(kn[2], an[2], 0.42)]; g.tube([bt, an], [lr * 1.12, lr * 0.98], shoes, MAT.LEATHER, 9, true); }
+      else limb(g, hp, kn, an, lr * 1.3, leg, pants, fab, shade(pants, 0.82), sd);
     }
     buf.emit(g.data, A.I());
+    if (window.__prof) window.__prof.limbs = (window.__prof.limbs || 0) + performance.now() - t0;
   }
   // world position of a hand (for holding hands)
   function handPos(a, i) { const B = a._B; if (!B) return null; const d = dims(a.id); return A.p(B['wr' + i], 0, -d.hand * 0.5, 0); }
@@ -833,5 +847,5 @@ const ACT = (() => {
     });
   }
 
-  return { CHARS, dims, drawPerson, drawKrampus, handPos, carMesh, carInteriorMesh, propMesh, KD };
+  return { CHARS, dims, setEye, drawPerson, drawKrampus, handPos, carMesh, carInteriorMesh, propMesh, KD };
 })();

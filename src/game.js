@@ -1899,6 +1899,8 @@
     BUF.reset(); ABUF.reset(); MBUF.reset();
     for (const k in cast) {
       const a = cast[k]; if (!a.visible) continue;
+      { const e = camInfo.eye, dx = a.x - e[0], dz = a.z - e[2], dd = Math.hypot(dx, dz);   // not drawn when behind the camera or far off
+        if (dd > 55 || (dd > 3 && (dx * Math.sin(camInfo.yaw) - dz * Math.cos(camInfo.yaw)) / dd < -0.25)) continue; }
       const talking = a.talkUntil && a.talkUntil > NOW && (!a.face.mouth || a.face.mouth === 'neutral' || a.face.mouth === 'smile');
       if (a.face.mouth === 'maw') a.face.open = smooth(clamp((NOW - a.mawT0) / a.mawDur, 0, 1)) * (a.mawMax || 1);
       const keep = a.face; if (talking) a.face = Object.assign({}, a.face, { mouth: Math.sin(NOW * 16 + a.seed) > 0 ? 'o' : 'neutral' });
@@ -1972,9 +1974,10 @@
     if (debug && window.__hold) { lastTime = nowMs; window.__held = (window.__held || 0) + 1; return; } // test tools drive the clock themselves
     const dt = Math.min(0.05, (nowMs - lastTime) / 1000); lastTime = nowMs;
     fpsT += dt; fpsN++; if (fpsT > 1) { fps = fpsN / fpsT; fpsT = 0; fpsN = 0; }
-    R.resize(isTouch ? 1.0 : 1.35);
+    R.resize(isTouch ? 1.0 : 1.15);
     const sdt = dt * timeScale;
     if (mode !== 'pause' && mode !== 'title' && mode !== 'end') NOW += sdt;
+    const pf0 = performance.now();
     try {
       if (mode === 'cine') { sceneTick(sdt); for (const k in cast) stepActor(cast[k], sdt); camUpdate(sdt); runTimers(); }
       else if (mode === 'explore') updateExplore(dt);
@@ -2004,13 +2007,16 @@
       ex = P.x; ez = P.z; ey = P.y + EYE() + (G && G.hiding != null && mode === 'play' ? 0 : Math.sin(P.bob) * 0.025); yaw = P.yaw; pitch = P.pitch;
     }
     if (DBGCAM) { [ex, ey, ez] = DBGCAM.pos; const l = DBGCAM.look; yaw = Math.atan2(l[0] - ex, -(l[2] - ez)); pitch = Math.atan2(l[1] - ey, Math.hypot(l[0] - ex, l[2] - ez)); roll = 0; fov = DBGCAM.fov || 1.0; }
-    Object.assign(camInfo, { eye: [ex, ey, ez], yaw, pitch, fov });
+    Object.assign(camInfo, { eye: [ex, ey, ez], yaw, pitch, fov }); ACT.setEye(camInfo.eye);
     if (mode !== 'pause') snowAround(ex, ez, dt, cine || ez < -0.2 || ex > 64.2 ? 60 : 20);
     const proj = perspective(fov, canvas.width / Math.max(1, canvas.height), 0.04, 170);
     const view = viewFPS(ex, ey, ez, yaw, pitch, roll), vp = mul4(proj, view);
+    const pf1 = performance.now();
     drawWorld(NOW);
+    const pf2 = performance.now();
     R.begin({ vp, view, fov, fear: FEAR, focus: cine && cam.look ? Math.hypot(cam.look[0] - ex, cam.look[1] - ey, cam.look[2] - ez) : 0, eye: [ex, ey, ez], zones: mode === 'title' ? MENU_Z : ZL, k: KV.visible && mode === 'play' ? [KV.x, KV.y + 1.5, KV.z, flick] : [0, -99, 0, 1], alarm: G && mode === 'play' && G.phase === 'escape' ? 1 : 0, time: NOW, lights: mode === 'scare' ? [{ x: ex, y: ey + 0.25, z: ez, r: 4, c: [1, 0.42, 0.3], i: 1.5 }].concat(pickLights([ex, ey, ez])) : mode === 'play' && K && K.state === 'peer' && KV._eye ? [{ x: lerp(ex, KV._eye[0], 0.35), y: lerp(ey, KV._eye[1], 0.35), z: lerp(ez, KV._eye[2], 0.35), r: 3.6, c: [1.0, 0.66, 0.5], i: 3.2 }].concat(pickLights([ex, ey, ez])) : pickLights([ex, ey, ez]), amb: ambDim, expo: 1.3 });
     R.draw(STATIC);
+    if (debug) { const pf3 = performance.now(), PR = window.__prof = window.__prof || { n: 0, upd: 0, world: 0, draw: 0 }; PR.n++; PR.upd += pf1 - pf0; PR.world += pf2 - pf1; PR.draw += pf3 - pf2; }
     R.drawDynamic(BUF.view());
     R.drawDynamic(MBUF.view(), 'mul');
     R.drawDynamic(ABUF.view(), 'alpha');
@@ -2099,7 +2105,7 @@
   // ---------------- test hooks ----------------
   window.__box = {
     R, get P() { return P; }, get G() { return G; }, get K() { return K; }, get mode() { return mode; }, get EX() { return EX; }, get NOW() { return NOW; }, LV, ZL, ZT, cast, KV, CAR, cam,
-    log: () => EV.splice(0), MIC, get audio() { return { muted, FF, state: AC ? AC.state : 'none' }; },
+    log: () => EV.splice(0), MIC, BUF, get audio() { return { muted, FF, state: AC ? AC.state : 'none' }; },
     stats: () => ({ walk: walk.reduce((a, b) => a + b, 0), reach: REACH.length, spots: SPOTS.length, links: stairLinks, verts: STATIC.count, obbs: LV.obbs.length, lights: LV.lights.length }),
     start: (d) => { if (d) diffKey = d; showOnly(null); startHunt(); },
     explore: () => { showOnly(null); startExplore(); },
