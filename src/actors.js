@@ -433,7 +433,7 @@ const ACT = (() => {
   function handPos(a, i) { const B = a._B; if (!B) return null; const d = dims(a.id); return A.p(B['wr' + i], 0, -d.hand * 0.5, 0); }
 
   // ---------- Krampus ----------
-  const KC = { fur: '#2a1e17', fur2: '#3b2a1f', skin: '#2b1916', horn: '#cdbf9f', hornTip: '#5e5038', eye: '#ffae1f', tongue: '#a8222e', teeth: '#e8e2d0', chain: '#7d8288', bell: '#d6b24a', sack: '#8a6a46', hoof: '#151110' };
+  const KC = { fur: '#1e1612', fur2: '#2f241c', skin: '#2b1916', horn: '#cdbf9f', hornTip: '#5e5038', eye: '#ffae1f', tongue: '#6e1019', teeth: '#e8e2d0', chain: '#7d8288', bell: '#d6b24a', sack: '#8a6a46', hoof: '#151110' };
   // Put a hoof at (fwd, up) relative to the ground under the hip, with the cannon bone at angle `meta` (from straight
   // down, + = forward). Solves thigh and shin (knee forward), so feet plant instead of swinging through the air.
   function legIK(P, i, fwd, up, meta) {
@@ -453,24 +453,30 @@ const ACT = (() => {
       const nx = Math.cos(u) * c, ny = v, nz = Math.sin(u) * c;
       if (keep && !keep(nx, ny, nz)) continue;
       const px = cx + nx * rx, py = cy + ny * ry, pz = cz + nz * rz;
-      const dir = [nx * 0.6, ny * 0.3 - 0.75, nz * 0.6];
+      const dir = [nx * 0.42, ny * 0.2 - 0.9, nz * 0.42];
       g.push(A.mul(A.T(px, py, pz), A.alignY([-dir[0], -dir[1], -dir[2]])));
       const L = len * (0.6 + r() * 0.7);
-      g.ellipsoid(0, -L * 0.5, 0, L * 0.11, L * 0.58, L * 0.07, shade(H(r() < 0.5 ? KC.fur : KC.fur2), 0.7 + r() * 0.6), MAT.FUR, 5, 4);
+      g.ellipsoid(0, -L * 0.5, 0, L * 0.085, L * 0.6, L * 0.055, shade(H(r() < 0.5 ? KC.fur : KC.fur2), 0.7 + r() * 0.6), MAT.FUR, 5, 4);
       g.pop();
     }
   }
+  // ridged horns: up out of the skull, sweeping back and flaring out, dark at the root and bone at the tip
   function horn(g, side) {
-    const pts = [], rad = [];
-    for (let i = 0; i <= 16; i++) {
-      const t = i / 16, a = t * 2.6;
-      pts.push([side * (0.08 + 0.4 * t + 0.16 * Math.sin(a)), 0.2 + 0.78 * Math.sin(Math.min(a, 1.9)) - 0.4 * Math.max(0, t - 0.6), 0.02 + 0.62 * (1 - Math.cos(a)) * 0.6]);
-      rad.push(0.09 * (1 - t) + 0.006);
+    const N = 40, pts = [], rad = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N, a = t * 1.55, r = 0.44;
+      pts.push([side * (0.085 + 0.24 * t + 0.16 * t * t * t), 0.29 + r * Math.sin(a) * (1 - 0.15 * t), -0.03 + r * (1 - Math.cos(a)) * 0.95 - 0.06 * Math.sin(t * Math.PI)]);
+      rad.push((0.062 * Math.pow(1 - t, 0.85) + 0.004) * (1 + (t < 0.8 ? 0.13 * Math.max(0, Math.sin(t * 55)) : 0)));
     }
-    g.tube(pts, rad, H(KC.horn), MAT.CERAMIC, 8);
-    for (let i = 2; i < 14; i += 2) { const p = pts[i]; g.push(A.T(p[0], p[1], p[2])); g.sphere(0, 0, 0, rad[i] * 1.08, shade(H(KC.horn), 0.85), MAT.CERAMIC, 6); g.pop(); }
-    g.push(A.T(...pts[16])); g.sphere(0, 0, 0, 0.012, H(KC.hornTip), MAT.CERAMIC, 6); g.pop();
+    const cols = ['#1d140c', '#2f2418', '#4f4231', '#857559'];
+    for (let k = 0; k < 4; k++) { const i0 = Math.max(0, k * 10 - 1), i1 = Math.min(N, k * 10 + 11); g.tube(pts.slice(i0, i1 + 1), rad.slice(i0, i1 + 1).map((r) => r * (1 + 0.012 * k)), H(cols[k]), MAT.HORN, 9, k === 0 || k === 3); }
   }
+  // the skull: long and narrow like a goat's, deep under the brow, the muzzle dropping to a snarl
+  function lerpKeys(K, v, i) { for (let j = 0; j < K.length - 1; j++) if (v <= K[j + 1][0]) { const u = smooth((v - K[j][0]) / (K[j + 1][0] - K[j][0])); return lerp(K[j][i], K[j + 1][i], u); } return K[K.length - 1][i]; }
+  //            v     w     up    down   cy
+  const SKULL = [[0, 0.02, 0.02, 0.02, 0.17], [0.07, 0.11, 0.12, 0.09, 0.17], [0.24, 0.16, 0.165, 0.12, 0.175], [0.4, 0.145, 0.14, 0.1, 0.17],
+    [0.52, 0.112, 0.095, 0.07, 0.155], [0.74, 0.088, 0.075, 0.045, 0.125], [0.92, 0.078, 0.062, 0.038, 0.11], [1, 0.02, 0.015, 0.012, 0.105]];
+  const skullZ = (v) => lerp(0.2, -0.42, v);
   function kPart(part, extra = '') {
     return mesh('k:' + part + ':' + extra, (g) => {
       const fur = H(KC.fur), skin = H(KC.skin);
@@ -487,66 +493,80 @@ const ACT = (() => {
         g.ellipsoid(0, 0.8, 0.05, 0.5, 0.3, 0.36, shade(fur, 1.1), MAT.FUR, 16, 8);
         tufts(g, 120, 0, 0.45, 0, 0.42, 0.55, 0.32, 0.36, 22);
         tufts(g, 60, 0, 0.85, 0.05, 0.5, 0.28, 0.36, 0.42, 33, (x, y) => y > -0.2);
-        g.ellipsoid(0, 0.35, -0.24, 0.26, 0.3, 0.1, shade(skin, 1.05), MAT.SKIN, 12, 8);
+        g.ellipsoid(0, 0.88, 0.2, 0.46, 0.3, 0.3, shade(fur, 0.95), MAT.FUR, 14, 8);                                   // hunched hump over the shoulders
+        tufts(g, 90, 0, 0.95, 0.18, 0.46, 0.28, 0.3, 0.55, 34, (x, y, z) => y > -0.3 && z > -0.5);                    // long ragged mane
+        g.ellipsoid(0, 0.35, -0.24, 0.26, 0.3, 0.1, shade(skin, 1.05), MAT.HIDE, 12, 8);
         // diagonal chain across the chest
         const pts = []; for (let i = 0; i <= 20; i++) { const t = i / 20; pts.push([lerp(-0.42, 0.38, t), lerp(0.95, 0.05, t), -0.33 - 0.06 * Math.sin(t * Math.PI)]); }
         for (let i = 0; i < 20; i++) { const p = pts[i], q = pts[i + 1]; g.push(A.mul(A.T(p[0], p[1], p[2]), A.alignY([q[0] - p[0], q[1] - p[1], q[2] - p[2]]))); g.push(i % 2 ? A.Ry(Math.PI / 2) : A.I()); g.push(A.Rx(Math.PI / 2)); g.torus(0, 0, 0, 0.04, 0.011, H(KC.chain), MAT.METAL, 8, 4); g.pop(); g.pop(); g.pop(); }
         g.tube([[0.35, 0.95, -0.12], [0.45, 0.6, 0.25], [0.3, 0.2, 0.42]], 0.03, H('#5a4530'), MAT.LEATHER, 6, false);
         // ribs showing through the hide, and a row of bone spines down the back
-        for (let i = 0; i < 4; i++) for (const sd of [-1, 1]) g.tube([[sd * 0.04, 0.5 - i * 0.09, -0.335], [sd * 0.16, 0.47 - i * 0.09, -0.31], [sd * 0.26, 0.43 - i * 0.09, -0.22]], [0.016, 0.014, 0.008], H('#6b5348'), MAT.SKIN, 5);
+        for (let i = 0; i < 4; i++) for (const sd of [-1, 1]) g.tube([[sd * 0.04, 0.5 - i * 0.09, -0.335], [sd * 0.16, 0.47 - i * 0.09, -0.31], [sd * 0.26, 0.43 - i * 0.09, -0.22]], [0.016, 0.014, 0.008], H('#6b5348'), MAT.HIDE, 5);
         for (let i = 0; i < 7; i++) { const y = 0.98 - i * 0.14, L = 0.2 - Math.abs(i - 2) * 0.022; g.push(A.chain(A.T(0, y, 0.3 + 0.05 * Math.sin(i * 0.6)), A.Rx(1.15))); g.lathe(0, 0, 0, [[0.035, 0], [0.022, L * 0.5], [0, L]], H(KC.horn), MAT.CERAMIC, 6); g.pop(); }
       } else if (part === 'neck') {
         g.capsule(0.34, 0.2, 0.24, H(KC.fur), MAT.FUR, 12);
         g.push(A.T(0, 0.05, 0)); tufts(g, 40, 0, -0.15, 0, 0.22, 0.2, 0.22, 0.3, 44); g.pop();
       } else if (part === 'head') {
-        g.push(A.S(1.25));
-        g.ellipsoid(0, 0.12, 0.02, 0.17, 0.19, 0.2, skin, MAT.SKIN, 16, 10);
-        g.ellipsoid(0, 0.06, -0.2, 0.115, 0.09, 0.17, skin, MAT.SKIN, 14, 8);
-        g.ellipsoid(0, 0.08, -0.34, 0.06, 0.045, 0.04, H('#1a0f0d'), MAT.SKIN, 8, 5);
-        g.ellipsoid(0, 0.2, -0.1, 0.16, 0.06, 0.12, shade(skin, 0.8), MAT.SKIN, 12, 6);
+        g.param((u, v) => {
+          const w = lerpKeys(SKULL, v, 1), up = lerpKeys(SKULL, v, 2), dn = lerpKeys(SKULL, v, 3), cy = lerpKeys(SKULL, v, 4), a = u * TAU, c = Math.cos(a), sn = Math.sin(a);
+          const cheek = Math.exp(-Math.pow((v - 0.6) / 0.08, 2)) * 0.22 * Math.max(0, -sn + 0.3);   // hollow under the cheekbone
+          const x = w * Math.sign(c) * Math.pow(Math.abs(c), 0.8) * (1 - cheek), y = cy + (sn > 0 ? up : dn) * Math.sign(sn) * Math.pow(Math.abs(sn), 0.85);
+          return [x, y - 0.03 * Math.exp(-Math.pow((v - 0.47) / 0.06, 2)) * Math.max(0, sn) * (1 - Math.abs(c)), skullZ(v)];   // a dip at the bridge between the eyes
+        }, 22, 30, skin, MAT.HIDE);
         for (const s of [-1, 1]) {
-          g.ellipsoid(s * 0.078, 0.14, -0.135, 0.062, 0.046, 0.04, H('#050202'), 0, 10, 6);            // sunken socket
-          g.ellipsoid(s * 0.078, 0.138, -0.162, 0.05, 0.036, 0.014, H('#ff2600'), MAT.GLOW, 10, 6);  // ember eye
-          g.ellipsoid(s * 0.078, 0.138, -0.172, 0.013, 0.013, 0.004, H('#ffb040'), MAT.GLOW, 6, 4);
-          g.ellipsoid(s * 0.078, 0.138, -0.176, 0.004, 0.017, 0.003, H('#100000'), 0, 6, 4);          // slit pupil
-          g.ellipsoid(s * 0.085, 0.185, -0.15, 0.07, 0.022, 0.05, shade(skin, 0.55), MAT.SKIN, 8, 5);   // heavy brow
-          g.ellipsoid(s * 0.1, 0.06, -0.12, 0.03, 0.05, 0.06, shade(skin, 0.5), MAT.SKIN, 8, 5);       // hollow cheek
-          g.push(A.chain(A.T(s * 0.16, 0.16, 0.05), A.Rz(-s * 1.2), A.Rx(-0.3))); g.lathe(0, 0, 0, [[0, 0], [0.05, 0.02], [0.035, 0.12], [0, 0.2]], shade(skin, 0.9), MAT.SKIN, 8); g.pop();
+          // a brow that overhangs and slants down to the middle, so he always looks furious
+          g.push(A.chain(A.T(s * 0.07, 0.244, -0.14), A.Rz(s * 0.45), A.Ry(-s * 0.3))); g.ellipsoid(0, 0, 0, 0.085, 0.02, 0.048, shade(skin, 0.75), MAT.HIDE, 10, 6); g.pop();
+          g.push(A.chain(A.T(s * 0.062, 0.205, -0.15), A.Ry(s * 0.35), A.Rz(s * 0.3))); g.ellipsoid(0, 0, 0, 0.04, 0.028, 0.02, H('#030101'), 0, 10, 6); g.pop();        // deep socket
+          g.push(A.chain(A.T(s * 0.068, 0.204, -0.166), A.Ry(s * 0.35), A.Rz(s * 0.34))); g.ellipsoid(0, 0, 0, 0.038, 0.014, 0.01, H('#ff2a08'), MAT.GLOW, 12, 6);    // narrow ember eye, slanted
+          g.ellipsoid(0, 0.001, -0.006, 0.024, 0.008, 0.007, H('#ffe08a'), MAT.GLOW, 8, 4); g.ellipsoid(0, 0, -0.011, 0.0035, 0.013, 0.003, H('#080000'), 0, 6, 4); g.pop();
+          g.push(A.chain(A.T(s * 0.095, 0.168, -0.13), A.Rz(-s * 0.5))); g.ellipsoid(0, 0, 0, 0.038, 0.014, 0.05, shade(skin, 1.15), MAT.HIDE, 8, 5); g.pop();   // cheekbone
+          g.push(A.chain(A.T(s * 0.15, 0.27, 0.06), A.Rz(-s * 1.5), A.Rx(0.6))); g.lathe(0, 0, 0, [[0, 0], [0.045, 0.03], [0.04, 0.12], [0.018, 0.22], [0, 0.27]], shade(skin, 0.85), MAT.HIDE, 8); g.pop();   // long ear, laid back
           horn(g, s);
+          // the snarl: lip pulled up off the teeth, gum showing
+          g.tube([[s * 0.03, 0.078, -0.405], [s * 0.065, 0.08, -0.35], [s * 0.084, 0.09, -0.27], [s * 0.098, 0.1, -0.18], [s * 0.11, 0.11, -0.12]], [0.012, 0.015, 0.017, 0.014, 0.008], H('#3a0c10'), MAT.HIDE, 6);
+          g.push(A.chain(A.T(s * 0.022, 0.112, -0.435), A.Rz(s * 0.5))); g.ellipsoid(0, 0, 0, 0.008, 0.016, 0.008, H('#050101'), 0, 6, 4); g.pop();   // flared nostril
+          for (let k = 0; k < 3; k++) g.tube([[s * 0.005, 0.19 - k * 0.012, -0.24 - k * 0.04], [s * 0.045, 0.18 - k * 0.013, -0.235 - k * 0.04], [s * 0.078, 0.15 - k * 0.012, -0.225 - k * 0.04]], 0.008, shade(skin, 0.6), MAT.HIDE, 5);   // wrinkles over the nose
         }
-        for (let i = -5; i <= 5; i++) { if (!i) continue; const fang = Math.abs(i) === 2 || Math.abs(i) === 4, L = fang ? 0.12 : 0.045 + 0.02 * ((i * 7) % 3); g.push(A.chain(A.T(i * 0.02, 0.0, -0.31 + Math.abs(i) * 0.016), A.Rx(Math.PI), A.Rz(i * 0.03))); g.lathe(0, 0, 0, [[0.011, 0], [0.008, L * 0.5], [0, L]], shade(H(KC.teeth), 0.8 + 0.2 * ((i * 5) % 2)), MAT.CERAMIC, 6); g.pop(); }
-        g.push(A.T(0, -0.04, -0.12)); tufts(g, 26, 0, -0.06, -0.02, 0.1, 0.06, 0.1, 0.2, 55, (x, y) => y < 0.1); g.pop();
-        tufts(g, 30, 0, 0.22, 0.12, 0.16, 0.12, 0.16, 0.18, 66, (x, y, z) => z > -0.1 && y > -0.2);
-        g.pop();
+        g.ellipsoid(0, 0.112, -0.405, 0.038, 0.018, 0.024, H('#160a09'), MAT.HIDE, 10, 6);                               // flat, cracked nose
+        for (let i = 0; i < 9; i++) for (const s of [-1, 1]) {                                                        // upper teeth, two hooked fangs
+          const z = -0.39 + i * 0.032, fang = i === 1, L = fang ? 0.09 : 0.03 + 0.018 * ((i * 7) % 3), x = s * (0.034 + 0.065 * (i / 8) + 0.012);
+          g.push(A.chain(A.T(x, 0.08 + i * 0.004, z), A.Rx(Math.PI + (fang ? -0.15 : 0)), A.Rz(s * 0.08))); g.lathe(0, 0, 0, [[0.011, 0], [0.008, L * 0.5], [0, L]], shade(H(KC.teeth), 0.7 + 0.3 * ((i * 5) % 2)), MAT.CERAMIC, 6); g.pop();
+        }
+        tufts(g, 40, 0, 0.22, 0.12, 0.15, 0.12, 0.13, 0.26, 66, (x, y, z) => z > -0.2 && y > -0.3);                    // mane behind the horns
       } else if (part === 'jaw') {
-        g.push(A.S(1.25));
-        g.ellipsoid(0, -0.03, -0.12, 0.1, 0.045, 0.14, H(KC.skin), MAT.SKIN, 12, 6);
-        for (let i = -5; i <= 5; i++) { if (!i) continue; const fang = Math.abs(i) === 3, L = fang ? 0.1 : 0.035 + 0.015 * ((i * 5) % 3); g.push(A.chain(A.T(i * 0.019, -0.005, -0.225 + Math.abs(i) * 0.016), A.Rz(-i * 0.04))); g.lathe(0, 0, 0, [[0.01, 0], [0.007, L * 0.5], [0, L]], shade(H(KC.teeth), 0.75 + 0.25 * ((i * 3) % 2)), MAT.CERAMIC, 6); g.pop(); }
-        g.ellipsoid(0, -0.0, -0.13, 0.07, 0.02, 0.1, H('#2a0a0c'), 0, 10, 5);
-        g.pop();
+        // long lower jaw, hinged under the eyes
+        g.param((u, v) => { const a = u * TAU, c = Math.cos(a), sn = Math.sin(a), w = 0.08 - 0.025 * v, d = 0.05 - 0.015 * v, e = Math.sin(Math.min(1, v / 0.08) * Math.PI / 2) * Math.sqrt(Math.max(0, 1 - Math.pow(Math.max(0, (v - 0.88) / 0.12), 2)));
+          return [w * e * Math.sign(c) * Math.pow(Math.abs(c), 0.8), (sn < 0 ? d : 0.008) * e * Math.sign(sn) * Math.pow(Math.abs(sn), 0.85) - 0.012, lerp(0.02, -0.33, v)]; }, 14, 18, H(KC.skin), MAT.HIDE);
+        g.ellipsoid(0, -0.002, -0.16, 0.048, 0.006, 0.14, H('#2a0508'), 0, 10, 5);                                     // the wet dark inside
+        for (let i = 0; i < 8; i++) for (const s of [-1, 1]) {
+          const z = -0.31 + i * 0.034, fang = i === 0, L = fang ? 0.055 : 0.026 + 0.014 * ((i * 5) % 3), x = s * (0.03 + 0.036 * (i / 7));
+          g.push(A.chain(A.T(x, -0.004, z), A.Rz(-s * 0.06))); g.lathe(0, 0, 0, [[0.01, 0], [0.007, L * 0.5], [0, L]], shade(H(KC.teeth), 0.68 + 0.3 * ((i * 3) % 2)), MAT.CERAMIC, 6); g.pop();
+        }
+        tufts(g, 22, 0, -0.05, 0.0, 0.06, 0.03, 0.08, 0.22, 57, (x, y) => y < 0.2);                                  // matted beard off the jaw
       } else if (part === 'upper') {
-        g.capsule(KD.upper, 0.15, 0.11, H(KC.fur), MAT.FUR, 12);
-        tufts(g, 34, 0, -KD.upper * 0.45, 0, 0.14, KD.upper * 0.5, 0.13, 0.26, 77 + (extra === 'R' ? 1 : 0));
+        g.capsule(KD.upper, 0.17, 0.12, H(KC.fur), MAT.FUR, 12);
+        tufts(g, 44, 0, -KD.upper * 0.45, 0, 0.16, KD.upper * 0.5, 0.15, 0.34, 77 + (extra === 'R' ? 1 : 0));
       } else if (part === 'fore') {
-        g.capsule(KD.fore, 0.1, 0.07, H(KC.skin), MAT.SKIN, 10);
+        g.capsule(KD.fore, 0.115, 0.075, H(KC.skin), MAT.HIDE, 10);
+        g.tube([[0.03, -0.1, -0.06], [0.05, -KD.fore * 0.5, -0.07], [0.02, -KD.fore * 0.85, -0.05]], [0.022, 0.03, 0.018], shade(H(KC.skin), 1.1), MAT.HIDE, 6);   // tendon
         tufts(g, 14, 0, -KD.fore * 0.25, 0, 0.1, KD.fore * 0.25, 0.1, 0.18, 88, (x, y) => y > -0.3);
       } else if (part === 'hand') {
-        g.ellipsoid(0, -0.08, 0, 0.09, 0.1, 0.05, H(KC.skin), MAT.SKIN, 10, 6);
+        g.ellipsoid(0, -0.08, 0, 0.09, 0.1, 0.05, H(KC.skin), MAT.HIDE, 10, 6);
         for (let i = 0; i < 4; i++) {
           const x = -0.06 + i * 0.04, L = 0.2 - Math.abs(i - 1.5) * 0.02;
           const pts = [[x, -0.14, 0], [x * 1.1, -0.14 - L * 0.5, -0.025], [x * 1.15, -0.14 - L, -0.07]];
-          g.tube(pts, [0.019, 0.016, 0.012], H(KC.skin), MAT.SKIN, 6);
+          g.tube(pts, [0.019, 0.016, 0.012], H(KC.skin), MAT.HIDE, 6);
           g.push(A.mul(A.T(...pts[2]), A.alignY([0, -0.6, -0.8]))); g.lathe(0, 0, 0, [[0.016, 0], [0.011, 0.12], [0, 0.3]], H('#120d0a'), MAT.CERAMIC, 6); g.pop();
         }
-        g.tube([[0.07, -0.08, -0.02], [0.11, -0.13, -0.06], [0.12, -0.18, -0.09]], [0.02, 0.016, 0.012], H(KC.skin), MAT.SKIN, 6);
+        g.tube([[0.07, -0.08, -0.02], [0.11, -0.13, -0.06], [0.12, -0.18, -0.09]], [0.02, 0.016, 0.012], H(KC.skin), MAT.HIDE, 6);
       } else if (part === 'thigh') {
         g.capsule(KD.thigh, 0.19, 0.13, H(KC.fur), MAT.FUR, 12);
         tufts(g, 46, 0, -KD.thigh * 0.45, 0, 0.18, KD.thigh * 0.5, 0.18, 0.32, 99 + (extra === 'R' ? 1 : 0));
       } else if (part === 'shin') {
-        g.capsule(KD.shin, 0.12, 0.07, H(KC.fur), MAT.FUR, 10);
-        tufts(g, 26, 0, -KD.shin * 0.4, 0, 0.11, KD.shin * 0.45, 0.11, 0.24, 111 + (extra === 'R' ? 1 : 0));
+        g.capsule(KD.shin, 0.13, 0.085, H(KC.fur), MAT.FUR, 10);
+        tufts(g, 34, 0, -KD.shin * 0.4, 0, 0.12, KD.shin * 0.45, 0.12, 0.32, 111 + (extra === 'R' ? 1 : 0));
       } else if (part === 'meta') {
-        g.capsule(KD.meta, 0.06, 0.05, H(KC.skin), MAT.SKIN, 8);
+        g.capsule(KD.meta, 0.06, 0.05, H(KC.skin), MAT.HIDE, 8);
         g.lathe(0, -KD.meta - 0.07, -0.03, [[0, 0], [0.085, 0, 1], [0.08, 0.07], [0.05, 0.09, 1], [0, 0.09]], H(KC.hoof), MAT.CERAMIC, 10);
         g.box(0, -KD.meta - 0.072, -0.08, 0.012, 0.08, 0.1, 0, H('#000000'));
       } else if (part === 'sack') {
@@ -607,7 +627,7 @@ const ACT = (() => {
       const lurch = Math.max(0, Math.sin(ph));                                  // drops onto the left leg
       P.hip = KD.hip - (run ? 0.2 : 0.16) - Math.abs(Math.cos(ph)) * (run ? 0.12 : 0.05) - lurch * (run ? 0.05 : 0.11);
       P.roll = (run ? 0.1 : 0.17) * Math.sin(ph); P.twist = (run ? 0.2 : 0.16) * Math.sin(ph);
-      P.lean = run ? -0.95 : -0.62; P.neckX = run ? 0.5 : 0.3; P.headX = run ? 0.35 : 0.18;
+      P.lean = run ? -0.95 : -0.62; P.neckX = run ? 0.5 : 0.3; P.headX = run ? 0.35 : 0.34;
       P.headY = run ? 0 : 0.45 * Math.sin(t * 0.8) + 0.1 * Math.sin(t * 2.9);  // searching, side to side
       P.headZ = run ? 0.1 * Math.sin(ph) : 0.16 * Math.sin(t * 1.3) + (Math.sin(t * 0.37) > 0.93 ? 0.35 : 0);   // and now and then it snaps over
       P.jaw = run ? 0.5 : 0.12 + 0.06 * Math.sin(t * 1.7);
@@ -628,9 +648,9 @@ const ACT = (() => {
       P.lean += 0.03 * br; P.shX = [0.12 + 0.05 * br, 0.12 - 0.05 * br];   // the two close-ups were staged from this upright stance
     } else {
       // standing: hunched, breathing, head sweeping, claws flexing
-      P.hip = KD.hip - 0.14; P.hipX = [0.5, 0.42]; P.kn = [1.32, 1.24]; P.lean = -0.5 - 0.04 * br; P.neckX = 0.25; P.headX = 0.15;
+      P.hip = KD.hip - 0.14; P.hipX = [0.5, 0.42]; P.kn = [1.32, 1.24]; P.lean = -0.5 - 0.04 * br; P.neckX = 0.25; P.headX = 0.32;
       P.headY = 0.55 * Math.sin(t * 0.55); P.headZ = 0.14 * Math.sin(t * 0.9) + (Math.sin(t * 0.31) > 0.94 ? 0.38 : 0);
-      P.shX = [0.42 + 0.05 * br, 0.4 - 0.04 * br]; P.shZ = [0.36, 0.42]; P.el = [0.25, 0.5]; P.wr = [0.45 + 0.25 * Math.sin(t * 2.1), 0.5 + 0.2 * Math.sin(t * 1.6 + 1)];
+      P.shX = [0.48 + 0.05 * br, 0.44 - 0.04 * br]; P.shZ = [0.2, 0.26]; P.el = [0.25, 0.5]; P.wr = [0.45 + 0.25 * Math.sin(t * 2.1), 0.5 + 0.2 * Math.sin(t * 1.6 + 1)];
       carry();
     }
     if (k.look) {
@@ -650,12 +670,12 @@ const ACT = (() => {
         if (gs.name === 'tilt') { set('headZ', null, 0.35); }
         if (gs.name === 'lunge') { set('shX', 0, 2.3); set('shZ', 0, 0.15); set('el', 0, 0.25); set('wr', 0, 0.2); set('jaw', null, 0.75); }   // the long arm, only when he is nearly on you
         // bent double over a hiding place, hands on the rim, face in the opening
-        if (gs.name === 'peer') { set('hip', null, 0.82); set('lean', null, -1.15 + 0.04 * Math.sin(t * 0.9)); set('neckX', null, -0.2); set('headX', null, -0.5 + 0.06 * Math.sin(t * 0.5)); set('headY', null, 0.25 * Math.sin(t * 0.21)); set('jaw', null, 0.2 + 0.14 * Math.sin(t * 0.7)); set('headZ', null, 0.4 * Math.sin(t * 0.33)); for (const i of [0, 1]) { set('hipX', i, 1.25); set('kn', i, 2.2); set('an', i, 1.25); set('shX', i, 1.0); set('el', i, 0.5); set('shZ', i, 0.4); } }
+        if (gs.name === 'peer') { set('hip', null, 0.82); set('lean', null, -1.15 + 0.04 * Math.sin(t * 0.9)); set('neckX', null, -0.2); set('headX', null, -0.85 + 0.06 * Math.sin(t * 0.5)); set('headY', null, 0.25 * Math.sin(t * 0.21)); set('jaw', null, 0.2 + 0.14 * Math.sin(t * 0.7)); set('headZ', null, 0.4 * Math.sin(t * 0.33)); for (const i of [0, 1]) { set('hipX', i, 1.25); set('kn', i, 2.2); set('an', i, 1.25); set('shX', i, 1.0); set('el', i, 0.5); set('shZ', i, 0.4); } }
         // the catch: hunched to your height, arms wide, jaw unhinged
-        if (gs.name === 'scare') { const sh = Math.sin(t * 47) * 0.04; set('hip', null, 1.25); set('lean', null, 0.75); set('neckX', null, -0.75 + sh); set('headX', null, 0.0); set('headZ', null, sh * 2); set('jaw', null, 0.82 + sh * 2); for (const i of [0, 1]) { set('hipX', i, 0.8); set('kn', i, 1.6); set('an', i, 1.0); set('shX', i, 1.5); set('shZ', i, 1.0); set('el', i, 0.7); } }
+        if (gs.name === 'scare') { const sh = Math.sin(t * 47) * 0.04; set('hip', null, 1.25); set('lean', null, 0.75); set('neckX', null, -0.75 + sh); set('headX', null, 0.38); set('headZ', null, sh * 2); set('jaw', null, 0.82 + sh * 2); for (const i of [0, 1]) { set('hipX', i, 0.8); set('kn', i, 1.6); set('an', i, 1.0); set('shX', i, 1.5); set('shZ', i, 1.0); set('el', i, 0.7); } }
       }
     }
-    P.jaw += 0.03 * Math.sin(t * 2.3);
+    P.jaw += 0.12 + 0.03 * Math.sin(t * 2.3);
     return P;
   }
   function drawKrampus(buf, k, t) {
@@ -667,11 +687,11 @@ const ACT = (() => {
     const nk = A.chain(ch, A.T(0, KD.chest * 0.92, -0.08), A.Rx(P.neckX));
     const hd = A.chain(nk, A.T(0, KD.neck, -0.02), A.Ry(P.headY), A.Rx(P.headX), A.Rz(P.headZ));
     buf.emit(kPart('pelvis'), pel); buf.emit(kPart('chest'), ch); buf.emit(kPart('neck'), nk); buf.emit(kPart('head'), hd);
-    const jw = A.chain(hd, A.T(0, 0.0, -0.075), A.Rx(P.jaw)); buf.emit(kPart('jaw'), jw);
+    const jw = A.chain(hd, A.T(0, 0.065, -0.1), A.Rx(P.jaw * 0.75)); buf.emit(kPart('jaw'), jw);
     // the tongue hangs and sways
     const tg = new Geo(); const pts = [], rad = [];
-    for (let i = 0; i <= 8; i++) { const u = i / 8, sw = Math.sin(t * 3 + u * 3) * 0.06 * u; pts.push([sw, -0.01 - u * (0.42 + 0.25 * P.jaw), -0.25 - 0.12 * Math.sin(u * 2.2) - 0.08 * u]); rad.push(0.04 * (1 - u * 0.6)); }
-    tg.tube(pts, rad, hex(KC.tongue), MAT.SKIN, 7); buf.emit(tg.data, A.chain(jw, A.T(0, -0.01, -0.25), A.Rx(-P.jaw * 0.85), A.T(0, 0.01, 0.25))); // hangs with gravity, not with the jaw
+    for (let i = 0; i <= 8; i++) { const u = i / 8, sw = Math.sin(t * 3 + u * 3) * 0.06 * u; const sc = k.gest && k.gest.name === 'scare'; pts.push([sw + 0.03 * u, -0.01 - u * (0.3 + 0.2 * P.jaw) * (sc ? 0.35 : 1), -0.26 - 0.1 * Math.sin(u * 2.2) - 0.06 * u]); rad.push(0.026 * (1 - u * 0.7)); }
+    tg.tube(pts, rad, hex(KC.tongue), MAT.HIDE, 7); buf.emit(tg.data, A.chain(jw, A.T(0, -0.01, -0.26), A.Rx(-P.jaw * 0.65), A.T(0, 0.01, 0.26))); // hangs with gravity, not with the jaw
     for (const [i, sd] of [[0, -1], [1, 1]]) {
       const S = i ? 'R' : 'L';
       const sh = A.chain(ch, A.T(sd * KD.shW, KD.chest * 0.85, 0), A.Ry(P.shY[i]), A.Rx(P.shX[i]), A.Rz(sd * P.shZ[i]));
@@ -688,7 +708,7 @@ const ACT = (() => {
       const full = !!k.sackFull, wig = full ? Math.sin(t * 9) * 0.06 + Math.sin(t * 5.3) * 0.05 : 0;
       buf.emit(kPart('sack', full ? 'full' : ''), A.chain(ch, A.T(0.3, 0.98, 0.4), A.Rx(0.5 + P.sackRot + wig), A.Rz(-0.3 + wig)));
     }
-    k._eye = A.p(hd, 0, 0.17, -0.25);
+    k._eye = A.p(hd, 0, 0.205, -0.2);
   }
 
   // ---------- the family car ----------

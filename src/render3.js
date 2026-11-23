@@ -126,6 +126,12 @@ const SURFACE_F = /* glsl */`
     float sn=smoothstep(0.42,0.62,vn(vec3(p.x*0.5,0.0,p.z*0.5))+0.2*vn(p*4.0)); float h=vn(p*30.0);
     c=mix(c*(0.6+0.5*h), vec3(0.78,0.83,0.9), sn); bxRough=mix(0.55,0.75,sn); bxN=bumpH(n,h*(1.0-sn)+sn*fbm(p*2.0)*4.0,0.004);
   } else if(m==18.0){ float h=vn(p*60.0)*0.6+vn(p*170.0)*0.4; c*=0.85+0.2*h; bxRough=0.38; bxN=bumpH(n,h,0.0012); } // leather
+  else if(m==20.0){ // Krampus hide: cracked, dry, matte
+    float h=vn(p*48.0)*0.55+vn(p*140.0)*0.3+vn(p*9.0)*0.15; float cr=smoothstep(0.0,0.05,abs(vn(p*17.0)-0.5));
+    c*=(0.7+0.45*h)*mix(0.45,1.0,cr); bxRough=0.86; bxN=bumpH(n,h*0.7+cr*0.3,0.0035);
+  } else if(m==21.0){ // horn: ridged and dry
+    float h=vn(p*vec3(90.0,25.0,90.0))*0.6+vn(p*220.0)*0.4; c*=0.75+0.4*h; bxRough=0.6; bxN=bumpH(n,h,0.0025);
+  }
   else { c*=0.96+0.06*vn(p*24.0); }
   bxL = bxOutside>0.5 ? 1.0 : zl(p)*uAmb;
   bxSh = bxOutside>0.5 ? 1.0 : shadowAt(p, n);

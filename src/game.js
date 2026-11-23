@@ -389,6 +389,85 @@
   function roar() { tone(95, 1.1, 0.5, 'sawtooth', 0, -50); tone(63, 1.3, 0.4, 'square', 0.05, -25); thud(0.6, 0, 400); }
   function shatter(vol = 0.6) { noise(vol, 0, 3500, 'highpass', 4); for (let i = 0; i < 14; i++) tone(2500 + Math.random() * 4000, 0.05 + Math.random() * 0.2, vol * 0.25, 'square', Math.random() * 0.5, -1500); thud(vol, 0, 300); }
   function boxSmash() { for (let i = 0; i < 6; i++) tone(1800 + Math.random() * 2600, 0.08 + Math.random() * 0.12, 0.12, 'square', i * 0.05 + Math.random() * 0.05, -900); thud(0.5, 0, 1800); }
+  // ---------------- voices during the hunt ----------------
+  // The family is gone, but the store keeps talking: the manager on the speakers, Leo calling out from wherever
+  // Krampus hid him, the staff whispering through the glass, Leo again once you've got him.
+  const HV = {
+    pa: [['MANAGER', 'Attention, shoppers. The store is now closed. Please remain where you are.'], ['MANAGER', 'Attention, shoppers. Lost children may be collected upstairs.'],
+      ['MANAGER', 'A team member will be with you shortly. Please do not run in the store.'], ['MANAGER', 'Attention, shoppers. Please stay very, very quiet.']],
+    sack: [['LEO', 'Let me go! LET ME GO!'], ['LEO', 'Help me! Somebody help me!']],
+    leo: [['LEO', 'Help! I’m up here!'], ['LEO', 'It’s so dark in here…'], ['LEO', 'I want Mom…'], ['LEO', 'Are you still there?'], ['LEO', 'Please hurry. I can hear his bells.']],
+    glass: [['MARCUS', 'You should have left when we told you.'], ['DANA', 'Shhh. He’s listening.'], ['PRIYA', 'Thank you for shopping with us.'], ['MANAGER', 'He always finds them.'], ['MARCUS', 'The doors are locked, little one.']],
+    rescue: [['LEO', 'I knew you’d find me.']],
+    escape: [['LEO', 'He’s coming! Run!'], ['LEO', 'Don’t let go of me!'], ['LEO', 'Faster! He’s right behind us!']],
+    fell: [['LEO', 'Wait! Don’t leave me!']],
+  };
+  let voiceUntil = 0;
+  // where: [x, y, z] (heard from there, quieter with distance) or null (right beside you). fx: 'muffled' (inside a pot or a
+  // sack), 'pa' (the store speakers: a chime, thin and echoing), or nothing. Returns false when nothing was played.
+  function voiceAt(line, where, range = 20, fx = '') {
+    const [who, text] = line, buf = SND['v_' + vhash(who + '|' + text)];
+    if (!AC || muted || mode !== 'play' || NOW < voiceUntil) return false;
+    let vol = 1, pan = 0;
+    if (where) { [vol, pan] = hear(where[0], where[2], where[1], range); if (vol < 0.04) return false; vol = clamp(0.2 + vol * 1.3, 0.2, 1); }
+    const lag = fx === 'pa' ? 0.9 : 0;
+    if (fx === 'pa') { tone(784, 0.7, 0.12, 'sine'); tone(659, 0.9, 0.12, 'sine', 0.35); }   // ding-dong
+    if (buf) {
+      const src = AC.createBufferSource(), g = AC.createGain(); src.buffer = buf; g.gain.value = vol * (fx === 'muffled' ? 1.6 : fx === 'pa' ? 0.9 : 1.2);
+      let node = src;
+      if (fx === 'muffled') { const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 750; node.connect(f); node = f; }
+      if (fx === 'pa') { const f = AC.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1700; f.Q.value = 0.6; node.connect(f); node = f;
+        const d = AC.createDelay(1), fb = AC.createGain(); d.delayTime.value = 0.23; fb.gain.value = 0.35; f.connect(d); d.connect(fb); fb.connect(d); d.connect(g); }
+      node.connect(g); out(g, pan); src.start(AC.currentTime + lag);
+      VOX.add(src); src.onended = () => VOX.delete(src);
+    }
+    const dur = (buf ? buf.duration : text.length * 0.06) + lag + 0.4; voiceUntil = NOW + dur + 1.5;
+    ev('say', who + (fx ? ' (' + fx + ')' : '') + ': ' + text);
+    const tag = fx === 'muffled' ? ' <i>(muffled)</i>' : fx === 'pa' ? ' <i>(speakers)</i>' : '';
+    $('sub').innerHTML = `<b>${who}${tag}</b><span>${text}</span>`; $('sub').style.opacity = 1; subT = dur;
+    return true;
+  }
+  const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+  function huntVoices(dt) {
+    if (NOW - kSaidAt < 4) return;                                            // never over the top of Krampus
+    const b = G.bro, fd = LV.doors.front;
+    G.paT = (G.paT == null ? 2.5 : G.paT) - dt;
+    if (G.paT <= 0 && G.phase !== 'escape') { const line = G.paN ? pick(HV.pa.slice(1)) : HV.pa[0]; if (voiceAt(line, null, 0, 'pa')) { G.paN = (G.paN || 0) + 1; G.paT = 70 + Math.random() * 40; } else G.paT = 3; return; }
+    if (G.phase === 'grace' && K.carry !== false && KV.sackFull) {             // you can hear him in the sack, upstairs
+      G.sackT = (G.sackT == null ? 7 : G.sackT) - dt;
+      if (G.sackT <= 0) { G.sackT = 9 + Math.random() * 5; voiceAt(pick(HV.sack), [KV.x, KV.y, KV.z], 90, 'muffled'); }
+      return;
+    }
+    if (b.state === 'hidden' && G.phase === 'hunt') {                          // calling out from inside the pot or hamper
+      G.leoT = (G.leoT == null ? 18 : G.leoT) - dt;
+      if (G.leoT <= 0) { G.leoT = 24 + Math.random() * 16; if (voiceAt(G.leoN ? pick(HV.leo) : HV.leo[0], [b.x, b.y, b.z], G.leoN ? 18 + 8 * G.clues : 70, 'muffled')) G.leoN = (G.leoN || 0) + 1; else G.leoT = 6; }
+    }
+    if (G.phase === 'escape' && b.state === 'follow' && !b.down) {
+      G.escT = (G.escT == null ? 6 : G.escT) - dt;
+      if (G.escT <= 0 && (K.state === 'chase' || K.state === 'rage')) { G.escT = 10 + Math.random() * 6; voiceAt(pick(HV.escape), null); }
+    }
+    G.glassT = (G.glassT == null ? 12 : G.glassT) - dt;                                           // the staff, through the glass
+    if (G.glassT <= 0 && floorOf(P.y) === 0 && Math.hypot(P.x - fd.x, P.z - fd.z) < 7) { const line = pick(HV.glass), a = cast[line[0].toLowerCase()];
+      if (a && voiceAt(line, [a.visible ? a.x : fd.x, 0, a.visible ? a.z : fd.z], 14)) G.glassT = 16 + Math.random() * 10; }
+  }
+  // the store at night: air handling, and wind through the smashed skylight. Only while you're playing.
+  const AMB = { on: false, g: null };
+  function ambTick() {
+    if (!AC) return;
+    const want = (mode === 'play' || mode === 'scare') && !muted ? 1 : 0;
+    if (want && !AMB.g) {
+      const g = AMB.g = AC.createGain(); g.gain.value = 0; g.connect(master);
+      const mk = (type, freq, q, vol) => { const s = AC.createBufferSource(); if (!noiseBuf) noise(0.011, 0); s.buffer = noiseBuf; s.loop = true; const f = AC.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q; const v = AC.createGain(); v.gain.value = vol; s.connect(f); f.connect(v); v.connect(g); s.start(); return v; };
+      mk('lowpass', 140, 0.7, 0.5);                                              // the building's hum
+      const wind = mk('bandpass', 520, 0.8, 0.16), lfo = AC.createOscillator(), lg = AC.createGain(); lfo.frequency.value = 0.09; lg.gain.value = 0.12; lfo.connect(lg); lg.connect(wind.gain); lfo.start();
+      AMB.hum = AC.createOscillator(); AMB.hum.frequency.value = 60; const hg = AC.createGain(); hg.gain.value = 0.025; AMB.hum.connect(hg); hg.connect(g); AMB.hum.start();
+    }
+    if (AMB.g) AMB.g.gain.setTargetAtTime(want * 0.3, AC.currentTime, want ? 1.2 : 0.3);
+  }
+  // phones pause web audio for calls, notifications and app switches. Start it again on the next touch or key.
+  const audioKick = () => { if (AC && AC.state !== 'running' && AC.state !== 'closed') { try { AC.resume(); } catch (e) {} } };
+  for (const ev of ['pointerdown', 'touchend', 'keydown']) window.addEventListener(ev, audioKick, true);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) audioKick(); });
   function yelp(vol = 0.3) { tone(880, 0.6, vol, 'sawtooth', 0, 300); tone(1100, 0.5, vol * 0.6, 'triangle', 0.05, 200); }
   function lockClick() { tone(1300, 0.04, 0.2, 'square'); thud(0.35, 0, 1500); tone(700, 0.06, 0.15, 'square', 0.06); }
   // "Jingle Bells" (public domain, 1857) on soft bells; the warp setting bends it down
@@ -575,8 +654,8 @@
   function skipScene() {
     if (!SC || FF) return;
     FF = true; muted = true; hush(); const sc = SC;
-    for (let i = 0; i < 6000 && SC === sc; i++) { NOW += 0.1; sceneTick(0.1); for (const k in cast) stepActor(cast[k], 0.1); }
-    FF = false; muted = false; $('fade').style.transition = 'none'; $('fade').style.opacity = 0; timeScale = 1;
+    try { for (let i = 0; i < 6000 && SC === sc; i++) { NOW += 0.1; sceneTick(0.1); for (const k in cast) stepActor(cast[k], 0.1); } }
+    finally { FF = false; muted = false; } $('fade').style.transition = 'none'; $('fade').style.opacity = 0; timeScale = 1;
   }
   function fadeTo(v, dur) { $('fade').style.transition = FF ? 'none' : `opacity ${dur}s`; $('fade').style.opacity = v; return FF ? 0 : dur; }
 
@@ -641,7 +720,7 @@
     K.state = 'rage'; K.stun = 2.4; K.repath = 0;
     for (let i = 0; i < 16; i++) ZT[i] = Math.max(ZT[i], 0.5);
     roar(); boxSmash();
-    showMsg(G.keys ? '“I knew you’d find me.”  RUN — front doors!' : '“I knew you’d find me.”  RUN — but you still need the keys!', 4);
+    showMsg(G.keys ? 'RUN — front doors!' : 'RUN — but you still need the keys!', 4); voiceUntil = 0; later(1.2, () => { voiceUntil = 0; voiceAt(HV.rescue[0], null); });
   }
 
   // ---------------- Krampus (hunt AI) ----------------
@@ -936,7 +1015,7 @@
     b.maxY = Math.max(b.maxY || 0, b.y);
     if (!b.tripped && b.maxY > 2 && b.y < 0.02 && G.phase === 'escape') {
       b.tripped = true; b.down = 0.001; yelp(0.2); thud(0.4, 0, 500); L.anim = 'crouch'; L.face = { eyes: 'closed', mouth: 'open', brows: 'sad' };
-      showMsg('Leo fell! Go back for him!', 2.6); later(0.5, () => sob(0.5, 0));
+      showMsg('Leo fell! Go back for him!', 2.6); later(0.5, () => sob(0.5, 0)); later(1.1, () => { voiceUntil = 0; voiceAt(HV.fell[0], [b.x, b.y, b.z], 30); });
     }
     if (b.down) {
       b.down += dt; Object.assign(L, { x: b.x, y: b.y, z: b.z, visible: true, anim: 'crouch' });
@@ -1768,7 +1847,7 @@
     if (mode !== 'play' && mode !== 'scare') FEAR += (0 - FEAR) * Math.min(1, dt * 2);
     if (mode !== 'pause') { stepParticles(sdt); for (let i = 0; i < 16; i++) ZL[i] += (ZT[i] - ZL[i]) * Math.min(1, dt * 5); flick = Math.random() < 0.3 ? 0.35 + Math.random() * 0.65 : lerp(flick, 1, 0.3); }
     if (subT > 0) { subT -= dt; if (subT <= 0) $('sub').style.opacity = 0; }
-    musicTick();
+    musicTick(); ambTick();
     let ex, ey, ez, yaw, pitch, fov = 1.15, roll = 0;
     const cine = mode === 'cine' || (mode === 'pause' && pausedFrom === 'cine');
     if (mode === 'title') {
@@ -1781,9 +1860,9 @@
       // dragged to his face
       const e = KV._eye || [K.x, K.y + 2.2, K.z], hx = P.x - K.x, hz = P.z - K.z, hd = Math.hypot(hx, hz) || 1;
       const u = smooth(SCARE.t / 0.14), sk = 0.05 * (1 - Math.min(1, SCARE.t / 1.8) * 0.5);
-      const tx = e[0] + hx / hd * 0.8, ty = e[1] - 0.03, tz = e[2] + hz / hd * 0.8;
+      const tx = e[0] + hx / hd * 0.62, ty = e[1] - 0.11, tz = e[2] + hz / hd * 0.62;
       ex = lerp(SCARE.from[0], tx, u) + (Math.random() - 0.5) * sk; ey = lerp(SCARE.from[1], ty, u) + (Math.random() - 0.5) * sk; ez = lerp(SCARE.from[2], tz, u) + (Math.random() - 0.5) * sk;
-      yaw = Math.atan2(e[0] - ex, -(e[2] - ez)); pitch = Math.atan2(e[1] - 0.1 - ey, Math.hypot(e[0] - ex, e[2] - ez)); roll = (Math.random() - 0.5) * 0.09; fov = lerp(1.15, 1.3, u);
+      yaw = Math.atan2(e[0] - ex, -(e[2] - ez)); pitch = Math.atan2(e[1] - 0.12 - ey, Math.hypot(e[0] - ex, e[2] - ez)); roll = (Math.random() - 0.5) * 0.09; fov = lerp(1.25, 1.12, u);
     } else {
       ex = P.x; ez = P.z; ey = P.y + EYE() + (G && G.hiding != null && mode === 'play' ? 0 : Math.sin(P.bob) * 0.025); yaw = P.yaw; pitch = P.pitch;
     }
@@ -1816,6 +1895,7 @@
       if (G.tauntT <= 0 && (K.state === 'patrol' || K.state === 'look') && G.hiding == null) { G.tauntT = 45 + Math.random() * 30; krampusSay('Come out, come out, wherever you are', clamp(1.2 - dK / 30, 0.3, 1) * (sameF ? 1 : 0.6)); }
       if (sameF && dK < 7 && P.crouch && G.hiding == null && !K.seeing && K.state !== 'chase' && NOW - (G.smellSaid || -99) > 30) { G.smellSaid = NOW; krampusSay('I can smell you, little one', 0.9); }
     }
+    huntVoices(dt);
     if (G.phase !== 'escape') micHear(dt); if (mode !== 'play') return;
     updateKrampus(dt); if (mode !== 'play') return;
     updateBrother(dt);
@@ -1876,7 +1956,7 @@
   // ---------------- test hooks ----------------
   window.__box = {
     R, get P() { return P; }, get G() { return G; }, get K() { return K; }, get mode() { return mode; }, get EX() { return EX; }, get NOW() { return NOW; }, LV, ZL, ZT, cast, KV, CAR, cam,
-    log: () => EV.splice(0), MIC,
+    log: () => EV.splice(0), MIC, get audio() { return { muted, FF, state: AC ? AC.state : 'none' }; },
     stats: () => ({ walk: walk.reduce((a, b) => a + b, 0), reach: REACH.length, spots: SPOTS.length, links: stairLinks, verts: STATIC.count, obbs: LV.obbs.length, lights: LV.lights.length }),
     start: (d) => { if (d) diffKey = d; showOnly(null); startHunt(); },
     explore: () => { showOnly(null); startExplore(); },

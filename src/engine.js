@@ -26,7 +26,7 @@ function mulberry32(a) {
 
 // Materials — patterns and shading are done in the fragment shader
 const MAT = { PLAIN: 0, PLANK: 1, TILE: 2, WOOD: 3, GLOW: 4, CONCRETE: 5, SHIPLAP: 6, BRICK: 7, CARPET: 8, FABRIC: 9,
-  CERAMIC: 10, METAL: 11, GLASS: 12, SKIN: 13, HAIR: 14, FUR: 15, SNOW: 16, ASPHALT: 17, LEATHER: 18, GRAIN: 19 };
+  CERAMIC: 10, METAL: 11, GLASS: 12, SKIN: 13, HAIR: 14, FUR: 15, SNOW: 16, ASPHALT: 17, LEATHER: 18, GRAIN: 19, HIDE: 20, HORN: 21 };
 
 // ---------- affine transforms: row-major 3x4 ----------
 const A = {

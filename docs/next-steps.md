@@ -31,7 +31,12 @@ you from the balcony scene, bow when Krampus lands, walk your parents out, and w
 
 **Krampus talks and can hear you**: five lines (see README) from `tools/krampus_voice.py`, and an optional real-microphone mode (`micStart`/`micTick`/`micHear` in `src/game.js`). The mic learns the room's background for two seconds, then compares loudness against it; game sound leaking from speakers raises the bar. `window.__micTest = 0..1` fakes a loudness level for tests. Also fixed: timed events (`later()`) never ran during the hunt, because `tick()` didn't run them.
 
+**Hunt voices**: `HV` and `huntVoices()` in `src/game.js` (store announcements, Leo muffled, staff at the glass, rescue/escape lines), `voiceAt()` plays a line from a place with an optional muffled or speaker effect. Ambience in `ambTick()`. Audio restarts itself after a phone pauses it (`audioKick`), and Skip can never leave the game muted.
+
+**Krampus's look**: long goat-demon skull (`SKULL` keys), slanted ember eyes under a heavy brow, snarl and two rows of teeth, ridged dark horns, matte cracked hide (material `HIDE`) and horn (`HORN`) in `src/render3.js`, hanging matted fur, a hump and mane. The jumpscare opens his jaws at you.
+
 ## Still to do
+0. **Cutscene camera pass**: Joseph says the scenes' camera views and movement still feel a little off. Go shot by shot.
 1. **People and Krampus are still hand-built.** Rigged CC0 packs (Quaternius) would need their faces and gestures rebuilt
    for the cutscenes: the stare, the wide smile, the owl head-turn and the bow all live in `src/actors.js`. Worth doing only
    if the result keeps those.
