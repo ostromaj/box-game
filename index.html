@@ -7441,14 +7441,23 @@ const ACT = (() => {
     buf.emit(kPart('pelvis'), pel); buf.emit(kPart('chest'), ch); buf.emit(kPart('neck'), nk); buf.emit(kPart('head'), hd);
     const jrot = 0.12 - P.jaw * 0.75;   // a bigger P.jaw drops the jaw open (it used to swing it up, into his own snout)
     const jw = A.chain(hd, A.T(0, 0.065, -0.1), A.Rx(jrot)); buf.emit(kPart('jaw'), jw);
-    // the tongue hangs and sways
+    // the tongue: lies on the floor of his mouth, comes out over the front teeth, then hangs with real gravity (worked out
+    // in the jaw's own frame, so it drops the right way whatever his head is doing) and never back through the jaw
     const tg = new Geo(); const pts = [], rad = [];
     const lk = k.gest && k.gest.name === 'peer' && k._lick;   // licking: out over the front teeth and dragged slowly side to side
-    for (let i = 0; i <= 8; i++) { const u = i / 8, sw = Math.sin(t * 3 + u * 3) * 0.06 * u; const sc = k.gest && k.gest.name === 'scare';
-      let p = [sw + 0.03 * u, -0.01 - u * (0.3 + 0.2 * P.jaw) * (sc ? 0.35 : 1), -0.26 - 0.1 * Math.sin(u * 2.2) - 0.06 * u];
-      if (lk) { const q = [lk.s * 0.1 * Math.pow(u, 1.4), -0.01 + 0.035 * u + 0.03 * Math.sin(u * Math.PI), -0.26 - u * (0.12 - 0.05 * Math.abs(lk.s))]; p = p.map((v, j) => lerp(v, q[j], lk.a)); }
-      pts.push(p); rad.push(0.026 * (1 - u * 0.7) * (lk ? 1 - 0.15 * lk.a : 1)); }
-    tg.tube(pts, rad, hex(KC.tongue), MAT.HIDE, 7); buf.emit(tg.data, A.chain(jw, A.T(0, -0.01, -0.26), A.Rx(-jrot * 0.87), A.T(0, 0.01, 0.26))); // hangs with gravity, not with the jaw
+    const sc = k.gest && k.gest.name === 'scare';
+    let gx = -jw[4], gy = -jw[5], gz = -jw[6]; { const l = Math.hypot(gx, gy, gz) || 1; gx /= l; gy /= l; gz /= l; }
+    gz = Math.min(gz, 0.1); gy = Math.min(gy, -0.35); { const l = Math.hypot(gx, gy, gz); gx /= l; gy /= l; gz /= l; }   // never back into the mouth or up through the jaw
+    const lip = [0, 0.05, -0.37], hang = (0.22 + 0.2 * P.jaw) * (sc ? 0.4 : 1), UA = 0.42, N = 12;
+    for (let i = 0; i <= N; i++) {
+      const u = i / N; let p;
+      if (u <= UA) { const m = u / UA; p = [0, 0.022 + 0.03 * smooth(clamp((m - 0.5) / 0.5, 0, 1)), lerp(-0.1, -0.37, m)]; }   // along the floor of the mouth, up over the teeth
+      else { const h = (u - UA) / (1 - UA), L = h * hang, sw = Math.sin(t * 3 + h * 3) * 0.05 * h;
+        p = [lip[0] + gx * L + sw, lip[1] + gy * L, lip[2] + gz * L - 0.035 * Math.sin(h * Math.PI)]; }
+      if (lk) { const q = [lk.s * 0.1 * Math.pow(u, 1.4), 0.024 + 0.04 * smooth(clamp((u - 0.3) / 0.4, 0, 1)) + 0.02 * Math.sin(u * Math.PI), lerp(-0.1, -0.44 + 0.05 * Math.abs(lk.s), u)]; p = p.map((v, j) => lerp(v, q[j], lk.a)); }
+      pts.push(p); rad.push(0.024 * (1 - u * 0.6) * (lk ? 1 - 0.15 * lk.a : 1));
+    }
+    tg.tube(pts, rad, hex(KC.tongue), MAT.HIDE, 7); buf.emit(tg.data, jw);
     for (const [i, sd] of [[0, -1], [1, 1]]) {
       const S = i ? 'R' : 'L';
       const sh = A.chain(ch, A.T(sd * KD.shW, KD.chest * 0.85, 0), A.Ry(P.shY[i]), A.Rx(P.shX[i]), A.Rz(sd * P.shZ[i]));
