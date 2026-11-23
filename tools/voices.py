@@ -10,7 +10,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parent.parent
 game = (root / 'src' / 'game.js').read_text(); level = (root / 'src' / 'level.js').read_text()
 # who: (Kokoro voice, accent, speed, pitch shift). Leo has no child voice to use, so a young woman's voice is raised a little.
-CAST = {'DAD': ('am_michael', 'en-us', 1.02, 1.0), 'MOM': ('af_heart', 'en-us', 1.0, 1.0), 'MARCUS': ('am_onyx', 'en-us', 0.97, 1.0),
+CAST = {'WHISPER': ('af_nicole', 'en-us', 0.9, 1.0), 'DAD': ('am_michael', 'en-us', 1.02, 1.0), 'MOM': ('af_heart', 'en-us', 1.0, 1.0), 'MARCUS': ('am_onyx', 'en-us', 0.97, 1.0),
         'MANAGER': ('bm_george', 'en-gb', 0.9, 0.97), 'DANA': ('af_sarah', 'en-us', 1.0, 1.0), 'PRIYA': ('af_nicole', 'en-us', 0.95, 1.0),
         'LEO': ('af_sky', 'en-us', 1.08, 1.14)}
 STR = r"'((?:[^'\\]|\\.)*)'"
@@ -63,6 +63,9 @@ for who, text in lines:
     a, sr = tts.create(sp, voice=voice, speed=speed / pitch * (0.92 if hush else 1), lang=lang)
     a = np.asarray(a, dtype=np.float64)
     if pitch != 1.0: a = signal.resample(a, int(len(a) / pitch))     # spoken slower, then sped back up: same pace, higher voice
+    if who == 'WHISPER':   # a real whisper: keep the shape of the speech, throw the voice (pitch) away
+        f0, t0, Z = signal.stft(a, sr, nperseg=512); Z = np.abs(Z) * np.exp(2j * np.pi * rng.random(Z.shape)); _, a = signal.istft(Z, sr, nperseg=512)
+        b2, a2 = signal.butter(2, [900 / (sr / 2), 7000 / (sr / 2)], 'band'); a = signal.lfilter(b2, a2, a)
     idx = np.where(np.abs(a) > 0.01)[0]
     if len(idx): a = a[max(0, idx[0] - 500): idx[-1] + 2400]
     a = np.concatenate([a, np.zeros(int(sr * 0.25))]); a = room(a, sr, 0.16)

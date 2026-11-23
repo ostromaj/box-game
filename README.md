@@ -45,6 +45,8 @@ Open `index.html` in a browser. It's one self-contained file (Three.js and the t
   - **"Come out, come out, wherever you are"**: every minute or so while he searches.
   - **"I can smell you, little one"**: when you're crouched or hiding close by and he hasn't seen you.
   - **"Your brother is waiting for you"**: after you pick up the first and third clue.
+- With the mic on, Krampus says your own words back to you a few seconds after he hears them: slowed, pitched down and echoing, from wherever he is, or whispered down at you while he stares into your hiding place. The game keeps only the last few seconds in memory and never saves or sends anything.
+- More things that are wrong with the store: faceless mannequins that are never quite where they were when you look back; lights that stutter wherever he walks; cloven hoofprints that fade; a music box playing Silent Night over the speakers, flatter the closer he is; whispers; staff collecting at the glass while your back is turned; his chains; frost and your breath when he's close; and sometimes Leo calling you from the wrong place, too clearly (the real Leo is always muffled).
 - Leo's things shimmer (circling sparks, rising motes, a ring pulsing across the floor) and twinkle when you're close; they're on the map on Easy and Normal.
 - The store keeps talking during the hunt: the manager on the store speakers, Leo calling out (muffled) from the sack and then from his hiding place, the staff whispering through the glass when you go near the doors, and Leo again once you've rescued him. Quiet air-handling hum and wind through the smashed skylight underneath.
 - Sometimes he then walks over, bends down and **stares into your hiding place** for about half a minute. Don't climb out.

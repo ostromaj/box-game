@@ -13,6 +13,7 @@ const CHARS = {
   dana: { h: 1.66, fem: true, skin: '#d9b596', hair: ['ponytail', '#3b2a20'], top: ['shirt', '#ece8de'], apron: '#2f2f31', pants: '#26272b', shoes: '#1d1d1f', tag: true, lips: '#9a4a4a' },
   marcus: { h: 1.88, bulk: 1.05, skin: '#8d5e3f', hair: ['buzz', '#141010'], top: ['shirt', '#5b6b7d'], apron: '#2f2f31', pants: '#2b2c30', shoes: '#1d1d1f', tag: true },
   priya: { h: 1.62, fem: true, skin: '#b88462', hair: ['braid', '#15100d'], glasses: true, top: ['shirt', '#8e4a52'], apron: '#2f2f31', pants: '#2b2c30', shoes: '#1d1d1f', tag: true, lips: '#8a3e44' },
+  mannequin: { h: 1.8, skin: '#e7e3dc', hair: ['none', '#e7e3dc'], top: ['plain', '#e3dfd7'], pants: '#e3dfd7', shoes: '#dcd8d0', faceless: true },
   manager: { h: 1.78, bulk: 1.02, skin: '#e8c4a2', hair: ['short', '#9a9a98'], top: ['sweater', '#3a4a3e'], tie: '#7a1f2b', pants: '#3a3a3c', shoes: '#1d1d1f', lanyard: true, glasses: true },
 };
 
@@ -62,12 +63,12 @@ const ACT = (() => {
       const sleeve = puff ? 1.45 : coat ? 1.25 : 1.12;
       if (part === 'pelvis') {
         loft(g, [[-d.spine * 0.5, d.hipW * 1.2, d.rz * 0.6], [-d.spine * 0.2, d.hipW * 2.2, d.rz * 0.95, d.rz * 0.06], [d.spine * 0.25, d.hipW * (c.fem ? 2.3 : 2.2), d.rz * 0.98, d.rz * 0.05], [d.spine * 0.7, d.hipW * (c.fem ? 1.9 : 2.05), d.rz * 0.8], [d.spine * 0.92, d.hipW * 1.5, d.rz * 0.55]], pants, fab);
-        if (!puff && !coat && !c.apron) { band(g, d.spine * 0.62, d.hipW * (c.fem ? 2.18 : 2.13), d.rz * 0.86, 0, d.H * 0.011, H('#1c1a19'), MAT.LEATHER); g.rbox(0, d.spine * 0.62 - d.H * 0.011, -d.rz * 0.86, d.H * 0.026, d.H * 0.022, 0.008, 0, H('#b9bcc0'), MAT.METAL, 0.003); }   // belt and buckle
+        if (!puff && !coat && !c.apron && !c.faceless) { band(g, d.spine * 0.62, d.hipW * (c.fem ? 2.18 : 2.13), d.rz * 0.86, 0, d.H * 0.011, H('#1c1a19'), MAT.LEATHER); g.rbox(0, d.spine * 0.62 - d.H * 0.011, -d.rz * 0.86, d.H * 0.026, d.H * 0.022, 0.008, 0, H('#b9bcc0'), MAT.METAL, 0.003); }   // belt and buckle
         if (puff) g.ellipsoid(0, d.spine * 0.55, 0, d.shW * 1.0, d.spine * 0.32, d.rz * 1.25, shade(top, 0.95), fab, 14, 6);
         if (coat) { const cw = d.hipW * (c.fem ? 1.85 : 2.08) * 1.1; g.push(A.S(1, 1, d.rz * 1.12 / cw)); g.lathe(0, -d.thigh * 0.75, 0, [[cw * 1.12, 0, 1], [cw * 1.07, d.thigh * 0.4], [cw * 1.0, d.thigh * 0.75 + d.spine * 0.4], [cw * 0.97, d.thigh * 0.75 + d.spine * 0.95, 1]], top, fab, 20); g.pop(); }
         if (c.apron) {
           const ap = H(c.apron), W = d.hipW * 2.2, D = d.rz * 1.02, hgt = d.thigh * 0.7 + d.spine * 0.75, y0 = -d.thigh * 0.7;
-          for (let i = -4; i <= 4; i++) { const a = i * 0.27, x = Math.sin(a) * W, z = -Math.cos(a) * D; g.rbox(x, y0, z, W * 0.31, hgt, 0.01, a * 0.75, shade(ap, 1 - 0.03 * Math.abs(i)), fab, 0.004); }
+          g.param((u, v) => { const a = (u * 2 - 1) * 1.18, fl = 1 + 0.07 * (1 - v), fold = 0.006 * Math.sin(u * 9 * Math.PI) * (1 - v); return [Math.sin(a) * W * fl, y0 - hgt / 2 + v * hgt, -Math.cos(a) * (D * fl + fold)]; }, 16, 6, ap, fab);   // one cloth sheet round the front, soft folds at the hem
           band(g, d.spine * 0.7, d.hipW * (c.fem ? 2.14 : 2.08), d.rz * 0.88, 0, d.H * 0.006, shade(ap, 0.8), fab);                                  // waist tie, all the way round
           for (const sd of [-1, 1]) g.tube([[sd * 0.01, d.spine * 0.7, D * 1.0], [sd * d.hipW * 0.9, d.spine * 0.45, D * 1.08], [sd * d.hipW * 0.7, d.spine * 0.05, D * 1.1]], 0.006, shade(ap, 0.8), fab, 4, false);   // the bow's tails
           g.rbox(-d.hipW * 0.9, -d.thigh * 0.2, -D - 0.008, d.hipW * 1.5, d.thigh * 0.3, 0.008, 0, shade(ap, 1.25), fab, 0.004);
@@ -105,7 +106,7 @@ const ACT = (() => {
           const ap = H(c.apron);
           // the bib: tapers from the waist to the chest and lies on the body, with a strap round the neck
           const fz = (t) => -d.rz * (c.fem ? lerp(0.98, 1.2, Math.sin(clamp(t, 0, 1) * Math.PI) ** 1.5) * (t > 0.75 ? lerp(1, 0.86, (t - 0.75) * 4) : 1) : lerp(1.02, 1.1, Math.sin(clamp(t, 0, 1) * Math.PI))) - 0.006;
-          for (let i = 0; i < 26; i++) { const t = i / 26, w = lerp(d.hipW * 3.3, d.shW * 1.0, smooth(Math.min(1, t * 1.25))); g.box(0, ch * (-0.2 + t * 1.0), fz(t), w, ch * 0.05, 0.01, 0, ap, fab); }
+          g.param((u, v) => { const w = lerp(d.hipW * 3.3, d.shW * 1.0, smooth(Math.min(1, v * 1.25))) / 2, x = (u * 2 - 1) * w; return [x, ch * (-0.2 + v * 1.0), fz(v) + d.rz * 0.28 * (x / (d.hipW * 1.8)) ** 2]; }, 10, 14, ap, fab);   // the bib, one smooth sheet curving round the body
           g.rbox(0, ch * 0.79, fz(0.99) - 0.002, d.shW * 1.02, ch * 0.03, 0.012, 0, shade(ap, 1.2), fab, 0.004);
           for (const s of [-1, 1]) g.tube([[s * d.shW * 0.46, ch * 0.78, fz(0.95)], [s * d.shW * 0.36, ch * 0.98, -d.rz * 0.5], [s * d.H * 0.03, ch * 1.03, d.rz * 0.35], [0, ch * 1.02, d.rz * 0.5]], 0.007, ap, fab, 4, false);
           if (c.tag) { g.rbox(-d.shW * 0.36, ch * 0.56, fz(0.75) - 0.01, 0.07, 0.025, 0.006, 0, H('#f6f5f1'), MAT.CERAMIC, 0.003); g.box(-d.shW * 0.36, ch * 0.568, fz(0.75) - 0.014, 0.05, 0.006, 0.002, 0, H('#2b2b2b')); }
@@ -146,6 +147,7 @@ const ACT = (() => {
         };
         const headFn = (u, v) => { const [x, y, z] = headN(u, v); return [x * rx, cy + y * ry * (y < 0 ? 1.1 : 1), z * rz]; };
         g.param(headFn, 30, 22, skin, MAT.SKIN);
+        if (c.faceless) return;   // a mannequin: smooth, blank, nothing where a face should be
         // where the face's surface is, so eyes, brows, nose and lips sit on it instead of floating in front of it
         const NB = 56, X0 = -rx * 1.1, X1 = rx * 1.1, Y0 = cy - ry * 1.15, Y1 = cy + ry * 1.05, fresh = !FACE_BINS.has(id), bins = fresh ? new Float32Array(NB * NB).fill(1e9) : FACE_BINS.get(id);   // the same face for every expression: work it out once
         if (fresh) FACE_BINS.set(id, bins);
@@ -312,9 +314,9 @@ const ACT = (() => {
         else { { const R = d.legR, L = d.shin, kid = d.k > 0.5; g.lathe(0, -L, 0, [[0, -0.03 * L], [R * 1.0, -0.01 * L], [R * 1.02, 0.1 * L], [R * (kid ? 0.95 : 1.05), 0.4 * L], [R * (kid ? 1.12 : 1.14), 0.72 * L], [R * 1.16, 0.92 * L], [R * 0.85, 1.04 * L], [0, 1.08 * L]], sc, fab, 12); } g.torus(0, -d.shin * 0.97, 0, d.legR * 1.1, d.legR * 0.13, shade(sc, 0.8), fab, 12, 4); g.rbox(0, -d.shin * 0.95, -d.legR * 1.16, 0.004, d.shin * 0.9, 0.004, 0, shade(sc, 1.25), fab, 0.002); }   // straight leg, hem, crease
       } else if (part === 'foot') {
         const L = d.H * 0.15;
-        g.rbox(0, -d.footH, -L * 0.25, d.legR * 1.6, d.footH * 1.15, L, 0, shoes, MAT.LEATHER, d.footH * 0.45);
-        g.ellipsoid(0, -d.footH * 0.35, -L * 0.52, d.legR * 0.8, d.footH * 0.6, L * 0.24, shoes, MAT.LEATHER, 8, 5);   // toe cap
-        if (!c.boots) for (let i = 0; i < 3; i++) g.rbox(0, d.footH * 0.12, -L * (0.22 + i * 0.1), d.legR * 0.9, 0.003, 0.004, 0, shade(shoes, id === 'you' ? 0.7 : 1.8), 0, 0.001);
+        g.param((u, v) => { const a = u * TAU, y = v, zz = -L * 0.72 + v * 0, w = d.legR * (0.62 + 0.2 * Math.sin(Math.PI * Math.min(1, v * 1.3))), len = v; // a sole-to-heel loft: wide at the ball of the foot, round at the toe and heel
+          const t = -Math.cos(Math.PI * v), z = -L * 0.25 + t * L * 0.5, half = Math.sqrt(Math.max(0, 1 - t * t)), ww = d.legR * (0.72 + 0.12 * Math.max(0, -t)) * (0.25 + 0.75 * half), hh = d.footH * (0.95 + 0.25 * Math.max(0, t)) * (0.3 + 0.7 * half);
+          return [Math.cos(a) * ww, -d.footH * 0.55 + Math.max(-0.45, Math.sin(a)) * hh, z]; }, 14, 12, shoes, MAT.LEATHER);
         g.box(0, -d.footH, -L * 0.25, d.legR * 1.62, d.footH * 0.25, L * 1.01, 0, shade(shoes, id === 'you' ? 0.9 : 0.7), MAT.LEATHER);
       }
     });
@@ -461,19 +463,48 @@ const ACT = (() => {
     { const dd = dims(id); a._head = A.p(B.head, 0, dd.headRy * 0.95, 0); }   // for cameras and tests
     for (const i of [0, 1]) {
       const sd = i ? 'R' : 'L';
-      buf.emit(personPart(id, 'upper'), B['sh' + i]);
-      buf.emit(personPart(id, 'fore', sd), B['el' + i]);
       buf.emit(personPart(id, 'hand', sd), B['wr' + i]);
-      buf.emit(personPart(id, 'thigh'), B['hp' + i]);
-      buf.emit(personPart(id, 'shin'), B['kn' + i]);
       buf.emit(personPart(id, 'foot'), B['an' + i]);
     }
+    drawLimbs(buf, a, B);
     const d = dims(id);
     for (const [k, i] of [['R', 1], ['L', 0]]) {
       const item = a['hold' + k];
       if (item) buf.emit(propMesh(item), A.chain(B['wr' + i], A.T(0, -d.hand * 0.6, -d.hand * 0.25), item === 'plate' ? A.Rx(Math.PI / 2) : A.I()));
     }
     a._B = B;
+  }
+  // Arms and legs as ONE smooth limb each, rebuilt every frame through the real joints: it comes out from inside the
+  // torso, swells over the shoulder or thigh, slims into the elbow or knee, bends round it on a curve (no seam, no
+  // ball joint), fills out over the forearm or calf and narrows to the wrist or ankle.
+  function limb(g, P0, P1, P2, ext, prof, col, mat, cuff) {
+    const sub = (u, v) => [u[0] - v[0], u[1] - v[1], u[2] - v[2]], L3 = (u, v, t) => [lerp(u[0], v[0], t), lerp(u[1], v[1], t), lerp(u[2], v[2], t)];
+    const up = sub(P0, P1), ul = Math.hypot(...up) || 1, start = [P0[0] + up[0] / ul * ext, P0[1] + up[1] / ul * ext, P0[2] + up[2] / ul * ext];
+    const pts = [], rad = [], add = (p, k) => { pts.push(p); rad.push(prof(k)); };
+    for (const t of [0, 0.5]) add(L3(start, P0, t), -1 + t * 2 * 0.999);                     // inside the body -> the root
+    for (const t of [0.15, 0.35, 0.55, 0.72]) add(L3(P0, P1, t), t);                          // upper segment
+    const q0 = L3(P0, P1, 0.84), q1 = L3(P1, P2, 0.16);
+    for (const t of [0, 0.33, 0.66, 1]) { const a2 = L3(q0, P1, t), b2 = L3(P1, q1, t); add(L3(a2, b2, t), t < 0.5 ? 0.84 + t * 0.32 : 1 + (t - 0.5) * 0.32); }   // round the joint
+    for (const t of [0.3, 0.5, 0.7, 0.86, 1]) add(L3(P1, P2, t), 1 + t);                      // lower segment
+    if (cuff) { const n = pts.length; g.tube(pts.slice(0, n - 1), rad.slice(0, n - 1), col, mat, 12, true); g.tube([L3(P1, P2, 0.84), L3(P1, P2, 1.0)], [prof(1.84) * 1.06, prof(2) * 1.08], cuff, mat, 12, true); }
+    else g.tube(pts, rad, col, mat, 12, true);
+  }
+  function drawLimbs(buf, a, B) {
+    const id = a.id, c = CHARS[id], d = dims(id), s = a.scale || 1, g = new Geo();
+    const top = H(c.top[1]), pants = H(c.pants), shoes = H(c.shoes), puff = c.top[0] === 'puffer', coat = c.top[0] === 'coat', fab = MAT.FABRIC;
+    const sleeve = (puff ? 1.45 : coat ? 1.25 : 1.12) * s, ar = d.armR * sleeve, lr = d.legR * s, kid = d.k > 0.5;
+    const cuffC = c.top[0] === 'shirt' ? shade(top, 1.12) : shade(top, 0.85);
+    // radius along the limb: k = -1..0 inside the body, 0..1 upper segment, 1..2 lower segment
+    const arm = (k) => ar * (k < 0 ? 1.05 : k < 1 ? lerp(1.22, 0.9, k) + 0.14 * Math.exp(-(((k - 0.62) / 0.2) ** 2)) : lerp(1.0, 0.74, (k - 1) ** 0.8) + 0.06 * Math.exp(-(((k - 1.3) / 0.25) ** 2)));
+    const leg = (k) => lr * (k < 0 ? 1.5 : k < 1 ? lerp(c.fem ? 1.6 : 1.55, 1.05, k ** 1.2) : (kid ? lerp(1.02, 0.82, k - 1) + 0.12 * Math.exp(-(((k - 1.32) / 0.22) ** 2)) : lerp(1.06, 0.96, k - 1) + 0.06 * Math.exp(-(((k - 1.3) / 0.25) ** 2))));
+    for (const i of [0, 1]) {
+      const sh = A.p(B['sh' + i], 0, 0, 0), el = A.p(B['el' + i], 0, 0, 0), wr = A.p(B['wr' + i], 0, 0, 0);
+      limb(g, sh, el, wr, ar * 0.9, arm, top, fab, puff ? shade(top, 0.85) : cuffC);
+      const hp = A.p(B['hp' + i], 0, 0, 0), kn = A.p(B['kn' + i], 0, 0, 0), an = A.p(B['an' + i], 0, 0, 0);
+      if (c.boots) { limb(g, hp, kn, an, lr * 1.3, leg, pants, fab, null); const bt = [lerp(kn[0], an[0], 0.42), lerp(kn[1], an[1], 0.42), lerp(kn[2], an[2], 0.42)]; g.tube([bt, an], [lr * 1.12, lr * 0.98], shoes, MAT.LEATHER, 12, true); }
+      else limb(g, hp, kn, an, lr * 1.3, leg, pants, fab, shade(pants, 0.82));
+    }
+    buf.emit(g.data, A.I());
   }
   // world position of a hand (for holding hands)
   function handPos(a, i) { const B = a._B; if (!B) return null; const d = dims(a.id); return A.p(B['wr' + i], 0, -d.hand * 0.5, 0); }

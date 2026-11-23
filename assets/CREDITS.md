@@ -20,3 +20,6 @@ Models were downloaded as 1K glTF from polyhaven.com and packed with
 
 Code libraries: three.js (MIT), bundled into `index.html` by `tools/build.py`.
 Reflections use three.js's built-in RoomEnvironment.
+
+| `sounds/v_*.mp3` (whispers) | Kokoro voice `af_nicole`, turned into a whisper in tools/voices.py (random-phase STFT, band-pass) | free to use |
+| Music box melody | *Stille Nacht* (Gruber, 1818), public domain, played by the game's own synth | public domain |

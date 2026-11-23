@@ -32,6 +32,8 @@
   #stance { position: absolute; left: max(12px, env(safe-area-inset-left)); top: calc(max(12px, env(safe-area-inset-top)) + 34px); font-size: 12px; opacity: 0.8; background: rgba(20,18,16,0.5); padding: 3px 10px; border-radius: 8px; }
   #minimap { position: absolute; right: max(12px, env(safe-area-inset-right)); top: max(12px, env(safe-area-inset-top)); width: 170px; height: 120px; border-radius: 12px; background: rgba(30,28,26,0.55); border: 2px solid rgba(255,255,255,0.5); pointer-events: auto; cursor: pointer; }
   #msg { position: absolute; top: 34%; left: 50%; transform: translate(-50%, -50%); font-size: clamp(18px, min(5vw, 8.5vh), 40px); font-weight: 900; text-shadow: 0 2px 12px rgba(0,0,0,0.7); transition: opacity .4s; text-align: center; width: 90vw; }
+  #frost { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, transparent 52%, rgba(190,215,235,0.28) 74%, rgba(230,242,252,0.8) 100%); }
+  #breath { position: absolute; left: 50%; bottom: -8%; width: 46vw; height: 30vh; transform: translateX(-50%); pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(236,241,246,0.6), rgba(236,241,246,0) 68%); filter: blur(10px); }
   #vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(200,20,10,0.75)); opacity: 0; }
   #dot { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 2px; background: rgba(255,255,255,0.7); }
   #hint { position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 12px; opacity: 0.7; background: rgba(20,18,16,0.5); padding: 4px 12px; border-radius: 8px; white-space: nowrap; }
@@ -112,6 +114,7 @@
 
 <div id="hud">
   <div id="vignette"></div>
+  <div id="frost"></div><div id="breath"></div>
   <div id="hidefx"></div>
   <div id="dot"></div>
   <div id="top">
