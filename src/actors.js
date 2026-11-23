@@ -52,6 +52,7 @@ const ACT = (() => {
   }
 
   // ---------- part meshes ----------
+  const FACE_BINS = new Map();
   function personPart(id, part, extra = '') {
     return mesh(`p:${id}:${part}:${extra}`, (g) => {
       const c = CHARS[id], d = dims(id), skin = H(c.skin), top = H(c.top[1]), pants = H(c.pants), shoes = H(c.shoes);
@@ -109,7 +110,7 @@ const ACT = (() => {
         }
         if (c.purse) g.tube([[-d.shW * 0.9, ch * 0.95, 0], [-d.shW * 0.2, ch * 0.5, -d.rz * 1.05], [d.shW * 0.6, ch * 0.05, -d.rz * 0.6]], 0.008, H(c.purse), MAT.LEATHER, 4, false);
       } else if (part === 'neck') {
-        g.lathe(0, -0.02, 0, [[d.H * (c.fem ? 0.031 : 0.036), 0, 1], [d.H * (c.fem ? 0.027 : 0.032), d.neck * 0.6 + 0.02], [d.H * (c.fem ? 0.028 : 0.033), d.neck + 0.05, 1]], skin, MAT.SKIN, 12);
+        g.lathe(0, -0.02, 0, [[d.H * (c.fem ? 0.03 : 0.035), 0, 1], [d.H * (c.fem ? 0.024 : 0.029), d.neck * 0.6 + 0.02], [d.H * (c.fem ? 0.024 : 0.029), d.neck + 0.05, 1]], skin, MAT.SKIN, 12);
         if (!c.fem && !d.k) g.ellipsoid(0, d.neck * 0.45, -d.H * 0.028, d.H * 0.008, d.H * 0.011, d.H * 0.008, shade(skin, 0.97), MAT.SKIN, 6, 4);
         if (c.scarf) {
           const sc = H(c.scarf);
@@ -118,121 +119,156 @@ const ACT = (() => {
         }
       } else if (part === 'head') {
         const [eyes, brows, mouth] = extra.split(',');
-        const rx = d.headRx, ry = d.headRy, rz = d.headRz, cy = ry * 0.95;
-        // a skull rather than an egg: wide cranium, flat temples, cheekbones, a jaw that narrows to a chin
-        const kid = d.k > 0.5, fem = !!c.fem;
-        g.param((u, v) => {
+        const rx = d.headRx * 0.96, ry = d.headRy, rz = d.headRz, cy = ry * 0.95;
+        const kid = d.k > 0.5, fem = !!c.fem, J = kid ? 0.2 : fem ? 0.4 : 0.32;
+        // A head, not a balloon: a squarer, flatter face in front, a skull that goes back further than it goes forward,
+        // cheekbones, deep-set eyes under a brow, a mouth area that comes forward a little, and a jaw that narrows to a chin.
+        const headN = (u, v) => {
           const th = -Math.PI / 2 + v * Math.PI, ph = u * TAU, y = Math.sin(th), cc = Math.cos(th);
-          let x = Math.cos(ph) * cc, z = Math.sin(ph) * cc;
-          const low = y < 0 ? y * y : 0, front = z < 0 ? -z : 0;
-          x *= 1 - (kid ? 0.2 : fem ? 0.36 : 0.3) * low; z *= 1 - 0.1 * low;
-          if (z < 0) z *= 1 + 0.07 * low;                                             // chin forward
-          x *= 1 - 0.07 * front * (1 - Math.abs(y));                                  // face narrower than the skull behind it
-          const cheek = Math.exp(-(((y + 0.12) / 0.26) ** 2)) * Math.exp(-(((Math.abs(x) - 0.62) / 0.3) ** 2)) * front;
-          z -= 0.05 * cheek; x *= 1 + 0.04 * cheek;                                   // cheekbones
-          const sock = Math.exp(-(((y - 0.13) / 0.11) ** 2)) * Math.exp(-(((Math.abs(x) - 0.4) / 0.2) ** 2)) * front;
-          z += 0.09 * sock;                                                           // eye sockets set in
-          const brow = Math.exp(-(((y - 0.3) / 0.09) ** 2)) * front * (1 - x * x);
-          z -= (fem || kid ? 0.015 : 0.035) * brow;                                   // brow ridge
-          return [x * rx, cy + y * ry * (y < 0 ? 1.06 : 1), z * rz];
-        }, 26, 18, skin, MAT.SKIN);
+          let cx = Math.cos(ph), cz = Math.sin(ph);
+          if (cz < 0) { cx = Math.sign(cx) * Math.pow(Math.abs(cx), 0.82); cz = -Math.pow(-cz, 0.82); }        // flatter face, defined sides
+          let x = cx * cc, z = cz * cc;
+          const low = y < 0 ? -y : 0, front = z < 0 ? -z : 0;
+          const s1 = smooth(clamp(low / 0.5, 0, 1)), s2 = smooth(clamp((low - 0.42) / 0.58, 0, 1));
+          x *= 1 - 0.05 * s1 - J * s2;                                                    // cheeks, then the jaw
+          if (z > 0) z *= (1 + 0.1 * (1 - low)) * (1 - 0.25 * s2);                         // the back of the skull; the jaw tucks in toward the neck
+          const g2 = (a, w) => Math.exp(-((a / w) ** 2));
+          z -= 0.09 * g2(y + 0.86, 0.14) * g2(x, 0.32) * front;                              // chin
+          z -= 0.04 * g2(y + 0.45, 0.22) * g2(x, 0.45) * front;                             // mouth area
+          const cheek = g2(y + 0.06, 0.2) * g2(Math.abs(x) - 0.6, 0.25) * front; z -= 0.045 * cheek; x *= 1 + 0.03 * cheek;
+          z += 0.13 * g2(y - 0.12, 0.12) * g2(Math.abs(x) - 0.42, 0.19) * front;           // eye sockets
+          z -= (fem || kid ? 0.02 : 0.045) * g2(y - 0.3, 0.09) * front * (1 - x * x);      // brow ridge
+          x *= 1 - 0.05 * g2(y - 0.35, 0.25) * g2(Math.abs(x) - 0.95, 0.15);               // temples
+          if (y > 0.35 && z < 0) z *= 1 - 0.12 * (y - 0.35);                                // forehead sloping back
+          return [x, y, z];
+        };
+        const headFn = (u, v) => { const [x, y, z] = headN(u, v); return [x * rx, cy + y * ry * (y < 0 ? 1.1 : 1), z * rz]; };
+        g.param(headFn, 30, 22, skin, MAT.SKIN);
+        // where the face's surface is, so eyes, brows, nose and lips sit on it instead of floating in front of it
+        const NB = 56, X0 = -rx * 1.1, X1 = rx * 1.1, Y0 = cy - ry * 1.15, Y1 = cy + ry * 1.05, fresh = !FACE_BINS.has(id), bins = fresh ? new Float32Array(NB * NB).fill(1e9) : FACE_BINS.get(id);   // the same face for every expression: work it out once
+        if (fresh) FACE_BINS.set(id, bins);
+        if (fresh) for (let i = 0; i <= 200; i++) for (let j = 0; j <= 120; j++) { const p = headFn(i / 200, j / 120); if (p[2] > 0) continue; const bx = Math.round((p[0] - X0) / (X1 - X0) * (NB - 1)), by = Math.round((p[1] - Y0) / (Y1 - Y0) * (NB - 1)), k = by * NB + bx; if (p[2] < bins[k]) bins[k] = p[2]; }
+        const fz = (x, y) => { const fx = (x - X0) / (X1 - X0) * (NB - 1), fy = (y - Y0) / (Y1 - Y0) * (NB - 1); let best = -rz, bd = 1e9;
+          for (let A2 = -2; A2 <= 2; A2++) for (let B2 = -2; B2 <= 2; B2++) { const X = Math.round(fx) + A2, Y = Math.round(fy) + B2; if (X < 0 || Y < 0 || X >= NB || Y >= NB) continue; const z = bins[Y * NB + X]; if (z > 1e8) continue; const dd = (X - fx) ** 2 + (Y - fy) ** 2; if (dd < bd) { bd = dd; best = z; } } return best; };
+        const on = (x, y, lift = 0.0015) => [x, y, fz(x, y) - lift];
         // ears
-        for (const s of [-1, 1]) { g.ellipsoid(s * rx * 0.97, cy + ry * 0.02, rz * 0.08, rx * 0.07, ry * 0.19, rz * 0.12, shade(skin, 0.96), MAT.SKIN, 8, 6); g.ellipsoid(s * rx * 1.0, cy + ry * 0.02, rz * 0.06, rx * 0.03, ry * 0.11, rz * 0.06, shade(skin, 0.78), MAT.SKIN, 6, 4); }
+        for (const s of [-1, 1]) { g.ellipsoid(s * rx * 0.95, cy + ry * 0.0, rz * 0.1, rx * 0.07, ry * 0.2, rz * 0.13, shade(skin, 0.96), MAT.SKIN, 8, 6); g.ellipsoid(s * rx * 0.99, cy + ry * 0.0, rz * 0.08, rx * 0.03, ry * 0.12, rz * 0.07, shade(skin, 0.78), MAT.SKIN, 6, 4); }
         // nose: bridge, tip, wings, nostrils
-        const nk = kid ? 0.7 : 1, ny = cy - ry * 0.16, nz = -rz * (0.98 + 0.13 * nk);
-        g.tube([[0, cy + ry * 0.2, -rz * 0.92], [0, cy + ry * 0.02, -rz * (0.97 + 0.05 * nk)], [0, ny + ry * 0.03, nz + rz * 0.02]], [rx * 0.055, rx * 0.065, rx * 0.085], shade(skin, 1.01), MAT.SKIN, 8);
-        g.ellipsoid(0, ny, nz + rz * 0.03, rx * 0.095 * nk, ry * 0.075, rz * 0.09, shade(skin, 1.02), MAT.SKIN, 8, 6);
-        for (const s of [-1, 1]) { g.ellipsoid(s * rx * 0.1 * nk, ny - ry * 0.015, -rz * 0.96, rx * 0.065, ry * 0.055, rz * 0.07, skin, MAT.SKIN, 6, 4); g.ellipsoid(s * rx * 0.055 * nk, ny - ry * 0.058, nz + rz * 0.06, rx * 0.028, ry * 0.014, rz * 0.03, H('#3a211c'), 0, 5, 3); }
-        const ey = cy + ry * 0.12, ez = -rz * 0.83, ex = rx * 0.37;
+        const nk = kid ? 0.7 : 1, ny = cy - ry * 0.2, nbz = fz(0, ny), ntz = nbz - rz * 0.16 * nk;
+        g.tube([on(0, cy + ry * 0.2, -0.001), [0, cy + ry * 0.02, fz(0, cy + ry * 0.02) - rz * 0.06 * nk], [0, ny + ry * 0.05, ntz + rz * 0.03]], [rx * 0.06, rx * 0.065, rx * 0.085], shade(skin, 1.01), MAT.SKIN, 8);
+        g.ellipsoid(0, ny + ry * 0.01, ntz + rz * 0.05, rx * 0.1 * nk, ry * 0.075, rz * 0.08, shade(skin, 1.02), MAT.SKIN, 8, 6);
+        for (const s of [-1, 1]) { g.ellipsoid(s * rx * 0.11 * nk, ny - ry * 0.01, nbz - rz * 0.05, rx * 0.07, ry * 0.06, rz * 0.07, skin, MAT.SKIN, 6, 4); g.ellipsoid(s * rx * 0.055 * nk, ny - ry * 0.055, ntz + rz * 0.075, rx * 0.03, ry * 0.015, rz * 0.03, H('#3a211c'), 0, 5, 3); }
+        const ex = rx * 0.4, ey = cy + ry * 0.12, ez = fz(ex, ey) + rz * 0.045;
         const dark = H('#1a1210'), white = H('#eeeae3');
         const irisCol = H({ dad: '#4a6a7a', mom: '#5a4028', you: '#5a4028', leo: '#5a4028', dana: '#3f5a42', marcus: '#2e1e14', priya: '#2e1e14', manager: '#6f8494' }[id] || '#3a2a1e');
+        const creepy = mouth === 'wide' || mouth.startsWith('maw');
         for (const s of [-1, 1]) {
-          if (eyes === 'closed') { g.ellipsoid(s * ex, ey, ez - rz * 0.01, rx * 0.18, ry * 0.05, rz * 0.07, skin, MAT.SKIN, 8, 4); g.rbox(s * ex, ey - ry * 0.035, ez - rz * 0.075, rx * 0.3, 0.0035, 0.004, 0, dark, 0, 0.0015); }
+          if (eyes === 'closed') { g.ellipsoid(s * ex, ey, ez - rz * 0.01, rx * 0.17, ry * 0.055, rz * 0.075, skin, MAT.SKIN, 8, 4); g.tube([on(s * ex - rx * 0.15, ey - ry * 0.02, 0.0), on(s * ex, ey - ry * 0.045, 0.0), on(s * ex + rx * 0.15, ey - ry * 0.02, 0.0)].map((p) => [p[0], p[1], Math.min(p[2], ez - rz * 0.08)]), 0.0014, dark, 0, 4, false); }
           else {
-            // stare: lids pulled right back, the whole iris showing, lit from nowhere
+            // stare: lids pulled right back, the whole iris showing, the pupil a pinprick
             const stare = eyes === 'stare', wide = eyes === 'wide', nar = eyes === 'narrow';
-            const ew = rx * (kid ? 0.19 : 0.165) * (stare ? 1.25 : 1), eh = ry * (kid ? 0.085 : 0.066) * (stare ? 1.75 : wide ? 1.4 : 1), ir = eh * (stare ? 0.48 : 0.92);
-            g.ellipsoid(s * ex, ey, ez, ew, eh, rz * 0.085, stare ? H('#8d8b85') : white, stare ? MAT.GLOW : MAT.CERAMIC, 12, 7);
+            const ew = rx * (kid ? 0.18 : 0.155) * (stare ? 1.2 : 1), eh = ry * (kid ? 0.085 : 0.066) * (stare ? 2.0 : wide ? 1.4 : 1), ir = eh * (stare ? 0.36 : 0.92);
+            if (stare) g.ellipsoid(s * ex, ey, ez + rz * 0.01, ew * 1.45, eh * 1.45, rz * 0.08, shade(skin, 0.62), MAT.SKIN, 12, 6);   // sunk in shadow
+            g.ellipsoid(s * ex, ey, ez, ew, eh, rz * 0.085, stare ? H('#d8d4cb') : white, MAT.CERAMIC, 12, 7);
             g.ellipsoid(s * ex, ey - (stare || wide ? 0 : eh * 0.08), ez - rz * 0.062, ir, ir, rz * 0.035, irisCol, MAT.CERAMIC, 10, 6);
-            g.ellipsoid(s * ex, ey - (stare || wide ? 0 : eh * 0.08), ez - rz * 0.085, ir * 0.45, ir * 0.45, rz * 0.02, dark, MAT.CERAMIC, 8, 5);
+            g.ellipsoid(s * ex, ey - (stare || wide ? 0 : eh * 0.08), ez - rz * 0.085, ir * (stare ? 0.22 : 0.45), ir * (stare ? 0.22 : 0.45), rz * 0.02, dark, MAT.CERAMIC, 8, 5);
             if (!stare) g.sphere(s * ex + ir * 0.35, ey + ir * 0.3, ez - rz * 0.1, d.H * 0.0016, white, MAT.GLOW, 4);
-            if (!stare) {
-              // upper lid, lash line, lower lid
+            if (stare) { g.tube([[s * ex - ew, ey, ez - rz * 0.02], [s * ex, ey + eh * 1.08, ez - rz * 0.05], [s * ex + ew, ey, ez - rz * 0.02]], 0.0018, shade(skin, 0.6), 0, 5, false);   // the lid, pulled all the way back
+              g.tube([[s * ex - ew, ey - eh * 0.2, ez - rz * 0.02], [s * ex, ey - eh * 1.05, ez - rz * 0.05], [s * ex + ew, ey - eh * 0.2, ez - rz * 0.02]], 0.0016, H('#8a4a44'), 0, 5, false); }   // red rim underneath
+            else {
               const drop = nar ? 0.2 : wide ? 1.25 : 0.72;
               g.ellipsoid(s * ex, ey + eh * drop, ez - rz * 0.012, ew * 1.12, eh * 0.62, rz * 0.095, skin, MAT.SKIN, 10, 5);
-              g.rbox(s * ex, ey + eh * (drop - 0.5), ez - rz * 0.092, ew * 1.9, fem ? 0.0038 : 0.0026, 0.004, 0, dark, 0, 0.0012);
+              g.tube([[s * ex - ew * 1.05, ey + eh * (drop - 0.45), ez - rz * 0.06], [s * ex, ey + eh * (drop - 0.05), ez - rz * 0.1], [s * ex + ew * 1.05, ey + eh * (drop - 0.45), ez - rz * 0.06]], fem ? 0.0019 : 0.0013, dark, 0, 4, false);   // lash line
               g.ellipsoid(s * ex, ey - eh * (nar ? 0.75 : 1.02), ez - rz * 0.005, ew * 1.05, eh * 0.4, rz * 0.085, shade(skin, 0.97), MAT.SKIN, 8, 4);
             }
           }
-          const by = ey + ry * (brows === 'up' ? 0.28 : 0.2), tilt = brows === 'angry' ? 0.38 : brows === 'sad' ? -0.32 : 0;
-          g.push(A.chain(A.T(s * ex, by, ez - 0.006), A.Rz(-s * tilt)));
-          { const bc = H(c.hair[1] === '#9a9a98' ? '#7a7a78' : c.hair[1]), th = d.H * (fem || kid ? 0.0045 : 0.007); for (let i = -2; i <= 2; i++) { const u = i / 2; g.rbox(u * rx * 0.17, -0.004 - u * u * ry * 0.035 + (s * u > 0 ? -ry * 0.02 * Math.abs(u) : 0), -rz * 0.035 + u * u * rz * 0.03, rx * 0.1, th * (1 - 0.3 * Math.abs(u)), d.H * 0.006, 0, bc, MAT.HAIR, 0.002); } }
-          g.pop();
+          // brows: a tapered stroke lying on the brow ridge
+          const by = ey + ry * (brows === 'up' ? 0.28 : 0.2), tilt = brows === 'angry' ? 0.07 : brows === 'sad' ? -0.06 : 0, bth = d.H * (fem || kid ? 0.0032 : 0.0048);
+          const bc = H(c.hair[1] === '#9a9a98' ? '#7a7a78' : c.hair[1]), bp = [], br = [];
+          for (let i = 0; i <= 6; i++) { const t = i / 6, x = s * (ex - rx * 0.17 + t * rx * 0.36), y = by + Math.sin(t * Math.PI) * ry * 0.035 - (1 - t) * ry * tilt * 1.2 + t * ry * tilt * 0.3; bp.push(on(x, y, 0.0022)); br.push(bth * (0.75 + 0.35 * Math.sin(Math.min(1, t * 1.6) * Math.PI / 2)) * (1 - 0.6 * t * t)); }
+          g.tube(bp, br, bc, MAT.HAIR, 5, true);
         }
-        const my = cy - ry * 0.42, mz = -rz * 0.86, sk = H(c.skin), lip = c.lips ? H(c.lips).map((v, i) => lerp(sk[i], v, 0.7)) : [sk[0] * 0.8, sk[1] * 0.62, sk[2] * 0.6];
-        if (mouth === 'smile' || mouth === 'frown') {
-          const sg = mouth === 'smile' ? 1 : -1;
-          for (let i = -4; i <= 4; i++) { const u = i / 4, w = 1 - u * u * 0.75; g.rbox(u * rx * 0.27, my + sg * u * u * ry * 0.075 + d.H * 0.0028 * w, mz - (1 - u * u) * 0.005, rx * 0.085, d.H * 0.003 * w + 0.0008, d.H * 0.006, 0, shade(lip, 0.9), 0, 0.0015); g.rbox(u * rx * 0.25, my + sg * u * u * ry * 0.075 - d.H * 0.0026 * w, mz - (1 - u * u) * 0.006, rx * 0.08, d.H * 0.0036 * w + 0.0008, d.H * 0.007, 0, lip, 0, 0.002); }
+        // the mouth
+        const my = cy - ry * 0.47, sk = H(c.skin), lip = c.lips ? H(c.lips).map((v, i) => lerp(sk[i], v, 0.7)) : [sk[0] * 0.82, sk[1] * 0.64, sk[2] * 0.62];
+        const pale = lip.map((v, i) => lerp(v, sk[i] * 0.86, 0.55));   // the smiles go bloodless
+        const lipLine = (Wd, yf, rf, lift, col, mat) => { const P2 = [], R2 = []; for (let i = 0; i <= 12; i++) { const u = -1 + i / 6; P2.push(on(u * Wd, yf(u), lift)); R2.push(rf(u)); } g.tube(P2, R2, col, mat, 6, true); };
+        if (mouth === 'smile' || mouth === 'frown' || mouth === 'neutral' || mouth === 'grin') {
+          const sg = mouth === 'smile' || mouth === 'grin' ? 1 : mouth === 'frown' ? -1 : 0, W = rx * (mouth === 'neutral' ? 0.25 : 0.28), cv = sg * ry * 0.07;
+          lipLine(W, (u) => my + cv * u * u, (u) => 0.0009, 0.0006, H('#3a1a18'), 0);
+          lipLine(W * 0.96, (u) => my + cv * u * u + d.H * 0.0028 * (1 - u * u) - d.H * 0.0012 * Math.exp(-((u / 0.15) ** 2)), (u) => d.H * 0.0026 * (1 - u * u * 0.8) + 0.0006, 0.0012, shade(lip, 0.9), MAT.SKIN);
+          lipLine(W * 0.9, (u) => my + cv * u * u - d.H * 0.0032 * (1 - u * u), (u) => d.H * 0.0034 * (1 - u * u * 0.85) + 0.0006, 0.0012, lip, MAT.SKIN);
         } else if (mouth === 'wide') {
-          // a closed smile that goes a little too far up the cheeks
-          for (let i = -6; i <= 6; i++) { const u = i / 6; g.rbox(u * rx * 0.5, my + u * u * ry * 0.2, mz - (1 - u * u) * 0.006 + Math.abs(u) * 0.004, rx * 0.095, d.H * 0.0065, d.H * 0.006, 0, lip, 0, 0.002); }
-          for (const sd of [-1, 1]) g.ellipsoid(sd * rx * 0.5, my + ry * 0.17, mz + 0.008, rx * 0.15, ry * 0.11, rz * 0.08, shade(skin, 1.02), MAT.SKIN, 8, 5);
+          // The wrong smile: lips pressed thin and pulled far too wide and too high, past where cheeks should stop them.
+          // Deep creases from the nose, the cheeks bunched up under eyes that aren't smiling at all.
+          const W = rx * 0.62, cv = ry * 0.24;
+          lipLine(W, (u) => my + cv * u * u, (u) => 0.0012 + 0.0006 * u * u, 0.0006, H('#2a1010'), 0);
+          lipLine(W * 0.97, (u) => my + cv * u * u + d.H * 0.0016 * (1 - u * u), (u) => d.H * 0.0014 * (1 - u * u * 0.7) + 0.0006, 0.0012, shade(pale, 0.9), MAT.SKIN);
+          lipLine(W * 0.94, (u) => my + cv * u * u - d.H * 0.0018 * (1 - u * u), (u) => d.H * 0.0018 * (1 - u * u * 0.7) + 0.0006, 0.0012, pale, MAT.SKIN);
+          for (const sd of [-1, 1]) {
+            g.tube([on(sd * rx * 0.15, ny - ry * 0.02, 0.0004), on(sd * rx * 0.34, my + ry * 0.08, 0.0004), on(sd * W * 1.0, my + cv + ry * 0.02, 0.0004), on(sd * W * 1.08, my + cv * 1.15, 0.0004)], [0.0014, 0.0024, 0.0018, 0.0006], shade(skin, 0.72), MAT.SKIN, 5, true);   // crease
+            // (no bunched cheeks: the smile doesn't reach anything else in the face)
+            g.ellipsoid(sd * W * 1.02, my + cv * 1.02, fz(sd * W, my + cv) - 0.0005, rx * 0.025, ry * 0.02, rz * 0.012, H('#3a1a18'), 0, 5, 3);   // the corner, dug in
+          }
         } else if (mouth.startsWith('maw')) {
-          // The smile that opens. Closed: lips stretched too far up the cheeks. Then the lips part, slowly, on two rows of
-          // needle teeth, and keep going further than a jaw should.
-          const o = (+mouth.slice(3) || 0) / 12, gap = ry * (0.03 + 0.44 * o), W = rx * (0.46 + 0.07 * o), lipD = shade(lip, 0.8);
-          const curve = (u) => u * u * ry * 0.22;                       // corners pulled up
-          const zc = (u) => mz - 0.012 + u * u * rz * 0.2;              // and wrapped back round the face
-          if (o > 0.02) for (let i = -6; i <= 6; i++) {                  // the dark inside
-            const u = i / 6, hgt = gap * (1 - u * u * 0.75);
-            g.rbox(u * W, my + curve(u) - hgt * 0.5 + ry * 0.02, zc(u) + 0.006, W / 5.4, hgt + 0.003, 0.012, 0, H('#1a0506'), 0, 0.002);
+          // The smile that opens. Closed: lips stretched thin, far too wide and high. Then they part, slowly, on rows of
+          // needle teeth, the corners never coming apart, and it keeps going further than a jaw should.
+          const o = (+mouth.slice(3) || 0) / 12, W = rx * (0.6 + 0.1 * o), cv = ry * (0.24 + 0.05 * o), gap = ry * (0.02 + 0.55 * o);
+          const Uy = (u) => my + cv * u * u + ry * 0.012, Ly = (u) => Uy(u) - gap * Math.pow(Math.max(0, 1 - u * u), 0.7);
+          if (o > 0.02) {
+            g.param((uu, vv) => { const u = -0.98 + 1.96 * uu, x = u * W, y = lerp(Uy(u), Ly(u), vv); return [x, y, fz(x, y) + Math.sin(Math.PI * vv) * rz * 0.3 * (1 - u * u) + 0.0015]; }, 18, 6, H('#120304'), 0);   // the dark inside
+            lipLine(W * 0.97, (u) => Uy(u) - 0.002, (u) => 0.003 * (1 - u * u * 0.6), -0.003, H('#4a0c12'), 0);   // gums
+            lipLine(W * 0.97, (u) => Ly(u) + 0.002, (u) => 0.003 * (1 - u * u * 0.6), -0.003, H('#4a0c12'), 0);
           }
-          for (let i = -6; i <= 6; i++) {                                // lips: upper stays, lower drops
-            const u = i / 6, hgt = gap * (1 - u * u * 0.75);
-            g.rbox(u * W, my + curve(u) + ry * 0.03, zc(u), W / 4.3, d.H * 0.0055, d.H * 0.007, 0, lipD, 0, 0.002);
-            g.rbox(u * W, my + curve(u) - hgt + ry * 0.01, zc(u), W / 4.3, d.H * 0.0055, d.H * 0.007, 0, lipD, 0, 0.002);
+          if (o > 0.06) {
+            const grow = Math.min(1, (o - 0.06) * 3);
+            for (let i = 0; i < 17; i++) {                                   // needle teeth, top and bottom, uneven, leaning in
+              const u = -0.9 + i * 1.8 / 16, hgt = Uy(u) - Ly(u), L = grow * Math.min(hgt * 0.6, ry * (0.12 + 0.07 * ((i * 7 + 3) % 4) / 3)), r0 = W / 46;
+              if (L > 0.002) { const p0 = on(u * W, Uy(u) - 0.0015, -0.002); g.push(A.chain(A.T(p0[0], p0[1], p0[2]), A.Rx(Math.PI - 0.22))); g.lathe(0, 0, 0, [[r0, 0], [r0 * 0.5, L * 0.5], [0, L]], H((i * 5) % 3 ? '#efe9da' : '#ddd3bb'), MAT.CERAMIC, 5); g.pop(); }
+              const u2 = u + 0.9 / 16; if (Math.abs(u2) > 0.88) continue;
+              const h2 = Uy(u2) - Ly(u2), L2 = grow * Math.min(h2 * 0.5, ry * (0.1 + 0.06 * ((i * 5 + 1) % 4) / 3));
+              if (L2 > 0.002) { const p1 = on(u2 * W, Ly(u2) + 0.0015, -0.002); g.push(A.chain(A.T(p1[0], p1[1], p1[2]), A.Rx(0.22))); g.lathe(0, 0, 0, [[r0, 0], [r0 * 0.5, L2 * 0.5], [0, L2]], H('#e3dac4'), MAT.CERAMIC, 5); g.pop(); }
+            }
           }
-          if (o > 0.08) for (let i = -5; i <= 5; i++) {                  // needle teeth, top and bottom, uneven
-            const u = i / 5.6, hgt = gap * (1 - u * u * 0.75), L = Math.min(hgt * 0.62, ry * (0.16 + 0.07 * ((i * 7 + 14) % 3))), r0 = W / 13;
-            g.push(A.chain(A.T(u * W, my + curve(u) + ry * 0.02, zc(u) - 0.003), A.Rx(Math.PI))); g.lathe(0, 0, 0, [[r0, 0], [r0 * 0.55, L * 0.55], [0, L]], H('#f1ecdf'), MAT.CERAMIC, 5); g.pop();
-            const u2 = (i + 0.5) / 5.6; if (Math.abs(u2) > 0.95) continue; const h2 = gap * (1 - u2 * u2 * 0.75), L2 = Math.min(h2 * 0.5, ry * (0.13 + 0.06 * ((i * 5 + 11) % 3)));
-            g.push(A.T(u2 * W, my + curve(u2) - h2 + ry * 0.02, zc(u2) - 0.003)); g.lathe(0, 0, 0, [[r0, 0], [r0 * 0.55, L2 * 0.55], [0, L2]], H('#e6dfcf'), MAT.CERAMIC, 5); g.pop();
+          if (o > 0.5) g.ellipsoid(0, (Uy(0) + Ly(0)) / 2 - gap * 0.15, fz(0, my) + rz * 0.22, W * 0.4, gap * 0.2, rz * 0.06, H('#5e1218'), 0, 8, 5);   // tongue, far back
+          lipLine(W, (u) => Uy(u) + d.H * 0.0012 * (1 - u * u), (u) => d.H * 0.0016 * (1 - u * u * 0.6) + 0.0006, 0.0012, shade(pale, 0.9), MAT.SKIN);   // lips stretched thin
+          lipLine(W, (u) => Ly(u) - d.H * 0.0012 * (1 - u * u), (u) => d.H * 0.0018 * (1 - u * u * 0.6) + 0.0006, 0.0012, pale, MAT.SKIN);
+          for (const sd of [-1, 1]) {
+            g.tube([on(sd * rx * 0.15, ny - ry * 0.02, 0.0004), on(sd * rx * 0.36, my + ry * 0.08, 0.0004), on(sd * W, Uy(1) + ry * 0.02, 0.0004)], [0.0014, 0.0024, 0.0012], shade(skin, 0.72), MAT.SKIN, 5, true);   // crease
+            // (no bunched cheeks: the smile doesn't reach anything else in the face)
+            if (o > 0.35) g.tube([on(sd * W, Uy(1), 0.0006), on(sd * W * 1.12, Uy(1) + ry * 0.05 * o, 0.0006), on(sd * W * (1.12 + 0.16 * o), Uy(1) + ry * 0.1 * o, 0.0006)], [0.0016, 0.0012, 0.0005], H('#2a0a0c'), 0, 4, true);   // the corners keep going, splitting toward the ears
           }
-          if (o > 0.5) g.ellipsoid(0, my - gap * 0.55, mz + 0.004, W * 0.45, gap * 0.22, rz * 0.03, H('#5e1218'), 0, 8, 5);   // tongue, deep in
-          for (const sd of [-1, 1]) g.ellipsoid(sd * W * 1.0, my + ry * 0.2, zc(1) + 0.02, rx * 0.13, ry * 0.1, rz * 0.07, shade(skin, 1.02), MAT.SKIN, 8, 5);
-        } else if (mouth === 'grin') {
-          // wide, wrong smile: dark mouth, teeth, corners pulled up
-          for (let i = -5; i <= 5; i++) {
-            const u = i / 5, yy = my + u * u * ry * 0.16, zz = mz - (1 - u * u) * 0.012;
-            g.rbox(u * rx * 0.46, yy - ry * 0.05 * (1 - u * u), zz, rx * 0.1, ry * 0.1 * (1 - u * u) + 0.004, 0.01, 0, H('#2a0d0d'), 0, 0.002);
-            if (Math.abs(i) < 5) g.rbox(u * rx * 0.44, yy - 0.002, zz - 0.006, rx * 0.075, ry * 0.045 * (1 - u * u * 0.7), 0.006, 0, H('#efe9dc'), MAT.CERAMIC, 0.002);
-          }
-          for (const s of [-1, 1]) g.ellipsoid(s * rx * 0.48, my + ry * 0.12, mz + 0.01, rx * 0.16, ry * 0.12, rz * 0.08, shade(skin, 1.02), MAT.SKIN, 8, 5);
-        } else if (mouth === 'open') g.ellipsoid(0, my - ry * 0.02, mz, rx * 0.2, ry * 0.13, rz * 0.06, H('#2a0d0d'), 0, 10, 6);
-        else if (mouth === 'o') g.ellipsoid(0, my, mz, rx * 0.09, ry * 0.08, rz * 0.05, H('#2a0d0d'), 0, 8, 5);
-        else for (let i = -4; i <= 4; i++) { const u = i / 4, w = 1 - u * u * 0.8; g.rbox(u * rx * 0.24, my + d.H * 0.0028 * w, mz - (1 - u * u) * 0.005, rx * 0.075, d.H * 0.003 * w + 0.0008, d.H * 0.006, 0, shade(lip, 0.9), 0, 0.0015); g.rbox(u * rx * 0.22, my - d.H * 0.0026 * w, mz - (1 - u * u) * 0.006, rx * 0.07, d.H * 0.0036 * w + 0.0008, d.H * 0.007, 0, lip, 0, 0.002); }
-        // hair
+        } else if (mouth === 'open') g.ellipsoid(0, my - ry * 0.03, fz(0, my) + rz * 0.03, rx * 0.2, ry * 0.12, rz * 0.06, H('#2a0d0d'), 0, 10, 6);
+        else if (mouth === 'o') g.ellipsoid(0, my, fz(0, my) + rz * 0.02, rx * 0.09, ry * 0.08, rz * 0.05, H('#2a0d0d'), 0, 8, 5);
+        // hair: the scalp's own shape pushed out a little above a hairline, tucked under the skin below it (a clean edge, no gaps)
         const hc = H(c.hair[1]), st = c.hair[0];
+        const hairShell = (thick, hl, col, mat, cond) => g.param((u, v) => {
+          const n = headN(u, v), [x, y, z] = n, f = Math.max(0, -z), b = Math.max(0, z), m = smooth(clamp((y - hl(x, z, f, b)) / 0.22, 0, 1)) * (cond ? cond(x, y, z) : 1);
+          const t = lerp(-0.025, thick(x, y, z), Math.pow(m, 0.6)), p = headFn(u, v), q = [p[0], p[1] - cy, p[2]], L = Math.hypot(...q) || 1, k = 1 + t * ry / L;
+          return [q[0] * k, cy + q[1] * k, q[2] * k];
+        }, 48, 34, col, mat);
+        const hlStd = (x, z, f, b) => 0.1 + 0.5 * f - 0.16 * Math.abs(x) * f - 0.68 * b + 0.06 * f * Math.max(0, -x) - 0.04 * f * Math.max(0, x);   // a hairline that comes back at the temples, parted on one side
         if (st === 'short' || st === 'bun' || st === 'ponytail' || st === 'braid') {
-          const s = st === 'short' ? 1.07 : 1.06;
-          g.ellipsoid(0, cy + ry * 0.04, rz * 0.02, rx * s, ry * s, rz * s, hc, MAT.HAIR, 16, 10, (x, y, z) => y > (z < -0.25 ? 0.5 - 0.22 * Math.abs(x) : 0.18) || (z > 0.15 && y > -0.55) || (Math.abs(x) > 0.75 && y > -0.1 && z > -0.3));
-          if (st === 'bun') g.ellipsoid(0, cy + ry * 0.75, rz * 0.65, rx * 0.42, ry * 0.36, rz * 0.4, hc, MAT.HAIR, 10, 6);
-          if (st === 'ponytail') g.tube([[0, cy + ry * 0.55, rz * 0.9], [0, cy + ry * 0.1, rz * 1.25], [0, cy - ry * 0.8, rz * 1.2], [0, cy - ry * 1.5, rz * 1.0]], [rx * 0.25, rx * 0.22, rx * 0.17, rx * 0.06], hc, MAT.HAIR, 8);
-          if (st === 'braid') for (let i = 0; i < 8; i++) g.ellipsoid(0, cy - ry * 0.1 - i * ry * 0.25, rz * (1.08 - i * 0.02), rx * (0.17 - i * 0.008), ry * 0.15, rz * 0.13, hc, MAT.HAIR, 8, 5);
+          hairShell((x, y, z) => (st === 'short' ? 0.022 + 0.07 * smooth(clamp(y * 1.6, 0, 1)) + 0.03 * Math.max(0, -z) * Math.max(0, y) * (1 + 0.6 * x) : 0.03 + 0.03 * Math.max(0, y)), st === 'short' ? hlStd : (x, z, f, b) => hlStd(x, z, f, b) - 0.04 * f, hc, MAT.HAIR);
+          if (st === 'bun') g.ellipsoid(0, cy + ry * 0.75, rz * 0.7, rx * 0.42, ry * 0.36, rz * 0.4, hc, MAT.HAIR, 10, 6);
+          if (st === 'ponytail') g.tube([[0, cy + ry * 0.55, rz * 0.95], [0, cy + ry * 0.1, rz * 1.3], [0, cy - ry * 0.8, rz * 1.22], [0, cy - ry * 1.5, rz * 1.0]], [rx * 0.25, rx * 0.22, rx * 0.17, rx * 0.06], hc, MAT.HAIR, 8);
+          if (st === 'braid') for (let i = 0; i < 8; i++) g.ellipsoid(0, cy - ry * 0.1 - i * ry * 0.25, rz * (1.12 - i * 0.02), rx * (0.17 - i * 0.008), ry * 0.15, rz * 0.13, hc, MAT.HAIR, 8, 5);
         } else if (st === 'buzz') {
-          g.ellipsoid(0, cy + ry * 0.02, 0, rx * 1.025, ry * 1.025, rz * 1.025, hc, MAT.HAIR, 16, 10, (x, y, z) => y > (z < -0.25 ? 0.56 - 0.18 * Math.abs(x) : 0.3) || (z > 0.3 && y > -0.35) || (Math.abs(x) > 0.85 && y > 0.05 && z > -0.2));
+          hairShell(() => 0.022, (x, z, f, b) => hlStd(x, z, f, b) + 0.05 * f, hc, MAT.HAIR);
         } else if (st === 'beanie') {
           const bc = H(c.hat);
-          g.ellipsoid(0, cy + ry * 0.12, rz * 0.02, rx * 1.12, ry * 1.08, rz * 1.12, bc, fab, 16, 10, (x, y, z) => y > 0.18);
-          g.torus(0, cy + ry * 0.28, 0.0, rx * 1.05, ry * 0.12, shade(bc, 0.85), fab, 18, 6);
+          hairShell(() => 0.04, (x, z, f, b) => -0.45 - 0.2 * f + 0.25 * b * 0, hc, MAT.HAIR, (x, y, z) => smooth(clamp(z * 3 + 0.4, 0, 1)));   // hair sticking out round the back
+          g.ellipsoid(0, cy + ry * 0.12, rz * 0.02, rx * 1.1, ry * 1.08, rz * 1.12, bc, fab, 16, 10, (x, y, z) => y > 0.18);
+          g.torus(0, cy + ry * 0.28, 0.0, rx * 1.03, ry * 0.12, shade(bc, 0.85), fab, 18, 6);
           g.sphere(0, cy + ry * 1.18, 0, rx * 0.32, H('#f2f0ea'), fab, 10);
-          g.ellipsoid(0, cy + ry * 0.05, rz * 0.2, rx * 1.05, ry * 0.5, rz * 1.0, hc, MAT.HAIR, 12, 6, (x, y, z) => z > 0.35 && y < 0.4);
         }
-        if (c.beard) g.ellipsoid(0, cy - ry * 0.32, -rz * 0.06, rx * 0.86, ry * 0.66, rz * 0.9, H(c.beard), MAT.HAIR, 14, 8, (x, y, z) => y < -0.12 && z < 0.4 && !(y > -0.5 && Math.abs(x) < 0.25 && z < -0.6));
+        if (c.beard) hairShell((x, y, z) => 0.022 + 0.018 * Math.max(0, -y - 0.6), (x, z, f, b) => -99, H(c.beard), MAT.HAIR, (x, y, z) => {
+          const g2 = (a, w) => Math.exp(-((a / w) ** 2)); const below = smooth(clamp((-0.3 - y + 0.12 * Math.max(0, -z) * (1 - Math.abs(x))) / 0.1, 0, 1)), backOK = smooth(clamp((0.25 - z) / 0.12, 0, 1));   // jaw and chin, a moustache, no higher than the cheeks
+          const lipsHole = g2(x, 0.3) * g2(y + 0.47, 0.09) * Math.max(0, -z); return below * backOK * (1 - smooth(clamp(lipsHole * 2.2, 0, 1)));
+        });
         if (c.glasses) {
-          const gc = H('#2a2a2c');
-          for (const s of [-1, 1]) { g.push(A.chain(A.T(s * ex, ey, ez - rz * 0.12), A.Rx(Math.PI / 2))); g.torus(0, 0, 0, rx * 0.22, d.H * 0.004, gc, MAT.METAL, 14, 4); g.pop(); g.box(s * rx * 0.8, ey - 0.003, ez + rz * 0.35, d.H * 0.004, d.H * 0.004, rz * 0.9, 0, gc, MAT.METAL); }
-          g.box(0, ey + ry * 0.02, ez - rz * 0.12, rx * 0.3, d.H * 0.004, d.H * 0.004, 0, gc, MAT.METAL);
+          const gc = H('#2a2a2c'), gz = ez - rz * 0.16;
+          for (const s of [-1, 1]) { g.push(A.chain(A.T(s * ex, ey, gz), A.Rx(Math.PI / 2))); g.torus(0, 0, 0, rx * 0.21, d.H * 0.0035, gc, MAT.METAL, 16, 4); g.pop(); g.tube([[s * (ex + rx * 0.21), ey, gz], [s * rx * 0.93, ey + 0.002, fz(s * rx * 0.8, ey) + rz * 0.1], [s * rx * 0.97, ey - 0.004, rz * 0.2]], d.H * 0.0025, gc, MAT.METAL, 4, false); }
+          g.tube([[-ex + rx * 0.21, ey + ry * 0.02, gz], [0, ey + ry * 0.05, gz - 0.002], [ex - rx * 0.21, ey + ry * 0.02, gz]], d.H * 0.0028, gc, MAT.METAL, 4, false);
         }
       } else if (part === 'upper') {
         g.capsule(d.upper, d.armR * 1.2 * sleeve, d.armR * 1.05 * sleeve, top, fab, 10);
@@ -413,6 +449,7 @@ const ACT = (() => {
     // 'maw': the mouth opens slowly from a closed smile (f.open goes 0..1; twelve steps, each cached)
     const mouth = f.mouth === 'maw' ? 'maw' + Math.round(clamp(f.open == null ? 1 : f.open, 0, 1) * 12) : (f.mouth || 'neutral');
     buf.emit(personPart(id, 'head', `${eyes},${f.brows || 'flat'},${mouth}`), B.head);
+    { const dd = dims(id); a._head = A.p(B.head, 0, dd.headRy * 0.95, 0); }   // for cameras and tests
     for (const i of [0, 1]) {
       const sd = i ? 'R' : 'L';
       buf.emit(personPart(id, 'upper'), B['sh' + i]);

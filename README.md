@@ -11,7 +11,7 @@ Open `index.html` in a browser. It's one self-contained file (Three.js and the t
 
 - **Computer:** WASD/arrows to move, mouse to look (click the view first), Shift to run, or R to toggle running (loud), C to crouch, E to hide in or look inside a pot or hamper, M for the map, Esc to pause.
 - **Phone/tablet:** left thumb moves, right thumb looks. Hide, Crouch and Run buttons are on the right. Landscape works best.
-- **Microphone (optional):** turn it on from the title screen or Pause. Krampus then hears your real room: a whisper carries a few metres, talking across a department, a scream across the floor. If he's staring into your hiding place and hears you, you get one warning on Normal (two on Easy, none on Hard). Headphones work best, so he doesn't hear the game itself. Nothing is recorded or sent anywhere; the game only measures loudness. The mic needs the GitHub Pages link (or any https page); it won't work from inside a sandboxed preview.
+- **Microphone (optional):** turn it on from the title screen or Pause. Krampus then hears your real room: a whisper carries a few metres, talking across a department, a scream across the floor. If he's staring into your hiding place and hears you, you get one warning on Normal (two on Easy, none on Hard). It ignores the game's own sound (it learns how much leaks from your speakers into the mic) and anything quieter than a soft speaking voice, so a silent room stays silent. Headphones still work best. Nothing is recorded or sent anywhere; the game only measures loudness. The mic needs the GitHub Pages link (or any https page); it won't work from inside a sandboxed preview.
 
 ## How a round goes
 1. **Grace period.** Krampus is upstairs hiding your brother in a random hamper or big planter.

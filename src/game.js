@@ -759,7 +759,7 @@
   }
   // ---------- the microphone (optional): he hears the room you are playing in ----------
   // Only loudness is measured, a few times a second; nothing is recorded, stored or sent anywhere.
-  const MIC = { on: false, ok: false, err: '', stream: null, an: null, buf: null, outAn: null, outBuf: null, floor: -60, cal: 0, level: 0, hot: 0, db: -100 };
+  const MIC = { on: false, ok: false, err: '', stream: null, an: null, buf: null, outAn: null, outBuf: null, floor: -60, cal: 0, level: 0, hot: 0, db: -100, leak: 0, gFloor: -90, gPeak: -120 };
   try { MIC.on = localStorage.getItem('box-mic') === '1'; } catch (e) {}
   async function micStart() {
     if (MIC.ok) return true;
@@ -776,23 +776,37 @@
   function sayHeard(vol) { const wait = Math.max(0, kSaidAt + 3.4 - NOW); later(wait, () => { if (mode === 'play') { kSaidAt = -99; krampusSay('I can hear you', vol); } }); }
   function micStop() { if (MIC.stream) for (const t of MIC.stream.getTracks()) t.stop(); MIC.stream = null; MIC.ok = false; MIC.level = 0; }
   const rmsDb = (an, buf) => { an.getFloatTimeDomainData(buf); let s2 = 0; for (let i = 0; i < buf.length; i++) s2 += buf[i] * buf[i]; return 10 * Math.log10(s2 / buf.length + 1e-12); };
-  // 0..1: how loud you are right now above your room's normal background
+  // 0..1: how loud YOU are right now. Three rules keep him from hearing the wrong things:
+  //  1. a hard minimum: in a silent room the background is near zero, so "above the background" alone would count a chair creak.
+  //     Nothing quieter than a soft speaking voice counts, however quiet the room.
+  //  2. the game's own sound: while the game is making a noise (Krampus talking, bells, a scream, music) and for a moment
+  //     after, the mic is ignored unless you are clearly louder than the game. Speakers leak into the mic; headphones don't.
+  //  3. it has to last: a quarter of a second of sound, not a click or a tap on the desk.
+  const MIC_MIN_DB = -48;
   function micTick(dt) {
-    if (window.__micTest != null) { MIC.level = window.__micTest; return MIC.level; }
+    if (window.__micTest != null) { MIC.level = window.__micTest; MIC.gate = window.__micGate || 0; return MIC.level; }
     if (!MIC.on || !MIC.ok) { MIC.level = 0; return 0; }
-    const db = rmsDb(MIC.an, MIC.buf), game = rmsDb(MIC.outAn, MIC.outBuf); MIC.db = db;
-    if (MIC.cal > 0) { MIC.cal -= dt; MIC.floor = MIC.cal > 1.6 ? db : Math.min(MIC.floor, db) * 0.7 + db * 0.3; MIC.level = 0; return 0; }   // first two seconds: learn the room
+    const db = rmsDb(MIC.an, MIC.buf), game = rmsDb(MIC.outAn, MIC.outBuf); MIC.db = db; MIC.game = game;
+    if (MIC.cal > 0) { MIC.cal -= dt; MIC.floor = MIC.cal > 1.6 ? db : Math.min(MIC.floor, db) * 0.7 + db * 0.3; MIC.gFloor = game; MIC.level = 0; return 0; }   // first two seconds: learn the room
     MIC.floor = db < MIC.floor ? lerp(MIC.floor, db, Math.min(1, dt * 2)) : MIC.floor + Math.min(db - MIC.floor, 6) * dt * 0.03;            // background drifts up slowly, down quickly
-    const margin = 11 + Math.max(0, game + 32) * 0.75;   // loud game sound coming through speakers raises the bar (headphones are best)
-    const lv = clamp((db - MIC.floor - margin) / 24, 0, 1);
+    MIC.gFloor = game < MIC.gFloor ? lerp(MIC.gFloor, game, Math.min(1, dt * 2)) : MIC.gFloor + Math.min(game - MIC.gFloor, 6) * dt * 0.05;   // the game's steady hum
+    // How much of the game's sound reaches the mic: learned from the quietest moments while the game is loud (you aren't
+    // talking all the time). With headphones that's almost nothing; through laptop speakers it's a lot. Starts cautious.
+    const loud = game > Math.max(-60, MIC.gFloor + 5);
+    if (loud) { const d = db - game; MIC.leak = d < MIC.leak ? lerp(MIC.leak, d, Math.min(1, dt * 3)) : Math.min(0, MIC.leak + dt * 0.25); MIC.leak = clamp(MIC.leak, -45, 0); }
+    MIC.gPeak = loud ? Math.max(game, (MIC.gPeak || -120) - dt * 20) : (MIC.gPeak || -120) - dt * 40;                                     // the game's recent loudest, fading over half a second
+    MIC.gate = clamp((MIC.gPeak + 70) / 30, 0, 1);
+    let thr = Math.max(MIC.floor + 12, MIC_MIN_DB);
+    thr = Math.max(thr, MIC.gPeak + MIC.leak + 8);                                                                                          // you have to be clearly louder than the game's echo in your room
+    const lv = clamp((db - thr) / 22, 0, 1);
     MIC.level = lv > MIC.level ? lerp(MIC.level, lv, Math.min(1, dt * 14)) : lerp(MIC.level, lv, Math.min(1, dt * 3));
     return MIC.level;
   }
   // he hears your real voice: a whisper carries a few metres, talking across a department, a scream across the floor
   function micHear(dt) {
-    const L = micTick(dt); MIC.hot = L > 0.08 ? MIC.hot + dt : 0; G.micCool = (G.micCool || 0) - dt;
+    const L = micTick(dt); MIC.hot = L > 0.1 ? MIC.hot + dt : Math.max(0, MIC.hot - dt * 2); G.micCool = (G.micCool || 0) - dt;
     const el = $('mic'); if (el) { el.style.display = MIC.on && (MIC.ok || window.__micTest != null) ? 'flex' : 'none'; $('micFill').style.width = Math.round(L * 100) + '%'; el.classList.toggle('loud', L > 0.08); }
-    if (G.phase === 'grace' || MIC.hot < 0.12 || K.state === 'wait') return;
+    if (G.phase === 'grace' || MIC.hot < 0.25 || K.state === 'wait') return;
     const f = floorOf(P.y), r = (4 + 30 * L) * (floorOf(K.y) === f ? 1 : 0.45), dK = Math.hypot(K.x - P.x, K.z - P.z);
     if (dK > r || K.state === 'rage') return;
     if (K.state === 'peer') {   // he is right there, staring in
@@ -1700,7 +1714,13 @@
     for (const z of [5, 6, 7, 13, 14, 15, 0, 1, 2, 8, 9, 10, 12, 4]) { ZT[z] = 0.12; }
     ZT[3] = 0.35; ZT[11] = 0.35; yield 1;
   }
-  function startJump() { audioInit(); showOnly(null); runScene(sceneQuickIntro, startHunt); }
+  function startJump() {
+    audioInit(); showOnly(null);
+    // whatever an earlier round left behind (a fade to black, slow motion, the jumpscare camera), start clean
+    $('fade').style.transition = 'none'; $('fade').style.opacity = 0; timeScale = 1; FEAR = 0; SCARE = null; PEEK = 0; SC = null; timers.length = 0;
+    document.body.classList.remove('stare'); $('hud').style.display = 'none'; $('msg').style.opacity = 0;
+    runScene(sceneQuickIntro, startHunt);
+  }
   function pause() { if (!playing()) return; pausedFrom = mode; mode = 'pause'; showOnly('pause'); $('skipAhead').style.display = pausedFrom === 'explore' && EX && EX.stage === 'explore' ? 'inline-block' : 'none'; if (document.pointerLockElement) document.exitPointerLock(); }
   function resume() { mode = pausedFrom || 'play'; showOnly(null); lastTime = performance.now(); lock(); }
   function toTitle() { hush(); $('ears').style.display = 'none'; mode = 'title'; SC = null; timers.length = 0; document.body.classList.remove('cine', 'explore', 'stare'); $('fade').style.opacity = 0; showOnly('title'); $('hud').style.display = 'none'; $('skipBtn').style.display = 'none'; refreshBest(); if (document.pointerLockElement) document.exitPointerLock(); music.on = false; hideAll(); timeScale = 1; }
@@ -1755,6 +1775,9 @@
   micLabel();
   for (const id of ['play', 'jump', 'again']) $(id).addEventListener('click', () => { if (MIC.on && !MIC.ok) micStart().then((ok) => { if (!ok) MIC.on = false; micLabel(); }); });   // switched on last time: reconnect
   $('play').addEventListener('click', startStory);
+  // if the phone's graphics give out, don't sit on a black screen: say what happened and offer a reload
+  canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); const d = document.createElement('div'); d.id = 'gfxlost';
+    d.innerHTML = '<div><b>The graphics stopped</b><br>Your device ran out of graphics memory.<br><button>Reload</button></div>'; document.body.appendChild(d); d.querySelector('button').onclick = () => location.reload(); }, false);
   $('jump').addEventListener('click', startJump);
   $('again').addEventListener('click', startJump);
   $('menu').addEventListener('click', toTitle);
@@ -1832,7 +1855,8 @@
   let titleCam = 0, fpsT = 0, fpsN = 0, fps = 60;
   const MENU_Z = new Float32Array(16).fill(0.7);
   function frame(nowMs) {
-    if (debug && window.__hold) { lastTime = nowMs; window.__held = (window.__held || 0) + 1; requestAnimationFrame(frame); return; } // test tools drive the clock themselves
+    requestAnimationFrame(frame);   // first, so an error further down can never stop the game for good
+    if (debug && window.__hold) { lastTime = nowMs; window.__held = (window.__held || 0) + 1; return; } // test tools drive the clock themselves
     const dt = Math.min(0.05, (nowMs - lastTime) / 1000); lastTime = nowMs;
     fpsT += dt; fpsN++; if (fpsT > 1) { fps = fpsN / fpsT; fpsT = 0; fpsN = 0; }
     R.resize(isTouch ? 1.0 : 1.35);
@@ -1879,7 +1903,6 @@
     R.drawDynamic(ABUF.view(), 'alpha');
     R.end();
     if (debug) { $('fps').textContent = fps.toFixed(0) + ' fps'; window.__frames = (window.__frames || 0) + 1; }
-    requestAnimationFrame(frame);
   }
   function tick(dt) {
     G.time += dt;
