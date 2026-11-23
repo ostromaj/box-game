@@ -41,6 +41,8 @@ you from the balcony scene, bow when Krampus lands, walk your parents out, and w
 
 **Round 4**: people's arms and legs are one smooth limb each, rebuilt every frame through the joints (`limb`/`drawLimbs` in actors.js); aprons are smooth sheets; shoes are shaped. Mic mimic: a 6 s rolling buffer (`MIC.ring`, ScriptProcessor), phrases cut where the mic counted you, played back by `mimic()`. New scares: light flicker near him (`pickLights`), hoofprints (`G.prints`, `hoofMesh`), chains, `musicBox()` (Silent Night, 1818), whispers (WHISPER voice in tools/voices.py: random-phase STFT), Leo lure (`HV.lure`, unmuffled), staff gathering at the glass (`staffOutside`), frost/breath overlays.
 
+**Mic, round 3**: `micTick` now works per frequency band (`MIC_BANDS`): mic vs the game's own output, per-band room floor (`nB`), learned speaker-to-mic leak (`lB`, quick to rise while the game is busy), game peak-hold (`pB`), 4 of 7 bands must agree, `MIC_MIN_DB = -38`, 0.35 s sustained, hearing radius 3 + 24 m x level. Tested with `/home/claude/work/microom2.py`-style simulation (game speech/bells/music box leaking at 0.25 and 0.7).
+
 ## Still to do
 0a. **Black screen on "Jump to the hunt"**: couldn't reproduce in headless Chrome (fresh, after caught, after a win, mic on/off). Ask which device/browser if it comes back.
 0. **Cutscene camera pass**: Joseph says the scenes' camera views and movement still feel a little off. Go shot by shot.

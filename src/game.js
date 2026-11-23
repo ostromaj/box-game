@@ -842,35 +842,46 @@
     const wait = Math.max(0, kSaidAt + 3.4 - NOW); later(wait, () => { if (mode === 'play') { kSaidAt = -99; krampusSay('I can hear you', vol); } }); }
   function micStop() { if (MIC.stream) for (const t of MIC.stream.getTracks()) t.stop(); if (MIC.sp) { MIC.sp.onaudioprocess = null; MIC.sp.disconnect(); MIC.sp = null; } MIC.stream = null; MIC.ok = false; MIC.level = 0; MIC.ring = null; MIC.clip = null; }
   const rmsDb = (an, buf) => { an.getFloatTimeDomainData(buf); let s2 = 0; for (let i = 0; i < buf.length; i++) s2 += buf[i] * buf[i]; return 10 * Math.log10(s2 / buf.length + 1e-12); };
-  // 0..1: how loud YOU are right now. Three rules keep him from hearing the wrong things:
-  //  1. a hard minimum: in a silent room the background is near zero, so "above the background" alone would count a chair creak.
-  //     Nothing quieter than a soft speaking voice counts, however quiet the room.
-  //  2. the game's own sound: while the game is making a noise (Krampus talking, bells, a scream, music) and for a moment
-  //     after, the mic is ignored unless you are clearly louder than the game. Speakers leak into the mic; headphones don't.
-  //  3. it has to last: a quarter of a second of sound, not a click or a tap on the desk.
-  const MIC_MIN_DB = -48;
+  // 0..1: how loud YOU are right now, with the game's own sound taken out.
+  // The game listens to its own output as well as the mic, split into seven voice-range bands. For each band it learns
+  // how much of the game reaches your mic (through speakers: a lot; headphones: nothing), from the quietest moments while
+  // the game is loud, and holds the game's recent peak for a moment to cover the delay from speaker to mic. A band only
+  // counts as YOU when the mic is clearly above both the room's background and the game's echo in that band, and a sound
+  // only counts when several bands agree (a voice is broad; the game's echo is whatever the game just played).
+  // On top of that: nothing quieter than talking at a normal level counts, and it has to last a third of a second.
+  const MIC_MIN_DB = -38, MIC_BANDS = [180, 300, 480, 760, 1200, 1900, 3000, 4600];
+  function bandsDb(an, fbuf, out) {
+    an.getFloatFrequencyData(fbuf); const hz = AC.sampleRate / an.fftSize;
+    for (let b = 0; b < MIC_BANDS.length - 1; b++) { let p = 0, n = 0; for (let i = Math.floor(MIC_BANDS[b] / hz); i < Math.ceil(MIC_BANDS[b + 1] / hz); i++) { p += Math.pow(10, fbuf[i] / 10); n++; } out[b] = 10 * Math.log10(p / Math.max(1, n) + 1e-14); }
+    return out;
+  }
   function micTick(dt) {
     if (window.__micTest != null) { MIC.level = window.__micTest; MIC.gate = window.__micGate || 0; return MIC.level; }
     if (!MIC.on || !MIC.ok) { MIC.level = 0; return 0; }
+    const NBd = MIC_BANDS.length - 1;
+    if (!MIC.mB) { MIC.fb = new Float32Array(MIC.an.frequencyBinCount); MIC.gfb = new Float32Array(MIC.outAn.frequencyBinCount); MIC.mB = new Float32Array(NBd); MIC.gB = new Float32Array(NBd);
+      MIC.nB = new Float32Array(NBd).fill(-80); MIC.lB = new Float32Array(NBd).fill(0); MIC.pB = new Float32Array(NBd).fill(-140); MIC.gfB = new Float32Array(NBd).fill(-140); }
     const db = rmsDb(MIC.an, MIC.buf), game = rmsDb(MIC.outAn, MIC.outBuf); MIC.db = db; MIC.game = game;
-    if (MIC.cal > 0) { MIC.cal -= dt; MIC.floor = MIC.cal > 1.6 ? db : Math.min(MIC.floor, db) * 0.7 + db * 0.3; MIC.gFloor = game; MIC.level = 0; return 0; }   // first two seconds: learn the room
-    MIC.floor = db < MIC.floor ? lerp(MIC.floor, db, Math.min(1, dt * 2)) : MIC.floor + Math.min(db - MIC.floor, 6) * dt * 0.03;            // background drifts up slowly, down quickly
-    MIC.gFloor = game < MIC.gFloor ? lerp(MIC.gFloor, game, Math.min(1, dt * 2)) : MIC.gFloor + Math.min(game - MIC.gFloor, 6) * dt * 0.05;   // the game's steady hum
-    // How much of the game's sound reaches the mic: learned from the quietest moments while the game is loud (you aren't
-    // talking all the time). With headphones that's almost nothing; through laptop speakers it's a lot. Starts cautious.
-    const loud = game > Math.max(-60, MIC.gFloor + 5);
-    if (loud) { const d = db - game; MIC.leak = d < MIC.leak ? lerp(MIC.leak, d, Math.min(1, dt * 3)) : Math.min(0, MIC.leak + dt * 0.25); MIC.leak = clamp(MIC.leak, -45, 0); }
-    MIC.gPeak = loud ? Math.max(game, (MIC.gPeak || -120) - dt * 20) : (MIC.gPeak || -120) - dt * 40;                                     // the game's recent loudest, fading over half a second
-    MIC.gate = clamp((MIC.gPeak + 70) / 30, 0, 1);
-    let thr = Math.max(MIC.floor + 12, MIC_MIN_DB);
-    thr = Math.max(thr, MIC.gPeak + MIC.leak + 8);                                                                                          // you have to be clearly louder than the game's echo in your room
-    const lv = clamp((db - thr) / 22, 0, 1);
-    MIC.level = lv > MIC.level ? lerp(MIC.level, lv, Math.min(1, dt * 14)) : lerp(MIC.level, lv, Math.min(1, dt * 3));
+    const m = bandsDb(MIC.an, MIC.fb, MIC.mB), g = bandsDb(MIC.outAn, MIC.gfb, MIC.gB);
+    if (MIC.cal > 0) { MIC.cal -= dt; for (let b = 0; b < NBd; b++) { MIC.nB[b] = MIC.cal > 1.6 ? m[b] : Math.min(MIC.nB[b], m[b]) * 0.7 + m[b] * 0.3; MIC.gfB[b] = g[b]; MIC.lB[b] = g[b] > -110 ? (MIC.cal > 1.6 ? m[b] - g[b] : Math.min(MIC.lB[b], m[b] - g[b])) : MIC.lB[b]; } MIC.floor = db; MIC.level = 0; return 0; }   // learn the room, and how much game reaches the mic
+    let over = 0, votes = 0;
+    for (let b = 0; b < NBd; b++) {
+      MIC.nB[b] = m[b] < MIC.nB[b] ? lerp(MIC.nB[b], m[b], Math.min(1, dt * 2)) : MIC.nB[b] + Math.min(m[b] - MIC.nB[b], 6) * dt * 0.02;          // room background
+      MIC.gfB[b] = g[b] < MIC.gfB[b] ? lerp(MIC.gfB[b], g[b], Math.min(1, dt * 2)) : MIC.gfB[b] + Math.min(g[b] - MIC.gfB[b], 6) * dt * 0.05;    // the game's steady hum
+      if (g[b] > -110) { const d = m[b] - g[b], busy = g[b] > MIC.gfB[b] + 6; MIC.lB[b] = clamp(d < MIC.lB[b] ? lerp(MIC.lB[b], d, Math.min(1, dt * 2.5)) : MIC.lB[b] + Math.min(d - MIC.lB[b], busy ? 12 : 3) * dt * (busy ? 0.6 : 0.05), -70, 6); }   // and quick to assume more while the game is busy   // how much game gets into the mic in this band: the lowest it's been, creeping back up slowly
+      MIC.pB[b] = Math.max(g[b], MIC.pB[b] - dt * 30);                                                                                          // the game's recent peak (covers speaker-to-mic delay)
+      const echo = MIC.pB[b] + MIC.lB[b], thr = Math.max(MIC.nB[b] + 12, echo + (MIC.pB[b] > MIC.gfB[b] + 6 ? 18 : 13)), e = m[b] - thr;   // extra room while the game is busy in this band
+      if (e > 0) { over += Math.min(e, 24); votes++; }
+    }
+    if (window.__micDbg && votes >= 4) window.__micDbg.push([+NOW.toFixed(2), Math.round(db), Array.from(m).map(Math.round), Array.from(MIC.pB).map(Math.round), Array.from(MIC.lB).map(Math.round), Array.from(MIC.gfB).map(Math.round)]);
+    MIC.floor = MIC.nB[3]; MIC.gate = clamp((Math.max(...MIC.pB) + 90) / 40, 0, 1);
+    const lv = votes >= 4 && db > MIC_MIN_DB ? clamp(over / (NBd * 9), 0, 1) : 0;
+    MIC.level = lv > MIC.level ? lerp(MIC.level, lv, Math.min(1, dt * 12)) : lerp(MIC.level, lv, Math.min(1, dt * 3));
     return MIC.level;
   }
   // he hears your real voice: a whisper carries a few metres, talking across a department, a scream across the floor
   function micHear(dt) {
-    const L = micTick(dt); MIC.hot = L > 0.1 ? MIC.hot + dt : Math.max(0, MIC.hot - dt * 2); G.micCool = (G.micCool || 0) - dt;
+    const L = micTick(dt); MIC.hot = L > 0.12 ? MIC.hot + dt : Math.max(0, MIC.hot - dt * 2); G.micCool = (G.micCool || 0) - dt;
     if (MIC.ring) {   // a phrase starts when you get loud and ends after half a second of quiet
       const sr = AC.sampleRate;
       if (L > 0.1) { if (MIC.ph == null) MIC.ph = { s: MIC.ringW - Math.round(sr * 0.2), q: 0 }; MIC.ph.q = 0; }
@@ -880,8 +891,8 @@
     }
     if (G.mimicDue && NOW > G.mimicDue && !MIC.ph) { G.mimicDue = 0; if (MIC.clip && NOW - MIC.clip.t < 20 && K.state !== 'peer') mimic(1); }
     const el = $('mic'); if (el) { el.style.display = MIC.on && (MIC.ok || window.__micTest != null) ? 'flex' : 'none'; $('micFill').style.width = Math.round(L * 100) + '%'; el.classList.toggle('loud', L > 0.08); }
-    if (G.phase === 'grace' || MIC.hot < 0.25 || K.state === 'wait') return;
-    const f = floorOf(P.y), r = (4 + 30 * L) * (floorOf(K.y) === f ? 1 : 0.45), dK = Math.hypot(K.x - P.x, K.z - P.z);
+    if (G.phase === 'grace' || MIC.hot < 0.35 || K.state === 'wait') return;
+    const f = floorOf(P.y), r = (3 + 24 * L) * (floorOf(K.y) === f ? 1 : 0.45), dK = Math.hypot(K.x - P.x, K.z - P.z);
     if (dK > r || K.state === 'rage') return;
     if (K.state === 'peer') {   // he is right there, staring in
       if (G.micStrikes > 0 && G.micCool <= 0) { G.micStrikes--; G.micCool = 2.5; kSaidAt = -99; krampusSay('I can hear you', 1); K.peerDur += 8; FEAR = 1; cam.shake = 0.4; showMsg('He heard that. Not a sound.', 2.4, 'tip'); }
