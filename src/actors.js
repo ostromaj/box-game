@@ -13,7 +13,6 @@ const CHARS = {
   dana: { h: 1.66, fem: true, skin: '#d9b596', hair: ['ponytail', '#3b2a20'], top: ['shirt', '#ece8de'], apron: '#2f2f31', pants: '#26272b', shoes: '#1d1d1f', tag: true, lips: '#9a4a4a' },
   marcus: { h: 1.88, bulk: 1.05, skin: '#8d5e3f', hair: ['buzz', '#141010'], top: ['shirt', '#5b6b7d'], apron: '#2f2f31', pants: '#2b2c30', shoes: '#1d1d1f', tag: true },
   priya: { h: 1.62, fem: true, skin: '#b88462', hair: ['braid', '#15100d'], glasses: true, top: ['shirt', '#8e4a52'], apron: '#2f2f31', pants: '#2b2c30', shoes: '#1d1d1f', tag: true, lips: '#8a3e44' },
-  mannequin: { h: 1.8, skin: '#e7e3dc', hair: ['none', '#e7e3dc'], top: ['plain', '#e3dfd7'], pants: '#e3dfd7', shoes: '#dcd8d0', faceless: true },
   manager: { h: 1.78, bulk: 1.02, skin: '#e8c4a2', hair: ['short', '#9a9a98'], top: ['sweater', '#3a4a3e'], tie: '#7a1f2b', pants: '#3a3a3c', shoes: '#1d1d1f', lanyard: true, glasses: true },
 };
 
@@ -63,7 +62,7 @@ const ACT = (() => {
       const sleeve = puff ? 1.45 : coat ? 1.25 : 1.12;
       if (part === 'pelvis') {
         loft(g, [[-d.spine * 0.5, d.hipW * 1.2, d.rz * 0.6], [-d.spine * 0.2, d.hipW * 2.2, d.rz * 0.95, d.rz * 0.06], [d.spine * 0.25, d.hipW * (c.fem ? 2.3 : 2.2), d.rz * 0.98, d.rz * 0.05], [d.spine * 0.7, d.hipW * (c.fem ? 1.9 : 2.05), d.rz * 0.8], [d.spine * 0.92, d.hipW * 1.5, d.rz * 0.55]], pants, fab);
-        if (!puff && !coat && !c.apron && !c.faceless) { band(g, d.spine * 0.62, d.hipW * (c.fem ? 2.18 : 2.13), d.rz * 0.86, 0, d.H * 0.011, H('#1c1a19'), MAT.LEATHER); g.rbox(0, d.spine * 0.62 - d.H * 0.011, -d.rz * 0.86, d.H * 0.026, d.H * 0.022, 0.008, 0, H('#b9bcc0'), MAT.METAL, 0.003); }   // belt and buckle
+        if (!puff && !coat && !c.apron) { band(g, d.spine * 0.62, d.hipW * (c.fem ? 2.18 : 2.13), d.rz * 0.86, 0, d.H * 0.011, H('#1c1a19'), MAT.LEATHER); g.rbox(0, d.spine * 0.62 - d.H * 0.011, -d.rz * 0.86, d.H * 0.026, d.H * 0.022, 0.008, 0, H('#b9bcc0'), MAT.METAL, 0.003); }   // belt and buckle
         if (puff) g.ellipsoid(0, d.spine * 0.55, 0, d.shW * 1.0, d.spine * 0.32, d.rz * 1.25, shade(top, 0.95), fab, 14, 6);
         if (coat) { const cw = d.hipW * (c.fem ? 1.85 : 2.08) * 1.1; g.push(A.S(1, 1, d.rz * 1.12 / cw)); g.lathe(0, -d.thigh * 0.75, 0, [[cw * 1.12, 0, 1], [cw * 1.07, d.thigh * 0.4], [cw * 1.0, d.thigh * 0.75 + d.spine * 0.4], [cw * 0.97, d.thigh * 0.75 + d.spine * 0.95, 1]], top, fab, 20); g.pop(); }
         if (c.apron) {
@@ -147,7 +146,6 @@ const ACT = (() => {
         };
         const headFn = (u, v) => { const [x, y, z] = headN(u, v); return [x * rx, cy + y * ry * (y < 0 ? 1.1 : 1), z * rz]; };
         g.param(headFn, 30, 22, skin, MAT.SKIN);
-        if (c.faceless) return;   // a mannequin: smooth, blank, nothing where a face should be
         // where the face's surface is, so eyes, brows, nose and lips sit on it instead of floating in front of it
         const NB = 56, X0 = -rx * 1.1, X1 = rx * 1.1, Y0 = cy - ry * 1.15, Y1 = cy + ry * 1.05, fresh = !FACE_BINS.has(id), bins = fresh ? new Float32Array(NB * NB).fill(1e9) : FACE_BINS.get(id);   // the same face for every expression: work it out once
         if (fresh) FACE_BINS.set(id, bins);

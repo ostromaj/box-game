@@ -750,10 +750,6 @@
   const level = () => Math.min(5, G.clues + Math.floor(G.huntT / 100));
   function startHunt() {
     newRound(); mode = 'play'; $('hud').style.display = 'block'; document.body.classList.remove('explore'); lastTime = performance.now(); lock();
-    // faceless mannequins in the aisles. They never touch you. They just aren't where they were.
-    { const spots = [...(LV.keySpots || []), ...(LV.trapSpots || []), ...(LV.clueSpots || [])].map((q) => ({ x: q[1], z: q[2], y: q[0] ? LV.F1 : 0 })).filter((sp) => G.items.every((it) => Math.hypot(it.x - sp.x, it.z - sp.z) > 3) && Math.hypot(sp.x - P.x, sp.z - P.z) > 6);
-      G.manq = []; for (let i = 0; i < Math.min(6, spots.length); i++) { const sp = spots.splice((Math.random() * spots.length) | 0, 1)[0];
-        G.manq.push({ id: 'mannequin', x: sp.x + 0.6, y: sp.y || 0, z: sp.z + 0.4, yaw: Math.random() * TAU, visible: true, anim: 'idle', still: true, noBlink: true, face: {}, seed: i * 1.7, unseen: 0, gest: null }); } }
     showMsg('It took Leo upstairs. Find him.', 4); jingle(0.3, 0, 8); $('sub').style.opacity = 0; subT = 0;
     $('ears').style.display = 'block';
   }
@@ -1898,7 +1894,6 @@
       ACT.drawPerson(BUF, a, t); a.face = keep;
       if (a.anim !== 'sit') blob(a.x, a.y || 0, a.z, ACT.dims(a.id).H * 0.17);
     }
-    if (G && G.manq && (mode === 'play' || mode === 'pause' || mode === 'scare')) for (const m of G.manq) { ACT.drawPerson(BUF, m, t); blob(m.x, m.y, m.z, 0.3); }
     if (G && G.prints && mode !== 'cine') { const pc = hex('#26150f');   // his hoofprints, fading
       for (const pr of G.prints) { const age = NOW - pr.t, k = 1 - smooth(clamp((age - 20) / 25, 0, 1)); if (k <= 0.02) continue;
         for (const sd of [-1, 1]) { const ox = Math.cos(pr.yaw) * 0.035 * sd, oz = Math.sin(pr.yaw) * 0.035 * sd; MBUF.emit(hoofMesh, A.chain(A.T(pr.x + ox, pr.y + 0.008, pr.z + oz), A.Ry(-pr.yaw), A.S(k))); } } }
@@ -2026,15 +2021,6 @@
       if (sameF && dK < 7 && P.crouch && G.hiding == null && !K.seeing && K.state !== 'chase' && NOW - (G.smellSaid || -99) > 30) { G.smellSaid = NOW; krampusSay('I can smell you, little one', 0.9); }
     }
     huntVoices(dt);
-    if (G.manq) for (const m of G.manq) {   // when nobody's looking, they turn to face you and come a step closer
-      const dx = m.x - P.x, dz = m.z - P.z, dd = Math.hypot(dx, dz), seen = floorOf(m.y) === floorOf(P.y) && dd < 30 && (dx * Math.sin(P.yaw) - dz * Math.cos(P.yaw)) / Math.max(0.01, dd) > 0.55;
-      if (seen) m.unseen = 0; else m.unseen += dt;
-      if (m.unseen > 5 && dd > 5 && Math.random() < dt * 0.3) {
-        let nx = m.x - dx / dd * 1.1, nz = m.z - dz / dd * 1.1; [nx, nz] = WORLD.collide(nx, nz, m.y, 1.0, 0.25, 0.3);
-        if (Math.hypot(nx - P.x, nz - P.z) > 4) { m.x = nx; m.z = nz; }
-        m.yaw = Math.atan2(P.x - m.x, -(P.z - m.z)); m.unseen = 0; m.gest = Math.random() < 0.4 ? { name: 'point', t0: NOW - 5, dur: 9e9 } : Math.random() < 0.5 ? { name: 'shield', t0: NOW - 5, dur: 9e9 } : null; m.look = [P.x, P.y + 1.3, P.z];
-      }
-    }
     if (G.phase !== 'escape') micHear(dt); if (mode !== 'play') return;
     updateKrampus(dt); if (mode !== 'play') return;
     updateBrother(dt);
